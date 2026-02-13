@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <!-- ============================================================
+       STOCKYA — Archivo principal HTML
+       Archivo: index.html
+       Descripción: Estructura de todas las pantallas del MVP
+       Para editar estilos → css/styles.css
+       Para editar lógica  → js/app.js
+  ============================================================ -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stockya — Control de Stock Simple</title>
+
+  <!-- Fuentes de Google: Syne (títulos) + DM Sans (cuerpo) -->
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+
+  <!-- Hoja de estilos principal -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ============================================================
+     PANTALLA 1: LOGIN
+     Lo primero que ve el usuario al entrar a la app
+============================================================ -->
+<div id="loginPage">
+  <div class="login-screen">
+    <div class="login-card">
+
+      <!-- Logo -->
+      <div class="login-logo">
+        <div class="logo-icon">📦</div>
+        <div class="logo-text">Stock<span>ya</span></div>
+      </div>
+
+      <!-- Tagline — modifica este texto para cambiar el mensaje -->
+      <p class="login-tagline">
+        Sabe qué se está acabando<br>antes de quedarte sin stock.
+      </p>
+
+      <!-- Formulario de login -->
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Correo electrónico</label>
+        <input class="form-input" type="email" placeholder="tu@negocio.com" value="demo@stockya.app">
+      </div>
+
+      <div class="form-group" style="margin-bottom:20px">
+        <label class="form-label">Contraseña</label>
+        <input class="form-input" type="password" placeholder="••••••••" value="demo1234">
+      </div>
+
+      <!-- Botón entrar — llama a enterApp() en js/app.js -->
+      <button class="btn-primary" style="width:100%; justify-content:center; padding:13px" onclick="enterApp()">
+        Entrar al negocio →
+      </button>
+
+      <p class="divider-text">¿Primera vez?</p>
+
+      <button class="btn-secondary" style="width:100%; justify-content:center" onclick="enterApp()">
+        Crear cuenta gratis — 30 días
+      </button>
+
+      <p style="text-align:center; font-size:11px; color:var(--muted); margin-top:20px">
+        Sin tarjeta de crédito · Cancela cuando quieras
+      </p>
+
+    </div>
+  </div>
+</div><!-- fin #loginPage -->
+
+
+<!-- ============================================================
+     APP PRINCIPAL (oculta hasta hacer login)
+============================================================ -->
+<div id="appMain" style="display:none">
+
+  <!-- Botón menú para móvil -->
+  <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+  <!-- Fondo oscuro al abrir sidebar en móvil -->
+  <div class="sidebar-backdrop" id="backdrop" onclick="toggleSidebar()"></div>
+
+
+  <!-- ==========================
+       SIDEBAR — Navegación lateral
+  ========================== -->
+  <nav class="sidebar" id="sidebar">
+
+    <!-- Logo -->
+    <div class="logo-block">
+      <div class="logo-icon">📦</div>
+      <div class="logo-text">Stock<span>ya</span></div>
+    </div>
+
+    <!-- Sección: Principal -->
+    <span class="nav-label">Principal</span>
+
+    <button class="nav-item active" id="nav-dashboard" onclick="showScreen('dashboard')">
+      <span class="nav-icon">🏠</span> Dashboard
+    </button>
+
+    <button class="nav-item" id="nav-productos" onclick="showScreen('productos')">
+      <span class="nav-icon">📋</span> Productos
+    </button>
+
+    <button class="nav-item" id="nav-movimientos" onclick="showScreen('movimientos')">
+      <span class="nav-icon">🔄</span> Movimientos
+    </button>
+
+    <!-- Sección: Análisis -->
+    <span class="nav-label">Análisis</span>
+
+    <!-- El badge rojo muestra la cantidad de alertas activas -->
+    <button class="nav-item" id="nav-alertas" onclick="showScreen('alertas')">
+      <span class="nav-icon">🔔</span> Alertas
+      <span class="nav-badge" id="alertBadge">3</span>
+    </button>
+
+    <button class="nav-item" id="nav-reportes" onclick="showScreen('reportes')">
+      <span class="nav-icon">📊</span> Reportes
+    </button>
+
+    <!-- Perfil del usuario en la parte inferior -->
+    <div class="sidebar-footer">
+      <div class="user-row">
+        <div class="avatar">JR</div><!-- Iniciales del usuario -->
+        <div class="user-info">
+          <div class="user-name">Juan Rodríguez</div>
+          <div class="user-plan">✦ Plan Activo</div>
+        </div>
+      </div>
+    </div>
+
+  </nav><!-- fin sidebar -->
+
+
+  <!-- ==========================
+       CONTENIDO PRINCIPAL
+  ========================== -->
+  <main class="main-content">
+
+
+    <!-- ==========================================
+         PANTALLA 2: DASHBOARD
+         La primera pantalla que se ve al entrar
+    ========================================== -->
+    <div class="screen active" id="screen-dashboard">
+
+      <div class="page-header">
+        <div>
+          <div class="page-title">Buen día, Juan 👋</div>
+          <div class="page-subtitle">Miércoles 11 de junio · Minimarket El Rincón</div>
+        </div>
+        <button class="btn-primary" onclick="openModal()">+ Agregar producto</button>
+      </div>
+
+      <!-- Tarjetas de resumen rápido -->
+      <div class="stats-grid">
+        <div class="stat-card verde">
+          <div class="stat-label">PRODUCTOS EN STOCK</div>
+          <div class="stat-value">142</div>
+          <div class="stat-trend">↑ 3 agregados esta semana</div>
+        </div>
+        <div class="stat-card rojo">
+          <div class="stat-label">BAJO STOCK 🔴</div>
+          <div class="stat-value">3</div>
+          <div class="stat-trend">Requieren reposición urgente</div>
+        </div>
+        <div class="stat-card amarillo">
+          <div class="stat-label">ALERTA AMARILLA</div>
+          <div class="stat-value">7</div>
+          <div class="stat-trend">Stock llegando al mínimo</div>
+        </div>
+        <div class="stat-card azul">
+          <div class="stat-label">VALOR INVENTARIO</div>
+          <div class="stat-value">$842K</div>
+          <div class="stat-trend">CLP estimado en bodega</div>
+        </div>
+      </div>
+
+      <!-- Dos columnas: alertas urgentes + gráfico semanal -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px">
+
+        <!-- Alertas urgentes del día -->
+        <div class="card">
+          <div class="card-title">
+            🚨 Requieren atención ahora
+            <span style="font-size:12px;color:var(--muted);font-family:var(--font-body);font-weight:400">ver todas →</span>
+          </div>
+          <div class="alert-list">
+            <div class="alert-item rojo">
+              <div class="alert-emoji">🥛</div>
+              <div class="alert-info">
+                <div class="alert-name">Leche entera 1L</div>
+                <div class="alert-detail">Mín: 20 unidades</div>
+              </div>
+              <div class="alert-qty">2</div>
+            </div>
+            <div class="alert-item rojo">
+              <div class="alert-emoji">🍞</div>
+              <div class="alert-info">
+                <div class="alert-name">Pan de molde grande</div>
+                <div class="alert-detail">Mín: 10 unidades</div>
+              </div>
+              <div class="alert-qty">1</div>
+            </div>
+            <div class="alert-item amarillo">
+              <div class="alert-emoji">🧃</div>
+              <div class="alert-info">
+                <div class="alert-name">Jugo Natural One 1L</div>
+                <div class="alert-detail">Mín: 15 unidades</div>
+              </div>
+              <div class="alert-qty">8</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mini gráfico de movimientos semanales -->
+        <div class="card">
+          <div class="card-title">📈 Movimientos esta semana</div>
+          <!-- Cada .mini-bar representa un día. Cambia el height % para ajustar -->
+          <div class="mini-chart">
+            <div class="mini-bar" style="height:35%"></div>
+            <div class="mini-bar" style="height:55%"></div>
+            <div class="mini-bar" style="height:40%"></div>
+            <div class="mini-bar" style="height:70%"></div>
+            <div class="mini-bar" style="height:45%"></div>
+            <div class="mini-bar highlight" style="height:90%"></div>
+            <div class="mini-bar" style="height:60%"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:8px; padding:0 2px">
+            <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+          </div>
+          <div style="display:flex; gap:20px; margin-top:16px">
+            <div>
+              <div style="font-size:11px; color:var(--muted)">ENTRADAS</div>
+              <div style="font-family:var(--font-head); font-size:20px; font-weight:800; color:var(--azul)">+48</div>
+            </div>
+            <div>
+              <div style="font-size:11px; color:var(--muted)">SALIDAS</div>
+              <div style="font-family:var(--font-head); font-size:20px; font-weight:800; color:var(--rojo)">-31</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- fin 2 columnas -->
+
+      <!-- Tabla de últimos movimientos -->
+      <div class="card">
+        <div class="card-title">🕐 Últimos movimientos registrados</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Tipo</th>
+                <th>Cantidad</th>
+                <th>Stock resultante</th>
+                <th>Hora</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Agua mineral 500ml</strong></td>
+                <td><span style="color:var(--azul); font-weight:600">↑ Entrada</span></td>
+                <td style="color:var(--azul); font-weight:600">+24</td>
+                <td>86 und.</td>
+                <td style="color:var(--muted)">Hoy 09:42</td>
+              </tr>
+              <tr>
+                <td><strong>Leche entera 1L</strong></td>
+                <td><span style="color:var(--rojo); font-weight:600">↓ Salida</span></td>
+                <td style="color:var(--rojo); font-weight:600">-6</td>
+                <td>2 und. ⚠️</td>
+                <td style="color:var(--muted)">Hoy 08:15</td>
+              </tr>
+              <tr>
+                <td><strong>Coca-Cola 1.5L</strong></td>
+                <td><span style="color:var(--rojo); font-weight:600">↓ Salida</span></td>
+                <td style="color:var(--rojo); font-weight:600">-12</td>
+                <td>34 und.</td>
+                <td style="color:var(--muted)">Ayer 18:30</td>
+              </tr>
+              <tr>
+                <td><strong>Arroz largo 1kg</strong></td>
+                <td><span style="color:var(--azul); font-weight:600">↑ Entrada</span></td>
+                <td style="color:var(--azul); font-weight:600">+30</td>
+                <td>62 und.</td>
+                <td style="color:var(--muted)">Ayer 14:00</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- fin screen-dashboard -->
+
+
+    <!-- ==========================================
+         PANTALLA 3: PRODUCTOS
+    ========================================== -->
+    <div class="screen" id="screen-productos">
+
+      <div class="page-header">
+        <div>
+          <div class="page-title">Mis Productos</div>
+          <div class="page-subtitle">142 productos registrados en bodega</div>
+        </div>
+        <button class="btn-primary" onclick="openModal()">+ Nuevo producto</button>
+      </div>
+
+      <!-- Barra de búsqueda y filtros -->
+      <div class="search-row">
+        <input class="search-input" placeholder="🔍  Buscar por nombre o código...">
+        <select class="filter-select">
+          <option>Todas las categorías</option>
+          <option>Lácteos</option>
+          <option>Bebestibles</option>
+          <option>Snacks</option>
+          <option>Limpieza</option>
+          <option>Granos</option>
+        </select>
+        <select class="filter-select">
+          <option>Todo el stock</option>
+          <option>🔴 Bajo stock</option>
+          <option>🟡 Stock medio</option>
+          <option>🟢 Stock ok</option>
+        </select>
+      </div>
+
+      <!-- Tabla de productos — cada fila es un producto -->
+      <div class="card" style="padding:0; overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="padding-left:20px">Producto</th>
+                <th>Categoría</th>
+                <th>Stock actual</th>
+                <th>Stock mínimo</th>
+                <th>Precio venta</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Fila producto 1: CRÍTICO -->
+              <tr onclick="showToast('✏️ Editando producto...')">
+                <td style="padding-left:20px">
+                  <strong>Leche entera 1L</strong>
+                  <br><span style="font-size:11px; color:var(--muted)">Código: LAC-001</span>
+                </td>
+                <td>🥛 Lácteos</td>
+                <td>
+                  <div class="stock-bar-wrap">
+                    <span style="font-weight:700; color:var(--rojo)">2</span>
+                    <div class="stock-bar-track">
+                      <div class="stock-bar-fill critico" style="width:10%"></div>
+                    </div>
+                  </div>
+                </td>
+                <td style="color:var(--muted)">20 und.</td>
+                <td>$1.190</td>
+                <td><span class="badge critico"><span class="badge-dot"></span>Crítico</span></td>
+              </tr>
+
+              <!-- Fila producto 2: OK -->
+              <tr onclick="showToast('✏️ Editando producto...')">
+                <td style="padding-left:20px">
+                  <strong>Coca-Cola 1.5L</strong>
+                  <br><span style="font-size:11px; color:var(--muted)">Código: BEB-003</span>
+                </td>
+                <td>🥤 Bebestibles</td>
+                <td>
+                  <div class="stock-bar-wrap">
+                    <span style="font-weight:700; color:var(--verde)">34</span>
+                    <div class="stock-bar-track">
+                      <div class="stock-bar-fill ok" style="width:68%"></div>
+                    </div>
+                  </div>
+                </td>
+                <td style="color:var(--muted)">10 und.</td>
+                <td>$1.490</td>
+                <td><span class="badge ok"><span class="badge-dot"></span>OK</span></td>
+              </tr>
+
+              <!-- Fila producto 3: CRÍTICO -->
+              <tr onclick="showToast('✏️ Editando producto...')">
+                <td style="padding-left:20px">
+                  <strong>Pan de molde grande</strong>
+                  <br><span style="font-size:11px; color:var(--muted)">Código: PAN-002</span>
+                </td>
+                <td>🍞 Panadería</td>
+                <td>
+                  <div class="stock-bar-wrap">
+                    <span style="font-weight:700; color:var(--rojo)">1</span>
+                    <div class="stock-bar-track">
+                      <div class="stock-bar-fill critico" style="width:5%"></div>
+                    </div>
+                  </div>
+                </td>
+                <td style="color:var(--muted)">10 und.</td>
+                <td>$2.290</td>
+                <td><span class="badge critico"><span class="badge-dot"></span>Crítico</span></td>
+              </tr>
+
+              <!-- Fila producto 4: ALERTA -->
+              <tr onclick="showToast('✏️ Editando producto...')">
+                <td style="padding-left:20px">
+                  <strong>Jugo Natural One 1L</strong>
+                  <br><span style="font-size:11px; color:var(--muted)">Código: BEB-011</span>
+                </td>
+                <td>🧃 Bebestibles</td>
+                <td>
+                  <div class="stock-bar-wrap">
+                    <span style="font-weight:700; color:var(--amarillo)">8</span>
+                    <div class="stock-bar-track">
+                      <div class="stock-bar-fill alerta" style="width:35%"></div>
+                    </div>
+                  </div>
+                </td>
+                <td style="color:var(--muted)">15 und.</td>
+                <td>$1.990</td>
+                <td><span class="badge alerta"><span class="badge-dot"></span>Alerta</span></td>
+              </tr>
+
+              <!-- Fila producto 5: OK -->
+              <tr onclick="showToast('✏️ Editando producto...')">
+                <td style="padding-left:20px">
+                  <strong>Arroz largo 1kg</strong>
+                  <br><span style="font-size:11px; color:var(--muted)">Código: GRA-005</span>
+                </td>
+                <td>🌾 Granos</td>
+                <td>
+                  <div class="stock-bar-wrap">
+                    <span style="font-weight:700; color:var(--verde)">62</span>
+                    <div class="stock-bar-track">
+                      <div class="stock-bar-fill ok" style="width:82%"></div>
+                    </div>
+                  </div>
+                </td>
+                <td style="color:var(--muted)">15 und.</td>
+                <td>$1.350</td>
+                <td><span class="badge ok"><span class="badge-dot"></span>OK</span></td>
+              </tr>
+
+              <!-- Fila producto 6: OK -->
+              <tr onclick="showToast('✏️ Editando producto...')">
+                <td style="padding-left:20px">
+                  <strong>Agua mineral 500ml</strong>
+                  <br><span style="font-size:11px; color:var(--muted)">Código: BEB-001</span>
+                </td>
+                <td>💧 Bebestibles</td>
+                <td>
+                  <div class="stock-bar-wrap">
+                    <span style="font-weight:700; color:var(--verde)">86</span>
+                    <div class="stock-bar-track">
+                      <div class="stock-bar-fill ok" style="width:95%"></div>
+                    </div>
+                  </div>
+                </td>
+                <td style="color:var(--muted)">20 und.</td>
+                <td>$450</td>
+                <td><span class="badge ok"><span class="badge-dot"></span>OK</span></td>
+              </tr>
+
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- fin screen-productos -->
+
+
+    <!-- ==========================================
+         PANTALLA 4: MOVIMIENTOS
+    ========================================== -->
+    <div class="screen" id="screen-movimientos">
+
+      <div class="page-header">
+        <div>
+          <div class="page-title">Movimientos</div>
+          <div class="page-subtitle">Registro de entradas y salidas de bodega</div>
+        </div>
+        <button class="btn-primary" onclick="showToast('📝 Registrando movimiento...')">+ Registrar movimiento</button>
+      </div>
+
+      <!-- Tabs para filtrar tipo de movimiento -->
+      <div class="mov-type-tabs">
+        <button class="mov-tab active all"    onclick="filterMov(this,'all')">Todos</button>
+        <button class="mov-tab entrada"       onclick="filterMov(this,'entrada')">↑ Entradas</button>
+        <button class="mov-tab salida"        onclick="filterMov(this,'salida')">↓ Salidas</button>
+      </div>
+
+      <!-- Tabla de movimientos — data-type define si es entrada o salida -->
+      <div class="card" style="padding:0; overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="padding-left:20px">Producto</th>
+                <th>Tipo</th>
+                <th>Cantidad</th>
+                <th>Stock anterior</th>
+                <th>Stock nuevo</th>
+                <th>Fecha / Hora</th>
+                <th>Registrado por</th>
+              </tr>
+            </thead>
+            <tbody id="movTableBody">
+              <tr data-type="entrada">
+                <td style="padding-left:20px"><strong>Agua mineral 500ml</strong></td>
+                <td><span class="mov-icon-entrada" style="font-weight:700">↑ Entrada</span></td>
+                <td style="color:var(--azul); font-weight:700">+24</td>
+                <td style="color:var(--muted)">62 und.</td>
+                <td><strong>86 und.</strong></td>
+                <td style="color:var(--muted)">Hoy 09:42</td>
+                <td style="color:var(--muted)">Juan R.</td>
+              </tr>
+              <tr data-type="salida">
+                <td style="padding-left:20px"><strong>Leche entera 1L</strong></td>
+                <td><span class="mov-icon-salida" style="font-weight:700">↓ Salida</span></td>
+                <td style="color:var(--rojo); font-weight:700">-6</td>
+                <td style="color:var(--muted)">8 und.</td>
+                <td><strong>2 und.</strong></td>
+                <td style="color:var(--muted)">Hoy 08:15</td>
+                <td style="color:var(--muted)">Juan R.</td>
+              </tr>
+              <tr data-type="salida">
+                <td style="padding-left:20px"><strong>Coca-Cola 1.5L</strong></td>
+                <td><span class="mov-icon-salida" style="font-weight:700">↓ Salida</span></td>
+                <td style="color:var(--rojo); font-weight:700">-12</td>
+                <td style="color:var(--muted)">46 und.</td>
+                <td><strong>34 und.</strong></td>
+                <td style="color:var(--muted)">Ayer 18:30</td>
+                <td style="color:var(--muted)">María G.</td>
+              </tr>
+              <tr data-type="entrada">
+                <td style="padding-left:20px"><strong>Arroz largo 1kg</strong></td>
+                <td><span class="mov-icon-entrada" style="font-weight:700">↑ Entrada</span></td>
+                <td style="color:var(--azul); font-weight:700">+30</td>
+                <td style="color:var(--muted)">32 und.</td>
+                <td><strong>62 und.</strong></td>
+                <td style="color:var(--muted)">Ayer 14:00</td>
+                <td style="color:var(--muted)">Juan R.</td>
+              </tr>
+              <tr data-type="salida">
+                <td style="padding-left:20px"><strong>Pan de molde grande</strong></td>
+                <td><span class="mov-icon-salida" style="font-weight:700">↓ Salida</span></td>
+                <td style="color:var(--rojo); font-weight:700">-8</td>
+                <td style="color:var(--muted)">9 und.</td>
+                <td><strong>1 und.</strong></td>
+                <td style="color:var(--muted)">Ayer 11:20</td>
+                <td style="color:var(--muted)">Juan R.</td>
+              </tr>
+              <tr data-type="entrada">
+                <td style="padding-left:20px"><strong>Aceite vegetal 1L</strong></td>
+                <td><span class="mov-icon-entrada" style="font-weight:700">↑ Entrada</span></td>
+                <td style="color:var(--azul); font-weight:700">+12</td>
+                <td style="color:var(--muted)">4 und.</td>
+                <td><strong>16 und.</strong></td>
+                <td style="color:var(--muted)">Lun 10:05</td>
+                <td style="color:var(--muted)">María G.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- fin screen-movimientos -->
+
+
+    <!-- ==========================================
+         PANTALLA 5: ALERTAS
+    ========================================== -->
+    <div class="screen" id="screen-alertas">
+
+      <div class="page-header">
+        <div>
+          <div class="page-title">Centro de Alertas 🔔</div>
+          <div class="page-subtitle">10 productos requieren tu atención</div>
+        </div>
+        <button class="btn-secondary" onclick="showToast('✓ Marcadas como revisadas')">✓ Marcar todas como vistas</button>
+      </div>
+
+      <!-- Resumen de alertas -->
+      <div class="stats-grid" style="margin-bottom:24px">
+        <div class="stat-card rojo">
+          <div class="stat-label">CRÍTICOS 🔴</div>
+          <div class="stat-value">3</div>
+          <div class="stat-trend">Pedir hoy mismo</div>
+        </div>
+        <div class="stat-card amarillo">
+          <div class="stat-label">EN ALERTA 🟡</div>
+          <div class="stat-value">7</div>
+          <div class="stat-trend">Pedir esta semana</div>
+        </div>
+      </div>
+
+      <!-- Lista de alertas críticas -->
+      <div class="card-title" style="margin-bottom:14px; font-family:var(--font-head); font-size:15px; font-weight:700">
+        🔴 Stock Crítico — Pedir urgente
+      </div>
+
+      <div class="alert-big-list" style="margin-bottom:28px">
+        <div class="alert-big-item critico">
+          <div class="alert-icon-big critico">🥛</div>
+          <div class="alert-big-info">
+            <div class="alert-big-name">Leche entera 1L</div>
+            <div class="alert-big-detail">Stock mínimo configurado: 20 und. · Categoría: Lácteos</div>
+          </div>
+          <div class="alert-big-action">
+            <div class="alert-stock-num critico">2 und.</div>
+            <button class="btn-primary" style="font-size:12px; padding:7px 14px" onclick="showToast('✅ ¡Movimiento registrado!')">+ Registrar entrada</button>
+          </div>
+        </div>
+
+        <div class="alert-big-item critico">
+          <div class="alert-icon-big critico">🍞</div>
+          <div class="alert-big-info">
+            <div class="alert-big-name">Pan de molde grande</div>
+            <div class="alert-big-detail">Stock mínimo configurado: 10 und. · Categoría: Panadería</div>
+          </div>
+          <div class="alert-big-action">
+            <div class="alert-stock-num critico">1 und.</div>
+            <button class="btn-primary" style="font-size:12px; padding:7px 14px" onclick="showToast('✅ ¡Movimiento registrado!')">+ Registrar entrada</button>
+          </div>
+        </div>
+
+        <div class="alert-big-item critico">
+          <div class="alert-icon-big critico">🧈</div>
+          <div class="alert-big-info">
+            <div class="alert-big-name">Margarina 500g</div>
+            <div class="alert-big-detail">Stock mínimo configurado: 12 und. · Categoría: Lácteos</div>
+          </div>
+          <div class="alert-big-action">
+            <div class="alert-stock-num critico">3 und.</div>
+            <button class="btn-primary" style="font-size:12px; padding:7px 14px" onclick="showToast('✅ ¡Movimiento registrado!')">+ Registrar entrada</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de alertas medias -->
+      <div class="card-title" style="margin-bottom:14px; font-family:var(--font-head); font-size:15px; font-weight:700">
+        🟡 Stock en Alerta — Pedir pronto
+      </div>
+
+      <div class="alert-big-list">
+        <div class="alert-big-item alerta">
+          <div class="alert-icon-big alerta">🧃</div>
+          <div class="alert-big-info">
+            <div class="alert-big-name">Jugo Natural One 1L</div>
+            <div class="alert-big-detail">Stock mínimo configurado: 15 und. · Actual: 8 und.</div>
+          </div>
+          <div class="alert-big-action">
+            <div class="alert-stock-num alerta">8 und.</div>
+            <button class="btn-secondary" style="font-size:12px; padding:7px 14px" onclick="showToast('✅ ¡Movimiento registrado!')">+ Entrada</button>
+          </div>
+        </div>
+
+        <div class="alert-big-item alerta">
+          <div class="alert-icon-big alerta">🧻</div>
+          <div class="alert-big-info">
+            <div class="alert-big-name">Papel higiénico doble hoja</div>
+            <div class="alert-big-detail">Stock mínimo configurado: 10 packs · Actual: 5 packs</div>
+          </div>
+          <div class="alert-big-action">
+            <div class="alert-stock-num alerta">5 packs</div>
+            <button class="btn-secondary" style="font-size:12px; padding:7px 14px" onclick="showToast('✅ ¡Movimiento registrado!')">+ Entrada</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- fin screen-alertas -->
+
+
+    <!-- ==========================================
+         PANTALLA 6: REPORTES
+    ========================================== -->
+    <div class="screen" id="screen-reportes">
+
+      <div class="page-header">
+        <div>
+          <div class="page-title">Reportes</div>
+          <div class="page-subtitle">Análisis de tu inventario y rotación</div>
+        </div>
+        <div style="display:flex; gap:10px">
+          <select class="filter-select">
+            <option>Esta semana</option>
+            <option>Este mes</option>
+            <option>Últimos 30 días</option>
+          </select>
+          <button class="btn-secondary" onclick="showToast('📥 Exportando reporte...')">📥 Exportar</button>
+        </div>
+      </div>
+
+      <!-- Métricas clave del período -->
+      <div class="stats-grid" style="margin-bottom:24px">
+        <div class="stat-card verde">
+          <div class="stat-label">MARGEN BRUTO EST.</div>
+          <div class="stat-value">31%</div>
+          <div class="stat-trend">Promedio del mes</div>
+        </div>
+        <div class="stat-card azul">
+          <div class="stat-label">ROTACIÓN TOTAL</div>
+          <div class="stat-value">248</div>
+          <div class="stat-trend">Unidades vendidas (est.)</div>
+        </div>
+        <div class="stat-card amarillo">
+          <div class="stat-label">VALOR BODEGA</div>
+          <div class="stat-value">$842K</div>
+          <div class="stat-trend">CLP en inventario</div>
+        </div>
+      </div>
+
+      <!-- Gráficos en dos columnas -->
+      <div class="report-grid">
+
+        <!-- Gráfico de barras por categoría -->
+        <div class="card">
+          <div class="card-title">📦 Movimientos por Categoría</div>
+          <div class="chart-placeholder">
+            <!-- Cada barra representa una categoría. Cambia el height% para ajustar -->
+            <div class="chart-bar-v" style="background: linear-gradient(to top, #5B8EFF, #8AADFF); height: 80%"><span>Bebestibles</span></div>
+            <div class="chart-bar-v" style="background: linear-gradient(to top, var(--verde), #00F59B); height: 55%"><span>Lácteos</span></div>
+            <div class="chart-bar-v" style="background: linear-gradient(to top, var(--amarillo), #FFD560); height: 40%"><span>Granos</span></div>
+            <div class="chart-bar-v" style="background: linear-gradient(to top, #FF6B9D, #FFB3CC); height: 35%"><span>Panadería</span></div>
+            <div class="chart-bar-v" style="background: linear-gradient(to top, #A78BFA, #C4B5FD); height: 25%"><span>Limpieza</span></div>
+          </div>
+          <div style="display:flex; justify-content:space-around; font-size:11px; color:var(--muted); margin-top:10px">
+            <span>💧 Beb.</span><span>🥛 Lác.</span><span>🌾 Gra.</span><span>🍞 Pan.</span><span>🧹 Lim.</span>
+          </div>
+        </div>
+
+        <!-- Top 5 productos con más movimiento -->
+        <div class="card">
+          <div class="card-title">🏆 Top Productos más Movidos</div>
+          <div class="top-products">
+            <div class="top-product-row">
+              <div class="top-rank gold">1</div>
+              <div style="flex:1">
+                <div style="font-size:13px; font-weight:500; margin-bottom:5px">Agua mineral 500ml</div>
+                <div class="top-bar-track"><div class="top-bar-fill" style="width:100%"></div></div>
+              </div>
+              <div class="top-qty">86 und.</div>
+            </div>
+            <div class="top-product-row">
+              <div class="top-rank silver">2</div>
+              <div style="flex:1">
+                <div style="font-size:13px; font-weight:500; margin-bottom:5px">Coca-Cola 1.5L</div>
+                <div class="top-bar-track"><div class="top-bar-fill" style="width:78%"></div></div>
+              </div>
+              <div class="top-qty">67 und.</div>
+            </div>
+            <div class="top-product-row">
+              <div class="top-rank bronze">3</div>
+              <div style="flex:1">
+                <div style="font-size:13px; font-weight:500; margin-bottom:5px">Leche entera 1L</div>
+                <div class="top-bar-track"><div class="top-bar-fill" style="width:58%"></div></div>
+              </div>
+              <div class="top-qty">50 und.</div>
+            </div>
+            <div class="top-product-row">
+              <div class="top-rank">4</div>
+              <div style="flex:1">
+                <div style="font-size:13px; font-weight:500; margin-bottom:5px">Pan de molde grande</div>
+                <div class="top-bar-track"><div class="top-bar-fill" style="width:42%"></div></div>
+              </div>
+              <div class="top-qty">36 und.</div>
+            </div>
+            <div class="top-product-row">
+              <div class="top-rank">5</div>
+              <div style="flex:1">
+                <div style="font-size:13px; font-weight:500; margin-bottom:5px">Arroz largo 1kg</div>
+                <div class="top-bar-track"><div class="top-bar-fill" style="width:30%"></div></div>
+              </div>
+              <div class="top-qty">26 und.</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- fin report-grid -->
+
+    </div><!-- fin screen-reportes -->
+
+
+  </main><!-- fin main-content -->
+</div><!-- fin appMain -->
+
+
+<!-- ============================================================
+     MODAL: AGREGAR NUEVO PRODUCTO
+     Se activa al hacer clic en "+ Agregar producto" o "+ Nuevo producto"
+============================================================ -->
+<div class="modal-overlay" id="modalAgregar">
+  <div class="modal-box">
+
+    <div class="modal-header">
+      <div class="modal-title">Agregar nuevo producto</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+
+    <!-- Formulario — id="formProducto" para poder hacer reset() desde js/app.js -->
+    <form id="formProducto">
+      <div class="form-grid">
+
+        <!-- Nombre del producto — ocupa toda la fila -->
+        <div class="form-group form-full">
+          <label class="form-label">Nombre del producto *</label>
+          <input id="inputNombre" class="form-input" type="text" placeholder="Ej: Leche entera 1L">
+        </div>
+
+        <!-- Categoría -->
+        <div class="form-group">
+          <label class="form-label">Categoría</label>
+          <select class="form-input">
+            <option>Seleccionar...</option>
+            <option>Lácteos</option>
+            <option>Bebestibles</option>
+            <option>Snacks</option>
+            <option>Granos</option>
+            <option>Limpieza</option>
+            <option>Panadería</option>
+            <option>Otro</option>
+          </select>
+        </div>
+
+        <!-- Stock inicial -->
+        <div class="form-group">
+          <label class="form-label">Stock inicial (unidades) *</label>
+          <input id="inputStock" class="form-input" type="number" placeholder="0" min="0">
+        </div>
+
+        <!-- Stock mínimo para alertas -->
+        <div class="form-group">
+          <label class="form-label">Stock mínimo (alerta)</label>
+          <input class="form-input" type="number" placeholder="10" min="0">
+        </div>
+
+        <!-- Precio de compra -->
+        <div class="form-group">
+          <label class="form-label">Precio compra (CLP)</label>
+          <input class="form-input" type="number" placeholder="$0" min="0">
+        </div>
+
+        <!-- Precio de venta -->
+        <div class="form-group">
+          <label class="form-label">Precio venta (CLP)</label>
+          <input class="form-input" type="number" placeholder="$0" min="0">
+        </div>
+
+      </div><!-- fin form-grid -->
+
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button type="button" class="btn-primary"   onclick="saveProduct()">✓ Guardar producto</button>
+      </div>
+
+    </form><!-- fin formProducto -->
+
+  </div><!-- fin modal-box -->
+</div><!-- fin modal-overlay -->
+
+
+<!-- ============================================================
+     TOAST — Notificación temporal
+============================================================ -->
+<div class="toast" id="toast">
+  <span id="toastMsg">¡Guardado!</span>
+</div>
+
+
+<!-- JavaScript principal — siempre al final del body -->
+<script src="js/app.js"></script>
+
+</body>
+</html>
