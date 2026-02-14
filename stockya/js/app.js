@@ -350,7 +350,7 @@ async function cargarProductos(buscar = "", categoria = "", estado = "") {
       }
 
       // Nombre seguro para atributo HTML (escapar comillas)
-      const nombreSafe = p.nombre.replace(/\/g, "\\").replace(/'/g, "\'");
+      const nombreSafe = p.nombre.split("'").join("&apos;");
 
       return `<tr>
         <td style="padding-left:16px">
