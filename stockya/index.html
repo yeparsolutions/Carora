@@ -322,31 +322,37 @@
       <div class="page-header">
         <div>
           <div class="page-title">Mis Productos</div>
-          <div class="page-subtitle">142 productos registrados en bodega</div>
+          <div class="page-subtitle" id="prodSubtitulo">Cargando...</div>
         </div>
         <button class="btn-primary" onclick="openModal()">+ Nuevo producto</button>
       </div>
 
-      <!-- Barra de búsqueda y filtros -->
+      <!-- Filtros funcionales -->
       <div class="search-row">
-        <input class="search-input" placeholder="🔍  Buscar por nombre o código...">
-        <select class="filter-select">
-          <option>Todas las categorías</option>
+        <input id="prodBuscar" class="search-input" placeholder="🔍  Buscar por nombre, código o marca..."
+               oninput="filtrarProductos()">
+        <select id="prodCategoria" class="filter-select" onchange="filtrarProductos()">
+          <option value="">Todas las categorías</option>
           <option>Lácteos</option>
           <option>Bebestibles</option>
           <option>Snacks</option>
           <option>Limpieza</option>
           <option>Granos</option>
+          <option>Panadería</option>
+          <option>Congelados</option>
+          <option>Carnes</option>
+          <option>Frutas y Verduras</option>
+          <option>Otro</option>
         </select>
-        <select class="filter-select">
-          <option>Todo el stock</option>
-          <option>🔴 Bajo stock</option>
-          <option>🟡 Stock medio</option>
-          <option>🟢 Stock ok</option>
+        <select id="prodEstado" class="filter-select" onchange="filtrarProductos()">
+          <option value="">Todo el stock</option>
+          <option value="critico">🔴 Crítico</option>
+          <option value="alerta">🟡 En alerta</option>
+          <option value="ok">🟢 Stock ok</option>
         </select>
       </div>
 
-      <!-- Tabla de productos — cada fila es un producto -->
+      <!-- Tabla dinámica — se llena desde el backend -->
       <div class="card" style="padding:0; overflow:hidden">
         <div class="table-wrap">
           <table>
@@ -354,133 +360,20 @@
               <tr>
                 <th style="padding-left:20px">Producto</th>
                 <th>Categoría</th>
-                <th>Stock actual</th>
-                <th>Stock mínimo</th>
-                <th>Precio venta</th>
+                <th>Stock</th>
+                <th>Mínimo</th>
+                <th>P. Venta</th>
+                <th>Vence</th>
                 <th>Estado</th>
+                <th style="text-align:center">Acciones</th>
               </tr>
             </thead>
-            <tbody>
-              <!-- Fila producto 1: CRÍTICO -->
-              <tr onclick="showToast('✏️ Editando producto...')">
-                <td style="padding-left:20px">
-                  <strong>Leche entera 1L</strong>
-                  <br><span style="font-size:11px; color:var(--muted)">Código: LAC-001</span>
+            <tbody id="prodTableBody">
+              <tr>
+                <td colspan="8" style="text-align:center; color:var(--muted); padding:40px; font-size:13px">
+                  Cargando productos...
                 </td>
-                <td>🥛 Lácteos</td>
-                <td>
-                  <div class="stock-bar-wrap">
-                    <span style="font-weight:700; color:var(--rojo)">2</span>
-                    <div class="stock-bar-track">
-                      <div class="stock-bar-fill critico" style="width:10%"></div>
-                    </div>
-                  </div>
-                </td>
-                <td style="color:var(--muted)">20 und.</td>
-                <td>$1.190</td>
-                <td><span class="badge critico"><span class="badge-dot"></span>Crítico</span></td>
               </tr>
-
-              <!-- Fila producto 2: OK -->
-              <tr onclick="showToast('✏️ Editando producto...')">
-                <td style="padding-left:20px">
-                  <strong>Coca-Cola 1.5L</strong>
-                  <br><span style="font-size:11px; color:var(--muted)">Código: BEB-003</span>
-                </td>
-                <td>🥤 Bebestibles</td>
-                <td>
-                  <div class="stock-bar-wrap">
-                    <span style="font-weight:700; color:var(--verde)">34</span>
-                    <div class="stock-bar-track">
-                      <div class="stock-bar-fill ok" style="width:68%"></div>
-                    </div>
-                  </div>
-                </td>
-                <td style="color:var(--muted)">10 und.</td>
-                <td>$1.490</td>
-                <td><span class="badge ok"><span class="badge-dot"></span>OK</span></td>
-              </tr>
-
-              <!-- Fila producto 3: CRÍTICO -->
-              <tr onclick="showToast('✏️ Editando producto...')">
-                <td style="padding-left:20px">
-                  <strong>Pan de molde grande</strong>
-                  <br><span style="font-size:11px; color:var(--muted)">Código: PAN-002</span>
-                </td>
-                <td>🍞 Panadería</td>
-                <td>
-                  <div class="stock-bar-wrap">
-                    <span style="font-weight:700; color:var(--rojo)">1</span>
-                    <div class="stock-bar-track">
-                      <div class="stock-bar-fill critico" style="width:5%"></div>
-                    </div>
-                  </div>
-                </td>
-                <td style="color:var(--muted)">10 und.</td>
-                <td>$2.290</td>
-                <td><span class="badge critico"><span class="badge-dot"></span>Crítico</span></td>
-              </tr>
-
-              <!-- Fila producto 4: ALERTA -->
-              <tr onclick="showToast('✏️ Editando producto...')">
-                <td style="padding-left:20px">
-                  <strong>Jugo Natural One 1L</strong>
-                  <br><span style="font-size:11px; color:var(--muted)">Código: BEB-011</span>
-                </td>
-                <td>🧃 Bebestibles</td>
-                <td>
-                  <div class="stock-bar-wrap">
-                    <span style="font-weight:700; color:var(--amarillo)">8</span>
-                    <div class="stock-bar-track">
-                      <div class="stock-bar-fill alerta" style="width:35%"></div>
-                    </div>
-                  </div>
-                </td>
-                <td style="color:var(--muted)">15 und.</td>
-                <td>$1.990</td>
-                <td><span class="badge alerta"><span class="badge-dot"></span>Alerta</span></td>
-              </tr>
-
-              <!-- Fila producto 5: OK -->
-              <tr onclick="showToast('✏️ Editando producto...')">
-                <td style="padding-left:20px">
-                  <strong>Arroz largo 1kg</strong>
-                  <br><span style="font-size:11px; color:var(--muted)">Código: GRA-005</span>
-                </td>
-                <td>🌾 Granos</td>
-                <td>
-                  <div class="stock-bar-wrap">
-                    <span style="font-weight:700; color:var(--verde)">62</span>
-                    <div class="stock-bar-track">
-                      <div class="stock-bar-fill ok" style="width:82%"></div>
-                    </div>
-                  </div>
-                </td>
-                <td style="color:var(--muted)">15 und.</td>
-                <td>$1.350</td>
-                <td><span class="badge ok"><span class="badge-dot"></span>OK</span></td>
-              </tr>
-
-              <!-- Fila producto 6: OK -->
-              <tr onclick="showToast('✏️ Editando producto...')">
-                <td style="padding-left:20px">
-                  <strong>Agua mineral 500ml</strong>
-                  <br><span style="font-size:11px; color:var(--muted)">Código: BEB-001</span>
-                </td>
-                <td>💧 Bebestibles</td>
-                <td>
-                  <div class="stock-bar-wrap">
-                    <span style="font-weight:700; color:var(--verde)">86</span>
-                    <div class="stock-bar-track">
-                      <div class="stock-bar-fill ok" style="width:95%"></div>
-                    </div>
-                  </div>
-                </td>
-                <td style="color:var(--muted)">20 und.</td>
-                <td>$450</td>
-                <td><span class="badge ok"><span class="badge-dot"></span>OK</span></td>
-              </tr>
-
             </tbody>
           </table>
         </div>
@@ -1069,6 +962,13 @@
           <span class="settings-field-hint" id="precioVentaHint" style="color:var(--verde)"></span>
         </div>
 
+        <!-- Lote -->
+        <div class="form-group">
+          <label class="form-label">Número de lote</label>
+          <input id="inputLote" class="form-input" type="text" placeholder="Ej: LOTE-2026-001">
+          <span class="settings-field-hint">Dejar vacío si no aplica</span>
+        </div>
+
         <!-- Fecha vencimiento -->
         <div class="form-group">
           <label class="form-label">Fecha de vencimiento</label>
@@ -1160,28 +1060,104 @@
 </div>
 
 <!-- ============================================================
-     MODAL: Producto ya existe — sumar stock
+     MODAL: Editar producto existente
 ============================================================ -->
-<div class="modal-overlay" id="modalSumarStock">
-  <div class="modal-box" style="max-width:400px">
+<div class="modal-overlay" id="modalEditar">
+  <div class="modal-box">
     <div class="modal-header">
-      <div class="modal-title">📦 Producto ya registrado</div>
+      <div class="modal-title">✏️ Editar producto</div>
+      <button class="modal-close" onclick="cerrarModalEditar()">✕</button>
     </div>
-    <p style="color:var(--muted); font-size:14px; margin-bottom:16px" id="sumarStockMsg">
-      Este producto ya existe. ¿Deseas sumar al stock existente?
-    </p>
-    <div class="form-group" style="margin-bottom:16px">
-      <label class="form-label">Cantidad a sumar *</label>
-      <input id="sumarCantidad" class="form-input" type="number" placeholder="0" min="1" value="1">
-    </div>
-    <div class="form-group" style="margin-bottom:20px">
-      <label class="form-label">Número de lote (opcional)</label>
-      <input id="sumarLote" class="form-input" type="text" placeholder="Ej: LOTE-2026-001">
-    </div>
-    <div class="form-actions">
-      <button type="button" class="btn-secondary" onclick="cerrarModalSumar()">Cancelar</button>
-      <button type="button" class="btn-primary"   onclick="confirmarSumarStock()">➕ Sumar al inventario</button>
-    </div>
+    <input type="hidden" id="editId">
+    <form id="formEditar">
+      <div class="form-grid">
+
+        <div class="form-group form-full">
+          <label class="form-label">Nombre del producto *</label>
+          <input id="editNombre" class="form-input" type="text">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Código de barras</label>
+          <input id="editCodigoBarra" class="form-input" type="text">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Código interno</label>
+          <input id="editCodigo" class="form-input" type="text">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Marca</label>
+          <input id="editMarca" class="form-input" type="text">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Proveedor</label>
+          <input id="editProveedor" class="form-input" type="text">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Categoría</label>
+          <select id="editCategoria" class="form-input">
+            <option value="">Sin categoría</option>
+            <option>Lácteos</option>
+            <option>Bebestibles</option>
+            <option>Snacks</option>
+            <option>Granos</option>
+            <option>Limpieza</option>
+            <option>Panadería</option>
+            <option>Congelados</option>
+            <option>Carnes</option>
+            <option>Frutas y Verduras</option>
+            <option>Otro</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Stock mínimo 🔔</label>
+          <input id="editStockMin" class="form-input" type="number" min="0">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Precio compra</label>
+          <input id="editPrecioCompra" class="form-input" type="number" min="0"
+                 oninput="calcularPrecioVentaEditar()">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">% Ganancia</label>
+          <input id="editPorcentaje" class="form-input" type="number" min="0"
+                 oninput="calcularPrecioVentaEditar()">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Precio venta</label>
+          <input id="editPrecioVenta" class="form-input" type="number" min="0">
+          <span class="settings-field-hint" id="editPrecioHint" style="color:var(--verde)"></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Número de lote</label>
+          <input id="editLote" class="form-input" type="text">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Fecha de vencimiento</label>
+          <input id="editFechaVenc" class="form-input" type="date">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Alertar X días antes</label>
+          <input id="editDiasAlerta" class="form-input" type="number" min="1">
+        </div>
+
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" onclick="cerrarModalEditar()">Cancelar</button>
+        <button type="button" class="btn-primary" onclick="guardarEdicion()">✓ Guardar cambios</button>
+      </div>
+    </form>
   </div>
 </div>
 

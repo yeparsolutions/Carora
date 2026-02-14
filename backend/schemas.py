@@ -67,6 +67,7 @@ class ProductoBase(BaseModel):
     porcentaje_ganancia: float = 0.0            # % ganancia sobre precio compra
     fecha_vencimiento: Optional[datetime] = None
     dias_alerta_venc: int = 30                  # Dias de anticipacion para alerta
+    lote: Optional[str] = None                  # Numero de lote
 
 class ProductoCrear(ProductoBase):
     # Datos para crear un producto nuevo
@@ -86,6 +87,7 @@ class ProductoActualizar(BaseModel):
     porcentaje_ganancia: Optional[float] = None
     fecha_vencimiento: Optional[datetime] = None
     dias_alerta_venc: Optional[int] = None
+    lote: Optional[str] = None
 
 class ProductoRespuesta(ProductoBase):
     # Lo que devuelve la API

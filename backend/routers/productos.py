@@ -63,6 +63,7 @@ def producto_a_dict(p) -> dict:
         "porcentaje_ganancia": p.porcentaje_ganancia,
         "fecha_vencimiento": p.fecha_vencimiento,
         "dias_alerta_venc": p.dias_alerta_venc,
+        "lote": p.lote,
         "activo": p.activo, "created_at": p.created_at,
         "estado":      calcular_estado(p.stock_actual, p.stock_minimo),
         "estado_venc": calcular_estado_venc(p.fecha_vencimiento, p.dias_alerta_venc or 30),
@@ -175,15 +176,23 @@ def crear_producto(
     Si se envía porcentaje_ganancia y precio_compra > 0,
     calcula el precio_venta automáticamente.
     """
-    # Verificar código de barras duplicado
+    # Verificar codigo de barras duplicado
     if datos.codigo_barra:
         existe = db.query(models.Producto).filter(
             models.Producto.codigo_barra == datos.codigo_barra
         ).first()
         if existe:
+            # En vez de error, retornar el producto existente con flag especial
+            # El frontend decide si sumar o no
             raise HTTPException(
-                status_code=400,
-                detail=f"Ya existe un producto con ese código de barras: '{existe.nombre}'"
+                status_code=409,  # 409 Conflict = recurso ya existe
+                detail={
+                    "tipo": "producto_existente",
+                    "mensaje": f"El producto '{existe.nombre}' ya está registrado",
+                    "producto_id": existe.id,
+                    "nombre": existe.nombre,
+                    "stock_actual": existe.stock_actual
+                }
             )
 
     # Calcular precio de venta automáticamente si viene % ganancia
@@ -262,12 +271,13 @@ def eliminar_producto(
 
     nombre = p.nombre
 
-    # Primero eliminar movimientos relacionados (integridad referencial)
+    # Desconectar movimientos del producto antes de eliminarlo
+    # (se conservan como historial pero sin referencia al producto)
     db.query(models.Movimiento).filter(
         models.Movimiento.producto_id == producto_id
-    ).delete()
+    ).update({"producto_id": None}, synchronize_session=False)
 
-    # Luego eliminar el producto
+    # Eliminar el producto permanentemente
     db.delete(p)
     db.commit()
 
@@ -282,14 +292,16 @@ def eliminar_producto(
 def sumar_stock_existente(
     producto_id: int,
     cantidad: int,
-    nota: str = "",
     lote: str = "",
+    nota: str = "",
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
     """
-    Suma stock a un producto existente y registra el movimiento.
-    Se usa cuando el escaner detecta un producto ya registrado.
+    Suma stock a un producto existente y registra el movimiento automaticamente.
+    Se llama cuando se detecta un codigo de barras ya registrado.
+    Analogia: es como anotar en el cuaderno de bodega que llegaron
+    mas unidades del mismo producto.
     """
     p = db.query(models.Producto).filter(
         models.Producto.id == producto_id
@@ -302,7 +314,11 @@ def sumar_stock_existente(
     stock_anterior = p.stock_actual
     p.stock_actual += cantidad
 
-    # Registrar movimiento automatico
+    # Actualizar lote si se proporciona
+    if lote:
+        p.lote = lote
+
+    # Registrar movimiento de entrada automaticamente
     mov = models.Movimiento(
         producto_id    = producto_id,
         usuario_id     = usuario_actual.id,
@@ -310,7 +326,7 @@ def sumar_stock_existente(
         cantidad       = cantidad,
         stock_anterior = stock_anterior,
         stock_nuevo    = p.stock_actual,
-        nota           = nota or f"Suma de stock via escaner",
+        nota           = nota or "Entrada por codigo de barras",
         lote           = lote or None
     )
     db.add(mov)

@@ -26,6 +26,7 @@ columnas_nuevas = [
     ("porcentaje_ganancia", "FLOAT",          "0.0",   "productos"),
     ("fecha_vencimiento",   "TIMESTAMPTZ",    None,    "productos"),
     ("dias_alerta_venc",    "INTEGER",        "30",    "productos"),
+    ("lote",                "VARCHAR(100)",   None,    "productos"),
     ("lote",                "VARCHAR(100)",   None,    "movimientos"),
 ]
 
@@ -76,4 +77,15 @@ except Exception as e:
 
 cursor.close()
 conn.close()
+# Hacer producto_id nullable en movimientos (para conservar historial al eliminar producto)
+try:
+    cursor.execute("""
+        ALTER TABLE movimientos ALTER COLUMN producto_id DROP NOT NULL
+    """)
+    conn.commit()
+    print("  [+] producto_id en movimientos ahora es nullable")
+except Exception as e:
+    conn.rollback()
+    print(f"  [OK] producto_id ya era nullable o: {e}")
+
 print("\nMigracion completada.")

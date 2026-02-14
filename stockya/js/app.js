@@ -49,9 +49,14 @@ async function api(path, method = "GET", body = null) {
 
   const data = await response.json();
 
-  // Si hay error del servidor lanzar excepción con el mensaje
+  // Si hay error, lanzar con status y detail (detail puede ser string u objeto)
   if (!response.ok) {
-    throw new Error(data.detail || "Error en el servidor");
+    const err       = new Error(
+      typeof data.detail === "string" ? data.detail : (data.detail?.mensaje || "Error en el servidor")
+    );
+    err.status      = response.status;
+    err.detail      = data.detail;   // preservar objeto completo para casos como 409
+    throw err;
   }
 
   return data;
@@ -307,38 +312,54 @@ function setEl(id, valor) {
 ---------------------------- */
 async function cargarProductos(buscar = "", categoria = "", estado = "") {
   try {
-    // Construir URL con filtros opcionales
+    // Construir URL con filtros
     let url = "/productos/?";
     if (buscar)    url += `buscar=${encodeURIComponent(buscar)}&`;
     if (categoria) url += `categoria=${encodeURIComponent(categoria)}&`;
     if (estado)    url += `estado=${encodeURIComponent(estado)}&`;
 
     const productos = await api(url);
+    const tbody     = document.getElementById("prodTableBody");
+    const subtitulo = document.getElementById("prodSubtitulo");
 
-    const tbody = document.querySelector("#screen-productos .table-wrap tbody");
+    // Actualizar subtítulo con el total
+    if (subtitulo) subtitulo.textContent = `${productos.length} producto${productos.length !== 1 ? "s" : ""} registrado${productos.length !== 1 ? "s" : ""}`;
+
     if (!tbody) return;
 
     if (productos.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--muted); padding:32px">
-        No hay productos registrados aún
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--muted); padding:40px; font-size:13px">
+        ${buscar || categoria || estado ? "No se encontraron productos con ese filtro" : "Aún no hay productos — haz clic en '+ Nuevo producto' para comenzar"}
       </td></tr>`;
       return;
     }
 
-    // Renderizar filas de la tabla con datos reales y botón eliminar
+    // Renderizar cada producto con botones de editar y eliminar
     tbody.innerHTML = productos.map(p => {
-      const pct    = Math.min(Math.round((p.stock_actual / Math.max(p.stock_minimo * 5, 1)) * 100), 100);
-      const color  = p.estado === "critico" ? "var(--rojo)" : p.estado === "alerta" ? "var(--amarillo)" : "var(--verde)";
+      const pct   = Math.min(Math.round((p.stock_actual / Math.max(p.stock_minimo * 5, 1)) * 100), 100);
+      const color = p.estado === "critico" ? "var(--rojo)" : p.estado === "alerta" ? "var(--amarillo)" : "var(--verde)";
       const precio = p.precio_venta ? `$${p.precio_venta.toLocaleString("es-CL")}` : "—";
-      // Icono de vencimiento si aplica
-      const vencIcon = p.estado_venc === "vencido"  ? ' <span title="Vencido" style="color:var(--rojo)">⚠️</span>'
-                     : p.estado_venc === "proximo"  ? ' <span title="Por vencer" style="color:var(--amarillo)">⏰</span>'
-                     : "";
+
+      // Vencimiento — mostrar fecha corta o estado
+      let venceStr = "—";
+      if (p.fecha_vencimiento) {
+        const dias = Math.ceil((new Date(p.fecha_vencimiento) - new Date()) / 86400000);
+        venceStr = p.estado_venc === "vencido"  ? `<span style="color:var(--rojo); font-weight:600">Vencido</span>`
+                 : p.estado_venc === "proximo"  ? `<span style="color:var(--amarillo); font-weight:600">${dias}d ⏰</span>`
+                 : new Date(p.fecha_vencimiento).toLocaleDateString("es-CL");
+      }
+
+      // Nombre seguro para atributo HTML (escapar comillas)
+      const nombreSafe = p.nombre.replace(/\/g, "\\").replace(/'/g, "\'");
 
       return `<tr>
-        <td style="padding-left:20px">
-          <strong>${p.nombre}${vencIcon}</strong>
-          <br><span style="font-size:11px; color:var(--muted)">${p.codigo_barra || p.codigo || "Sin código"}</span>
+        <td style="padding-left:16px">
+          <strong>${p.nombre}</strong>
+          <div style="font-size:11px; color:var(--muted); margin-top:2px">
+            ${p.codigo_barra ? "📦 " + p.codigo_barra : p.codigo ? p.codigo : "Sin código"}
+            ${p.marca ? " · " + p.marca : ""}
+            ${p.lote ? " · Lote: " + p.lote : ""}
+          </div>
         </td>
         <td>${p.categoria || "—"}</td>
         <td>
@@ -349,48 +370,47 @@ async function cargarProductos(buscar = "", categoria = "", estado = "") {
             </div>
           </div>
         </td>
-        <td style="color:var(--muted)">${p.stock_minimo} und.</td>
+        <td style="color:var(--muted)">${p.stock_minimo}</td>
         <td>${precio}</td>
+        <td style="font-size:12px">${venceStr}</td>
         <td><span class="badge ${p.estado}"><span class="badge-dot"></span>${p.estado === "critico" ? "Crítico" : p.estado === "alerta" ? "Alerta" : "OK"}</span></td>
-        <td>
-          <button onclick="abrirModalEliminar(${p.id}, '${p.nombre.replace(/'/g, "\\'")}')"
-                  style="background:none; border:1px solid var(--border); border-radius:8px; color:var(--muted);
-                         padding:5px 10px; cursor:pointer; font-size:13px; transition:all 0.2s"
-                  onmouseover="this.style.borderColor='var(--rojo)';this.style.color='var(--rojo)'"
-                  onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-            🗑️
-          </button>
+        <td style="text-align:center">
+          <div style="display:flex; gap:6px; justify-content:center">
+            <button onclick="abrirModalEditar(${p.id})"
+                    title="Editar producto"
+                    style="background:none; border:1px solid var(--border); border-radius:8px; color:var(--muted);
+                           padding:5px 9px; cursor:pointer; font-size:13px; transition:all 0.2s"
+                    onmouseover="this.style.borderColor='var(--azul)';this.style.color='var(--azul)'"
+                    onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+              ✏️
+            </button>
+            <button onclick="abrirModalEliminar(${p.id}, '${nombreSafe}')"
+                    title="Eliminar producto"
+                    style="background:none; border:1px solid var(--border); border-radius:8px; color:var(--muted);
+                           padding:5px 9px; cursor:pointer; font-size:13px; transition:all 0.2s"
+                    onmouseover="this.style.borderColor='var(--rojo)';this.style.color='var(--rojo)'"
+                    onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+              🗑️
+            </button>
+          </div>
         </td>
       </tr>`;
     }).join("");
 
-    // Actualizar contador en el subtítulo
-    const sub = document.querySelector("#screen-productos .page-subtitle");
-    if (sub) sub.textContent = `${productos.length} productos registrados en bodega`;
-
   } catch (error) {
-    showToast("❌ Error cargando productos: " + error.message);
+    console.error("Error cargando productos:", error);
   }
 }
 
-
-/* ----------------------------
-   editarProducto(id)
-   Placeholder para editar — lo desarrollamos luego
----------------------------- */
-function editarProducto(id) {
-  showToast(`✏️ Editando producto #${id}...`);
+/* Filtrar productos en tiempo real desde los controles de la pantalla */
+function filtrarProductos() {
+  const buscar    = document.getElementById("prodBuscar")?.value    || "";
+  const categoria = document.getElementById("prodCategoria")?.value || "";
+  const estado    = document.getElementById("prodEstado")?.value    || "";
+  cargarProductos(buscar, categoria, estado);
 }
 
 
-/* ============================================================
-   MOVIMIENTOS — Carga datos reales
-   ============================================================ */
-
-/* ----------------------------
-   cargarMovimientos()
-   Obtiene movimientos reales del backend
----------------------------- */
 async function cargarMovimientos(tipo = "") {
   try {
     let url = "/movimientos/?limit=50";
@@ -580,42 +600,125 @@ async function buscarPorCodigo(codigo) {
 
 
 /* ----------------------------
-   Modal sumar stock — cuando producto ya existe
+   Funciones de sumar stock — se llaman directamente desde saveProduct
+   sin popup adicional: usa la cantidad y lote ya ingresados en el formulario
 ---------------------------- */
-let productoExistenteId = null;
-
-function abrirModalSumar(id, nombre, stockActual) {
-  productoExistenteId = id;
-  const msg = document.getElementById("sumarStockMsg");
-  if (msg) msg.textContent = `"${nombre}" ya está registrado con ${stockActual} unidades. ¿Deseas sumar al stock existente?`;
-  document.getElementById("sumarCantidad").value = "1";
-  document.getElementById("sumarLote").value = "";
-  document.getElementById("modalSumarStock").classList.add("open");
+async function sumarStockDirecto(productoId, cantidad, lote) {
+  // Analogia: es como sumar una nueva caja al inventario existente
+  // sin preguntar de nuevo — la cantidad ya fue ingresada en el formulario
+  const params = `cantidad=${cantidad}${lote ? "&lote=" + encodeURIComponent(lote) : ""}`;
+  return await api(`/productos/${productoId}/sumar-stock?${params}`, "POST");
 }
 
-function cerrarModalSumar() {
-  document.getElementById("modalSumarStock").classList.remove("open");
-  productoExistenteId = null;
+
+/* ============================================================
+   EDITAR PRODUCTO
+   Analogía: abrir la ficha del producto y corregir los datos
+   ============================================================ */
+
+async function abrirModalEditar(id) {
+  try {
+    // Cargar datos actuales del producto desde el backend
+    const p = await api(`/productos/${id}`);
+
+    // Rellenar todos los campos del modal
+    document.getElementById("editId").value           = p.id;
+    document.getElementById("editNombre").value       = p.nombre        || "";
+    document.getElementById("editCodigoBarra").value  = p.codigo_barra  || "";
+    document.getElementById("editCodigo").value       = p.codigo        || "";
+    document.getElementById("editMarca").value        = p.marca         || "";
+    document.getElementById("editProveedor").value    = p.proveedor     || "";
+    document.getElementById("editStockMin").value     = p.stock_minimo  || 0;
+    document.getElementById("editPrecioCompra").value = p.precio_compra || 0;
+    document.getElementById("editPorcentaje").value   = p.porcentaje_ganancia || 0;
+    document.getElementById("editPrecioVenta").value  = p.precio_venta  || 0;
+    document.getElementById("editLote").value         = p.lote          || "";
+    document.getElementById("editDiasAlerta").value   = p.dias_alerta_venc || 30;
+
+    // Fecha de vencimiento — convertir a formato date del input
+    if (p.fecha_vencimiento) {
+      document.getElementById("editFechaVenc").value =
+        new Date(p.fecha_vencimiento).toISOString().split("T")[0];
+    } else {
+      document.getElementById("editFechaVenc").value = "";
+    }
+
+    // Seleccionar categoría correcta
+    const catSelect = document.getElementById("editCategoria");
+    for (let opt of catSelect.options) {
+      opt.selected = opt.value === (p.categoria || "");
+    }
+
+    document.getElementById("modalEditar").classList.add("open");
+
+  } catch (error) {
+    showToast("❌ No se pudo cargar el producto: " + error.message);
+  }
 }
 
-async function confirmarSumarStock() {
-  const cantidad = parseInt(document.getElementById("sumarCantidad").value) || 0;
-  const lote     = document.getElementById("sumarLote").value.trim();
-  if (cantidad <= 0) { showToast("⚠️ La cantidad debe ser mayor a 0"); return; }
+function cerrarModalEditar() {
+  document.getElementById("modalEditar").classList.remove("open");
+  document.getElementById("editPrecioHint").textContent = "";
+}
+
+/* Calcular precio venta en el modal de edición */
+function calcularPrecioVentaEditar() {
+  const compra     = parseFloat(document.getElementById("editPrecioCompra").value) || 0;
+  const porcentaje = parseFloat(document.getElementById("editPorcentaje").value)   || 0;
+  const hint       = document.getElementById("editPrecioHint");
+  if (compra > 0 && porcentaje > 0) {
+    const venta = Math.round(compra * (1 + porcentaje / 100));
+    document.getElementById("editPrecioVenta").value = venta;
+    if (hint) hint.textContent = `Ganancia: $${(venta - compra).toLocaleString("es-CL")} por unidad`;
+  } else {
+    if (hint) hint.textContent = "";
+  }
+}
+
+async function guardarEdicion() {
+  const id          = document.getElementById("editId").value;
+  const nombre      = document.getElementById("editNombre").value.trim();
+  const codigoBarra = document.getElementById("editCodigoBarra").value.trim();
+  const codigo      = document.getElementById("editCodigo").value.trim();
+  const marca       = document.getElementById("editMarca").value.trim();
+  const proveedor   = document.getElementById("editProveedor").value.trim();
+  const categoria   = document.getElementById("editCategoria").value;
+  const stockMin    = document.getElementById("editStockMin").value;
+  const precioComp  = document.getElementById("editPrecioCompra").value;
+  const precioVent  = document.getElementById("editPrecioVenta").value;
+  const porcentaje  = document.getElementById("editPorcentaje").value;
+  const lote        = document.getElementById("editLote").value.trim();
+  const fechaVenc   = document.getElementById("editFechaVenc").value;
+  const diasAlerta  = document.getElementById("editDiasAlerta").value;
+
+  if (!nombre) { showToast("⚠️ El nombre es obligatorio"); return; }
 
   try {
-    const params = `cantidad=${cantidad}${lote ? "&lote=" + encodeURIComponent(lote) : ""}`;
-    await api(`/productos/${productoExistenteId}/sumar-stock?${params}`, "POST");
-    cerrarModalSumar();
-    closeModal();
-    showToast("✅ Stock sumado correctamente");
+    await api(`/productos/${id}`, "PUT", {
+      nombre,
+      codigo_barra:        codigoBarra  || null,
+      codigo:              codigo        || null,
+      marca:               marca         || null,
+      proveedor:           proveedor     || null,
+      categoria:           categoria     || null,
+      stock_minimo:        parseInt(stockMin)      || 0,
+      precio_compra:       parseFloat(precioComp)  || 0,
+      precio_venta:        parseFloat(precioVent)  || 0,
+      porcentaje_ganancia: parseFloat(porcentaje)  || 0,
+      lote:                lote          || null,
+      fecha_vencimiento:   fechaVenc ? new Date(fechaVenc).toISOString() : null,
+      dias_alerta_venc:    parseInt(diasAlerta) || 30,
+    });
+
+    cerrarModalEditar();
+    showToast("✅ Producto actualizado correctamente");
     await cargarProductos();
     await cargarDashboard();
+
   } catch (error) {
     showToast("❌ " + error.message);
   }
 }
-
 
 /* ----------------------------
    Modal eliminar producto — confirmación antes de borrar
@@ -742,6 +845,7 @@ async function saveProduct() {
   const precioComp   = document.getElementById("inputPrecioCompra").value;
   const precioVent   = document.getElementById("inputPrecioVenta").value;
   const porcentaje   = document.getElementById("inputPorcentaje").value;
+  const lote         = document.getElementById("inputLote").value.trim();
   const fechaVenc    = document.getElementById("inputFechaVenc").value;
   const diasAlerta   = document.getElementById("inputDiasAlerta").value;
 
@@ -767,6 +871,7 @@ async function saveProduct() {
       porcentaje_ganancia: parseFloat(porcentaje)  || 0,
       fecha_vencimiento:   fechaVenc ? new Date(fechaVenc).toISOString() : null,
       dias_alerta_venc:    parseInt(diasAlerta) || 30,
+      lote:                lote || null,
     });
 
     closeModal();
@@ -778,17 +883,19 @@ async function saveProduct() {
     await cargarDashboard();
 
   } catch (error) {
-    // Si el error es de código de barras duplicado, ofrecer sumar stock
-    if (error.message && error.message.includes("Ya existe un producto")) {
-      // Extraer nombre del producto existente del mensaje
-      const match = error.message.match(/: '(.+)'/);
-      const nombreExistente = match ? match[1] : "este producto";
-      // Buscar el ID del producto existente por codigo de barra
+    // 409 = producto con ese codigo de barras ya existe
+    // Sumamos el stock directamente usando los datos ya escritos en el formulario
+    if (error.status === 409 && error.detail?.producto_id) {
+      const { producto_id, nombre } = error.detail;
+      const cantidadNum = parseInt(stockActual) || 1;
       try {
-        const prod = await api(`/productos/buscar-codigo/${encodeURIComponent(codigoBarra)}`);
-        abrirModalSumar(prod.id, prod.nombre, prod.stock_actual);
-      } catch(e) {
-        showToast("❌ " + error.message);
+        await sumarStockDirecto(producto_id, cantidadNum, lote);
+        closeModal();
+        showToast(`✅ Se sumaron ${cantidadNum} unidades a "${nombre}"`);
+        await cargarProductos();
+        await cargarDashboard();
+      } catch(e2) {
+        showToast("❌ " + e2.message);
       }
     } else {
       showToast("❌ " + error.message);

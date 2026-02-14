@@ -72,7 +72,8 @@ class Producto(Base):
     porcentaje_ganancia = Column(Float, default=0.0)                  # % de ganancia sobre precio compra
     fecha_vencimiento   = Column(DateTime(timezone=True), nullable=True)  # Aplica si el producto vence
     dias_alerta_venc    = Column(Integer, default=30)                 # Alertar X días antes del vencimiento
-    activo              = Column(Boolean, default=True)               # False = eliminado (soft delete)
+    lote                = Column(String(100), nullable=True)           # Número de lote del producto
+    activo              = Column(Boolean, default=True)               # Producto existe aunque stock sea 0
     created_at          = Column(DateTime(timezone=True), server_default=func.now())
     updated_at          = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -90,7 +91,7 @@ class Movimiento(Base):
     __tablename__ = "movimientos"
 
     id              = Column(Integer, primary_key=True, index=True)
-    producto_id     = Column(Integer, ForeignKey("productos.id"), nullable=False)
+    producto_id     = Column(Integer, ForeignKey("productos.id", ondelete="SET NULL"), nullable=True)  # NULL si el producto fue eliminado
     usuario_id      = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     tipo            = Column(String(10), nullable=False)             # 'entrada' o 'salida'
     cantidad        = Column(Integer, nullable=False)                # Siempre positivo
