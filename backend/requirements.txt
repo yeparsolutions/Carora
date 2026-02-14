@@ -1,0 +1,15 @@
+# ============================================================
+# STOCKYA — Dependencias del backend
+# Archivo: backend/requirements.txt
+# Uso: pip install -r requirements.txt
+# ============================================================
+
+fastapi==0.115.12
+uvicorn==0.40.0
+sqlalchemy==2.0.41
+psycopg2-binary==2.9.11
+python-jose==3.5.0
+passlib==1.7.4
+bcrypt==5.0.0
+python-multipart==0.0.20
+pydantic[email]==2.11.7
