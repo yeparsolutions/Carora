@@ -55,12 +55,18 @@ class TokenRespuesta(BaseModel):
 
 class ProductoBase(BaseModel):
     nombre: str
-    codigo: Optional[str] = None
+    codigo_barra: Optional[str] = None          # Codigo de barras EAN/UPC
+    codigo: Optional[str] = None                # Codigo interno
     categoria: Optional[str] = None
+    marca: Optional[str] = None
+    proveedor: Optional[str] = None
     stock_actual: int = 0
     stock_minimo: int = 0
     precio_compra: float = 0.0
     precio_venta: float = 0.0
+    porcentaje_ganancia: float = 0.0            # % ganancia sobre precio compra
+    fecha_vencimiento: Optional[datetime] = None
+    dias_alerta_venc: int = 30                  # Dias de anticipacion para alerta
 
 class ProductoCrear(ProductoBase):
     # Datos para crear un producto nuevo
@@ -69,19 +75,25 @@ class ProductoCrear(ProductoBase):
 class ProductoActualizar(BaseModel):
     # Todos los campos son opcionales al actualizar
     nombre: Optional[str] = None
+    codigo_barra: Optional[str] = None
     codigo: Optional[str] = None
     categoria: Optional[str] = None
+    marca: Optional[str] = None
+    proveedor: Optional[str] = None
     stock_minimo: Optional[int] = None
     precio_compra: Optional[float] = None
     precio_venta: Optional[float] = None
+    porcentaje_ganancia: Optional[float] = None
+    fecha_vencimiento: Optional[datetime] = None
+    dias_alerta_venc: Optional[int] = None
 
 class ProductoRespuesta(ProductoBase):
     # Lo que devuelve la API
     id: int
     activo: bool
     created_at: datetime
-    # Campo calculado: estado del stock
-    estado: Optional[str] = None   # 'ok' | 'alerta' | 'critico'
+    estado: Optional[str] = None        # 'ok' | 'alerta' | 'critico'
+    estado_venc: Optional[str] = None   # 'ok' | 'proximo' | 'vencido'
 
     class Config:
         from_attributes = True

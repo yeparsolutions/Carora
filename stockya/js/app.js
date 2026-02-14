@@ -483,6 +483,12 @@ function openModal() {
 
 function closeModal() {
   document.getElementById("modalAgregar").classList.remove("open");
+  // Limpiar campos del escaner y hints
+  cerrarEscaner();
+  const hint = document.getElementById("codigoHint");
+  if (hint) { hint.textContent = "Si el codigo ya existe, los campos se llenan automaticamente"; hint.style.color = "var(--muted)"; }
+  const precioHint = document.getElementById("precioVentaHint");
+  if (precioHint) precioHint.textContent = "";
 }
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -504,29 +510,180 @@ document.addEventListener("DOMContentLoaded", function () {
    saveProduct()
    Guarda un producto nuevo en el backend
 ---------------------------- */
+/* ============================================================
+   ESCANER DE CODIGO DE BARRAS
+   ============================================================ */
+
+/* ----------------------------
+   buscarPorCodigo(codigo)
+   Cuando el usuario termina de escribir/escanear el codigo,
+   busca en el backend si ya existe.
+   Analogia: el cajero que pasa el producto por el laser
+   y aparece solo en pantalla.
+---------------------------- */
+let buscarTimeout = null;
+async function buscarPorCodigo(codigo) {
+  clearTimeout(buscarTimeout);
+  const hint = document.getElementById("codigoHint");
+
+  if (!codigo || codigo.length < 4) {
+    if (hint) hint.textContent = "Si el codigo ya existe, los campos se llenan automaticamente";
+    if (hint) hint.style.color = "var(--muted)";
+    return;
+  }
+
+  // Esperar 600ms despues de que el usuario deje de escribir
+  buscarTimeout = setTimeout(async () => {
+    try {
+      const producto = await api(`/productos/buscar-codigo/${encodeURIComponent(codigo)}`);
+
+      // Producto encontrado — llenar campos automaticamente
+      document.getElementById("inputNombre").value       = producto.nombre       || "";
+      document.getElementById("inputMarca").value        = producto.marca        || "";
+      document.getElementById("inputProveedor").value    = producto.proveedor    || "";
+      document.getElementById("inputCodigo").value       = producto.codigo       || "";
+      document.getElementById("inputStockMin").value     = producto.stock_minimo || 0;
+      document.getElementById("inputPrecioCompra").value = producto.precio_compra || 0;
+      document.getElementById("inputPrecioVenta").value  = producto.precio_venta  || 0;
+      document.getElementById("inputPorcentaje").value   = producto.porcentaje_ganancia || 0;
+
+      // Seleccionar categoria si existe
+      const catSelect = document.getElementById("inputCategoria");
+      if (catSelect && producto.categoria) {
+        for (let opt of catSelect.options) {
+          if (opt.value === producto.categoria) { opt.selected = true; break; }
+        }
+      }
+
+      if (hint) { hint.textContent = "Producto encontrado — campos llenados automaticamente"; hint.style.color = "var(--verde)"; }
+      showToast("Producto encontrado: " + producto.nombre);
+
+    } catch (error) {
+      // Producto no encontrado — formulario vacio para registrar nuevo
+      if (hint) { hint.textContent = "Codigo nuevo — completa los campos para registrarlo"; hint.style.color = "var(--amarillo)"; }
+    }
+  }, 600);
+}
+
+
+/* ----------------------------
+   calcularPrecioVenta()
+   Calcula automaticamente el precio de venta
+   cuando cambia el precio de compra o el % de ganancia.
+   Analogia: la calculadora que hace el trabajo sucio.
+---------------------------- */
+function calcularPrecioVenta() {
+  const compra     = parseFloat(document.getElementById("inputPrecioCompra").value) || 0;
+  const porcentaje = parseFloat(document.getElementById("inputPorcentaje").value)   || 0;
+  const hint       = document.getElementById("precioVentaHint");
+
+  if (compra > 0 && porcentaje > 0) {
+    const venta = Math.round(compra * (1 + porcentaje / 100));
+    document.getElementById("inputPrecioVenta").value = venta;
+    const ganancia = venta - compra;
+    if (hint) hint.textContent = `Ganancia por unidad: $${ganancia.toLocaleString("es-CL")}`;
+  } else {
+    if (hint) hint.textContent = "";
+  }
+}
+
+
+/* ----------------------------
+   abrirEscaner() / cerrarEscaner()
+   Activa la camara del dispositivo para leer codigos de barras.
+   Usa la API BarcodeDetector si esta disponible (Chrome/Android),
+   o la libreria ZXing como fallback.
+   Analogia: abrir el ojo de la camara para leer etiquetas.
+---------------------------- */
+let streamEscaner = null;
+
+async function abrirEscaner() {
+  const box   = document.getElementById("escanerBox");
+  const video = document.getElementById("escanerVideo");
+  box.style.display = "block";
+
+  try {
+    // Pedir acceso a la camara trasera (ideal para movil)
+    streamEscaner = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" }
+    });
+    video.srcObject = streamEscaner;
+    video.play();
+
+    // Usar BarcodeDetector si el navegador lo soporta
+    if ("BarcodeDetector" in window) {
+      const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "code_128", "code_39", "upc_a", "upc_e"] });
+      const intervalo = setInterval(async () => {
+        try {
+          const codigos = await detector.detect(video);
+          if (codigos.length > 0) {
+            const codigo = codigos[0].rawValue;
+            document.getElementById("inputCodigoBarra").value = codigo;
+            await buscarPorCodigo(codigo);
+            clearInterval(intervalo);
+            cerrarEscaner();
+            showToast("Codigo escaneado: " + codigo);
+          }
+        } catch (e) {}
+      }, 500);
+    } else {
+      showToast("Escaner activo — ingresa el codigo manualmente si no detecta automatico");
+    }
+
+  } catch (error) {
+    box.style.display = "none";
+    showToast("No se pudo acceder a la camara: " + error.message);
+  }
+}
+
+function cerrarEscaner() {
+  const box = document.getElementById("escanerBox");
+  box.style.display = "none";
+  if (streamEscaner) {
+    streamEscaner.getTracks().forEach(t => t.stop());
+    streamEscaner = null;
+  }
+}
+
+
 async function saveProduct() {
-  // Leer todos los campos del modal con sus IDs correctos
-  const nombre      = document.getElementById("inputNombre").value.trim();
-  const codigo      = document.getElementById("inputCodigo").value.trim();
-  const categoria   = document.getElementById("inputCategoria").value;
-  const stockActual = document.getElementById("inputStock").value;
-  const stockMin    = document.getElementById("inputStockMin").value;
-  const precioComp  = document.getElementById("inputPrecioCompra").value;
-  const precioVent  = document.getElementById("inputPrecioVenta").value;
+  // Leer todos los campos del modal
+  const nombre       = document.getElementById("inputNombre").value.trim();
+  const codigoBarra  = document.getElementById("inputCodigoBarra").value.trim();
+  const codigo       = document.getElementById("inputCodigo").value.trim();
+  const marca        = document.getElementById("inputMarca").value.trim();
+  const proveedor    = document.getElementById("inputProveedor").value.trim();
+  const categoria    = document.getElementById("inputCategoria").value;
+  const stockActual  = document.getElementById("inputStock").value;
+  const stockMin     = document.getElementById("inputStockMin").value;
+  const precioComp   = document.getElementById("inputPrecioCompra").value;
+  const precioVent   = document.getElementById("inputPrecioVenta").value;
+  const porcentaje   = document.getElementById("inputPorcentaje").value;
+  const fechaVenc    = document.getElementById("inputFechaVenc").value;
+  const diasAlerta   = document.getElementById("inputDiasAlerta").value;
 
   // Validaciones
   if (!nombre) { showToast("⚠️ El nombre del producto es obligatorio"); return; }
   if (parseInt(stockActual) < 0) { showToast("⚠️ El stock no puede ser negativo"); return; }
 
+  // Cerrar escaner si estaba abierto
+  cerrarEscaner();
+
   try {
     await api("/productos/", "POST", {
       nombre,
-      codigo:        codigo || null,
-      categoria:     categoria || null,
-      stock_actual:  parseInt(stockActual) || 0,
-      stock_minimo:  parseInt(stockMin)    || 0,
-      precio_compra: parseFloat(precioComp) || 0,
-      precio_venta:  parseFloat(precioVent) || 0,
+      codigo_barra:        codigoBarra  || null,
+      codigo:              codigo        || null,
+      marca:               marca         || null,
+      proveedor:           proveedor     || null,
+      categoria:           categoria     || null,
+      stock_actual:        parseInt(stockActual)   || 0,
+      stock_minimo:        parseInt(stockMin)      || 0,
+      precio_compra:       parseFloat(precioComp)  || 0,
+      precio_venta:        parseFloat(precioVent)  || 0,
+      porcentaje_ganancia: parseFloat(porcentaje)  || 0,
+      fecha_vencimiento:   fechaVenc ? new Date(fechaVenc).toISOString() : null,
+      dias_alerta_venc:    parseInt(diasAlerta) || 30,
     });
 
     closeModal();
@@ -536,7 +693,6 @@ async function saveProduct() {
     if (document.getElementById("screen-productos").classList.contains("active")) {
       await cargarProductos();
     }
-    // Actualizar dashboard con los nuevos datos
     await cargarDashboard();
 
   } catch (error) {

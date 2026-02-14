@@ -1,59 +1,75 @@
 # ============================================================
 # STOCKYA — Router de Alertas
 # Archivo: backend/routers/alertas.py
-# Descripción: Endpoints para consultar stock bajo
+# Descripcion: Stock bajo + vencimientos proximos
 # ============================================================
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone, timedelta
 from database import get_db
 from auth import get_usuario_actual
-import models, schemas
+import models
 
 router = APIRouter(prefix="/alertas", tags=["Alertas"])
 
 
-# ============================================================
-# GET /alertas
-# Retorna productos con stock crítico y en alerta
-# ============================================================
-@router.get("/", response_model=schemas.AlertaRespuesta)
+@router.get("/")
 def obtener_alertas(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
     """
-    Retorna el resumen de alertas de stock.
-    Analogía: es la alarma de la bodega — te dice qué necesita
-    atención urgente y qué está por acabarse pronto.
+    Retorna alertas de stock bajo Y vencimientos proximos.
+    Analogia: el panel de advertencias del tablero del auto —
+    distintos tipos de alarma en un solo lugar.
     """
-    # Obtener todos los productos activos con stock_minimo > 0
-    productos = db.query(models.Producto).filter(
-        models.Producto.activo == True,
-        models.Producto.stock_minimo > 0
-    ).all()
+    ahora = datetime.now(timezone.utc)
+    productos = db.query(models.Producto).filter(models.Producto.activo == True).all()
 
-    criticos = []   # Stock por debajo del mínimo
-    alertas  = []   # Stock entre mínimo y mínimo * 1.5
+    criticos  = []   # Stock por debajo del minimo
+    alertas   = []   # Stock cerca del minimo
+    vencidos  = []   # Fecha de vencimiento ya paso
+    proximos  = []   # Vencen pronto (dentro de dias_alerta_venc)
 
     for p in productos:
-        p_dict = {
-            "id": p.id, "nombre": p.nombre, "codigo": p.codigo,
-            "categoria": p.categoria, "stock_actual": p.stock_actual,
+        d = {
+            "id": p.id, "nombre": p.nombre, "codigo_barra": p.codigo_barra,
+            "codigo": p.codigo, "categoria": p.categoria, "marca": p.marca,
+            "proveedor": p.proveedor, "stock_actual": p.stock_actual,
             "stock_minimo": p.stock_minimo, "precio_compra": p.precio_compra,
-            "precio_venta": p.precio_venta, "activo": p.activo,
-            "created_at": p.created_at, "estado": ""
+            "precio_venta": p.precio_venta, "porcentaje_ganancia": p.porcentaje_ganancia,
+            "fecha_vencimiento": p.fecha_vencimiento, "dias_alerta_venc": p.dias_alerta_venc,
+            "activo": p.activo, "created_at": p.created_at,
+            "estado": "", "estado_venc": None
         }
-        if p.stock_actual < p.stock_minimo:
-            p_dict["estado"] = "critico"
-            criticos.append(p_dict)
-        elif p.stock_actual < p.stock_minimo * 1.5:
-            p_dict["estado"] = "alerta"
-            alertas.append(p_dict)
+
+        # --- Alertas de stock ---
+        if p.stock_minimo > 0:
+            if p.stock_actual < p.stock_minimo:
+                d["estado"] = "critico"
+                criticos.append(d.copy())
+            elif p.stock_actual < p.stock_minimo * 1.5:
+                d["estado"] = "alerta"
+                alertas.append(d.copy())
+
+        # --- Alertas de vencimiento ---
+        if p.fecha_vencimiento:
+            diff = (p.fecha_vencimiento - ahora).days
+            if diff < 0:
+                d["estado_venc"] = "vencido"
+                vencidos.append(d.copy())
+            elif diff <= (p.dias_alerta_venc or 30):
+                d["estado_venc"] = "proximo"
+                proximos.append(d.copy())
 
     return {
-        "total_criticos": len(criticos),
-        "total_alertas": len(alertas),
+        "total_criticos":  len(criticos),
+        "total_alertas":   len(alertas),
+        "total_vencidos":  len(vencidos),
+        "total_proximos":  len(proximos),
         "productos_criticos": criticos,
-        "productos_alerta": alertas,
+        "productos_alerta":   alertas,
+        "productos_vencidos": vencidos,
+        "productos_proximos": proximos,
     }

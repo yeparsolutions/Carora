@@ -1,12 +1,14 @@
 # ============================================================
 # STOCKYA — Router de Productos
 # Archivo: backend/routers/productos.py
-# Descripción: CRUD completo de productos del inventario
+# Descripción: CRUD completo + búsqueda por código de barras
+#              + alertas de vencimiento + % ganancia automático
 # ============================================================
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import datetime, timezone
 from database import get_db
 from auth import get_usuario_actual
 import models, schemas
@@ -17,8 +19,8 @@ router = APIRouter(prefix="/productos", tags=["Productos"])
 # --- Función auxiliar: calcular estado del stock ---
 def calcular_estado(stock_actual: int, stock_minimo: int) -> str:
     """
-    Retorna el estado visual del stock.
-    Analogía: el semáforo de la bodega — rojo, amarillo o verde.
+    Semáforo del stock: rojo = crítico, amarillo = alerta, verde = ok.
+    Analogía: el indicador de combustible del auto.
     """
     if stock_minimo == 0:
         return "ok"
@@ -29,55 +31,118 @@ def calcular_estado(stock_actual: int, stock_minimo: int) -> str:
     return "ok"
 
 
+# --- Función auxiliar: calcular estado de vencimiento ---
+def calcular_estado_venc(fecha_venc, dias_alerta: int = 30) -> str:
+    """
+    Retorna el estado de vencimiento del producto.
+    - 'vencido'  → ya pasó la fecha
+    - 'proximo'  → vence en menos de dias_alerta días
+    - 'ok'       → todavía tiene tiempo
+    - None       → no aplica vencimiento
+    """
+    if not fecha_venc:
+        return None
+    ahora = datetime.now(timezone.utc)
+    diff  = (fecha_venc - ahora).days
+    if diff < 0:
+        return "vencido"
+    if diff <= dias_alerta:
+        return "proximo"
+    return "ok"
+
+
+# --- Función auxiliar: construir respuesta de producto ---
+def producto_a_dict(p) -> dict:
+    """Convierte un objeto Producto a dict con campos calculados."""
+    return {
+        "id": p.id, "nombre": p.nombre,
+        "codigo_barra": p.codigo_barra, "codigo": p.codigo,
+        "categoria": p.categoria, "marca": p.marca, "proveedor": p.proveedor,
+        "stock_actual": p.stock_actual, "stock_minimo": p.stock_minimo,
+        "precio_compra": p.precio_compra, "precio_venta": p.precio_venta,
+        "porcentaje_ganancia": p.porcentaje_ganancia,
+        "fecha_vencimiento": p.fecha_vencimiento,
+        "dias_alerta_venc": p.dias_alerta_venc,
+        "activo": p.activo, "created_at": p.created_at,
+        "estado":      calcular_estado(p.stock_actual, p.stock_minimo),
+        "estado_venc": calcular_estado_venc(p.fecha_vencimiento, p.dias_alerta_venc or 30),
+    }
+
+
 # ============================================================
-# GET /productos
-# Lista todos los productos activos
+# GET /productos/buscar-codigo/{codigo_barra}
+# Busca un producto por código de barras (para el escáner)
 # ============================================================
-@router.get("/", response_model=List[schemas.ProductoRespuesta])
-def listar_productos(
-    categoria: Optional[str] = None,    # Filtro opcional por categoría
-    estado: Optional[str] = None,       # Filtro: 'ok' | 'alerta' | 'critico'
-    buscar: Optional[str] = None,       # Búsqueda por nombre o código
+@router.get("/buscar-codigo/{codigo_barra}", response_model=schemas.ProductoRespuesta)
+def buscar_por_codigo_barra(
+    codigo_barra: str,
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    """Lista todos los productos con filtros opcionales."""
+    """
+    Busca un producto por su código de barras.
+    Analogía: el cajero que pasa el producto por el láser
+    y aparece automáticamente en la pantalla.
+    Retorna 404 si no existe — el frontend puede mostrar
+    el formulario vacío para registrarlo como nuevo.
+    """
+    producto = db.query(models.Producto).filter(
+        models.Producto.codigo_barra == codigo_barra,
+        models.Producto.activo == True
+    ).first()
+
+    if not producto:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Producto con código {codigo_barra} no encontrado — puedes registrarlo como nuevo"
+        )
+
+    return producto_a_dict(producto)
+
+
+# ============================================================
+# GET /productos
+# Lista todos los productos con filtros opcionales
+# ============================================================
+@router.get("/", response_model=List[schemas.ProductoRespuesta])
+def listar_productos(
+    categoria: Optional[str] = None,
+    estado: Optional[str] = None,
+    buscar: Optional[str] = None,
+    vencimiento: Optional[str] = None,   # 'proximo' | 'vencido'
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
+    """Lista todos los productos activos con filtros opcionales."""
     query = db.query(models.Producto).filter(models.Producto.activo == True)
 
-    # Aplicar filtro de búsqueda por nombre o código
     if buscar:
         query = query.filter(
             models.Producto.nombre.ilike(f"%{buscar}%") |
+            models.Producto.codigo_barra.ilike(f"%{buscar}%") |
             models.Producto.codigo.ilike(f"%{buscar}%")
         )
-
-    # Aplicar filtro por categoría
     if categoria:
         query = query.filter(models.Producto.categoria == categoria)
 
     productos = query.order_by(models.Producto.nombre).all()
 
-    # Agregar estado calculado a cada producto
+    # Construir respuesta con campos calculados y filtrar por estado/venc
     resultado = []
     for p in productos:
-        p_dict = {
-            "id": p.id, "nombre": p.nombre, "codigo": p.codigo,
-            "categoria": p.categoria, "stock_actual": p.stock_actual,
-            "stock_minimo": p.stock_minimo, "precio_compra": p.precio_compra,
-            "precio_venta": p.precio_venta, "activo": p.activo,
-            "created_at": p.created_at,
-            "estado": calcular_estado(p.stock_actual, p.stock_minimo)
-        }
-        # Filtrar por estado si se solicitó
-        if estado is None or p_dict["estado"] == estado:
-            resultado.append(p_dict)
+        d = producto_a_dict(p)
+        if estado and d["estado"] != estado:
+            continue
+        if vencimiento and d["estado_venc"] != vencimiento:
+            continue
+        resultado.append(d)
 
     return resultado
 
 
 # ============================================================
 # GET /productos/{id}
-# Obtiene un producto por su ID
+# Obtiene un producto por ID
 # ============================================================
 @router.get("/{producto_id}", response_model=schemas.ProductoRespuesta)
 def obtener_producto(
@@ -86,15 +151,13 @@ def obtener_producto(
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
     """Obtiene un producto específico por ID."""
-    producto = db.query(models.Producto).filter(
+    p = db.query(models.Producto).filter(
         models.Producto.id == producto_id,
         models.Producto.activo == True
     ).first()
-
-    if not producto:
+    if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-
-    return {**producto.__dict__, "estado": calcular_estado(producto.stock_actual, producto.stock_minimo)}
+    return producto_a_dict(p)
 
 
 # ============================================================
@@ -108,28 +171,39 @@ def crear_producto(
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
     """
-    Crea un producto nuevo en el inventario.
-    Si el código ya existe retorna error 400.
+    Crea un producto nuevo.
+    Si se envía porcentaje_ganancia y precio_compra > 0,
+    calcula el precio_venta automáticamente.
     """
-    # Verificar código duplicado
-    if datos.codigo:
+    # Verificar código de barras duplicado
+    if datos.codigo_barra:
         existe = db.query(models.Producto).filter(
-            models.Producto.codigo == datos.codigo
+            models.Producto.codigo_barra == datos.codigo_barra
         ).first()
         if existe:
-            raise HTTPException(status_code=400, detail="El código ya está en uso")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ya existe un producto con ese código de barras: '{existe.nombre}'"
+            )
 
-    nuevo = models.Producto(**datos.model_dump())
+    # Calcular precio de venta automáticamente si viene % ganancia
+    datos_dict = datos.model_dump()
+    if datos_dict["porcentaje_ganancia"] > 0 and datos_dict["precio_compra"] > 0:
+        datos_dict["precio_venta"] = round(
+            datos_dict["precio_compra"] * (1 + datos_dict["porcentaje_ganancia"] / 100), 2
+        )
+
+    nuevo = models.Producto(**datos_dict)
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)
 
-    return {**nuevo.__dict__, "estado": calcular_estado(nuevo.stock_actual, nuevo.stock_minimo)}
+    return producto_a_dict(nuevo)
 
 
 # ============================================================
 # PUT /productos/{id}
-# Actualiza los datos de un producto
+# Actualiza un producto existente
 # ============================================================
 @router.put("/{producto_id}", response_model=schemas.ProductoRespuesta)
 def actualizar_producto(
@@ -138,29 +212,37 @@ def actualizar_producto(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    """Actualiza los campos de un producto existente."""
-    producto = db.query(models.Producto).filter(
+    """
+    Actualiza los campos de un producto.
+    Si cambia precio_compra o porcentaje_ganancia,
+    recalcula precio_venta automáticamente.
+    """
+    p = db.query(models.Producto).filter(
         models.Producto.id == producto_id,
         models.Producto.activo == True
     ).first()
-
-    if not producto:
+    if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    # Actualizar solo los campos que vienen en el request
-    for campo, valor in datos.model_dump(exclude_unset=True).items():
-        setattr(producto, campo, valor)
+    # Aplicar cambios
+    cambios = datos.model_dump(exclude_unset=True)
+    for campo, valor in cambios.items():
+        setattr(p, campo, valor)
+
+    # Recalcular precio de venta si cambiaron precio_compra o % ganancia
+    if ("precio_compra" in cambios or "porcentaje_ganancia" in cambios):
+        if p.porcentaje_ganancia > 0 and p.precio_compra > 0:
+            p.precio_venta = round(p.precio_compra * (1 + p.porcentaje_ganancia / 100), 2)
 
     db.commit()
-    db.refresh(producto)
+    db.refresh(p)
 
-    return {**producto.__dict__, "estado": calcular_estado(producto.stock_actual, producto.stock_minimo)}
+    return producto_a_dict(p)
 
 
 # ============================================================
 # DELETE /productos/{id}
 # Elimina lógicamente un producto (soft delete)
-# Analogía: no se borra de la BD, solo se marca como inactivo
 # ============================================================
 @router.delete("/{producto_id}", response_model=schemas.MensajeRespuesta)
 def eliminar_producto(
@@ -168,16 +250,15 @@ def eliminar_producto(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    """Desactiva un producto (no lo borra físicamente de la BD)."""
-    producto = db.query(models.Producto).filter(
+    """Desactiva un producto — no lo borra de la BD."""
+    p = db.query(models.Producto).filter(
         models.Producto.id == producto_id,
         models.Producto.activo == True
     ).first()
-
-    if not producto:
+    if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    producto.activo = False
+    p.activo = False
     db.commit()
 
-    return {"mensaje": f"Producto '{producto.nombre}' eliminado correctamente", "ok": True}
+    return {"mensaje": f"Producto '{p.nombre}' eliminado correctamente", "ok": True}

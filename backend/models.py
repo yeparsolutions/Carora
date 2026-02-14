@@ -58,20 +58,26 @@ class Configuracion(Base):
 class Producto(Base):
     __tablename__ = "productos"
 
-    id              = Column(Integer, primary_key=True, index=True)
-    nombre          = Column(String(200), nullable=False)
-    codigo          = Column(String(50), unique=True, nullable=True)  # Código interno
-    categoria       = Column(String(100), nullable=True)
-    stock_actual    = Column(Integer, default=0)                      # Cantidad en bodega
-    stock_minimo    = Column(Integer, default=0)                      # Umbral de alerta
-    precio_compra   = Column(Float, default=0.0)
-    precio_venta    = Column(Float, default=0.0)
-    activo          = Column(Boolean, default=True)                   # False = eliminado
-    created_at      = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at      = Column(DateTime(timezone=True), onupdate=func.now())
+    id                  = Column(Integer, primary_key=True, index=True)
+    nombre              = Column(String(200), nullable=False)
+    codigo_barra        = Column(String(100), unique=True, nullable=True, index=True)  # Código de barras EAN/UPC
+    codigo              = Column(String(50), nullable=True)           # Código interno del negocio
+    categoria           = Column(String(100), nullable=True)
+    marca               = Column(String(100), nullable=True)          # Marca del producto
+    proveedor           = Column(String(150), nullable=True)          # Nombre del proveedor
+    stock_actual        = Column(Integer, default=0)                  # Cantidad en bodega
+    stock_minimo        = Column(Integer, default=0)                  # Umbral de alerta stock bajo
+    precio_compra       = Column(Float, default=0.0)
+    precio_venta        = Column(Float, default=0.0)
+    porcentaje_ganancia = Column(Float, default=0.0)                  # % de ganancia sobre precio compra
+    fecha_vencimiento   = Column(DateTime(timezone=True), nullable=True)  # Aplica si el producto vence
+    dias_alerta_venc    = Column(Integer, default=30)                 # Alertar X días antes del vencimiento
+    activo              = Column(Boolean, default=True)               # False = eliminado (soft delete)
+    created_at          = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at          = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relación: un producto puede tener muchos movimientos
-    movimientos     = relationship("Movimiento", back_populates="producto")
+    movimientos         = relationship("Movimiento", back_populates="producto")
 
 
 # ============================================================
