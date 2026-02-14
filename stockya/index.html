@@ -991,9 +991,14 @@
         </div>
 
         <div class="form-group">
+          <label class="form-label">Código interno</label>
+          <input id="inputCodigo" class="form-input" type="text" placeholder="Ej: LAC-001">
+        </div>
+
+        <div class="form-group">
           <label class="form-label">Categoría</label>
-          <select class="form-input">
-            <option>Seleccionar...</option>
+          <select id="inputCategoria" class="form-input">
+            <option value="">Sin categoría</option>
             <option>Lácteos</option>
             <option>Bebestibles</option>
             <option>Snacks</option>
@@ -1010,18 +1015,19 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Stock mínimo (alerta)</label>
-          <input class="form-input" type="number" placeholder="10" min="0">
+          <label class="form-label">Stock mínimo para alerta 🔔</label>
+          <input id="inputStockMin" class="form-input" type="number" placeholder="10" min="0">
+          <span class="settings-field-hint">Te avisamos cuando el stock baje de este número</span>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Precio compra (CLP)</label>
-          <input class="form-input" type="number" placeholder="$0" min="0">
+          <label class="form-label">Precio compra</label>
+          <input id="inputPrecioCompra" class="form-input" type="number" placeholder="0" min="0">
         </div>
 
         <div class="form-group">
-          <label class="form-label">Precio venta (CLP)</label>
-          <input class="form-input" type="number" placeholder="$0" min="0">
+          <label class="form-label">Precio venta</label>
+          <input id="inputPrecioVenta" class="form-input" type="number" placeholder="0" min="0">
         </div>
 
       </div>

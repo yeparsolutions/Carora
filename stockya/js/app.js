@@ -505,22 +505,26 @@ document.addEventListener("DOMContentLoaded", function () {
    Guarda un producto nuevo en el backend
 ---------------------------- */
 async function saveProduct() {
-  const nombre     = document.getElementById("inputNombre").value.trim();
-  const stockVal   = document.getElementById("inputStock").value;
-  const categoria  = document.querySelector("#formProducto select").value;
-  const stockMin   = document.querySelectorAll("#formProducto input[type='number']")[1]?.value || 0;
-  const precioComp = document.querySelectorAll("#formProducto input[type='number']")[2]?.value || 0;
-  const precioVent = document.querySelectorAll("#formProducto input[type='number']")[3]?.value || 0;
+  // Leer todos los campos del modal con sus IDs correctos
+  const nombre      = document.getElementById("inputNombre").value.trim();
+  const codigo      = document.getElementById("inputCodigo").value.trim();
+  const categoria   = document.getElementById("inputCategoria").value;
+  const stockActual = document.getElementById("inputStock").value;
+  const stockMin    = document.getElementById("inputStockMin").value;
+  const precioComp  = document.getElementById("inputPrecioCompra").value;
+  const precioVent  = document.getElementById("inputPrecioVenta").value;
 
-  if (!nombre) { showToast("El nombre del producto es obligatorio"); return; }
-  if (stockVal && parseInt(stockVal) < 0) { showToast("El stock no puede ser negativo"); return; }
+  // Validaciones
+  if (!nombre) { showToast("⚠️ El nombre del producto es obligatorio"); return; }
+  if (parseInt(stockActual) < 0) { showToast("⚠️ El stock no puede ser negativo"); return; }
 
   try {
     await api("/productos/", "POST", {
       nombre,
-      categoria:     categoria !== "Seleccionar..." ? categoria : null,
-      stock_actual:  parseInt(stockVal) || 0,
-      stock_minimo:  parseInt(stockMin) || 0,
+      codigo:        codigo || null,
+      categoria:     categoria || null,
+      stock_actual:  parseInt(stockActual) || 0,
+      stock_minimo:  parseInt(stockMin)    || 0,
       precio_compra: parseFloat(precioComp) || 0,
       precio_venta:  parseFloat(precioVent) || 0,
     });
@@ -532,6 +536,7 @@ async function saveProduct() {
     if (document.getElementById("screen-productos").classList.contains("active")) {
       await cargarProductos();
     }
+    // Actualizar dashboard con los nuevos datos
     await cargarDashboard();
 
   } catch (error) {
