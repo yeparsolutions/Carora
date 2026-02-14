@@ -130,7 +130,16 @@
 
     <!-- Perfil del usuario en la parte inferior -->
     <div class="sidebar-footer">
-      <div class="user-row">
+
+      <!-- Toggle claro/oscuro — hace clic para cambiar tema -->
+      <div class="theme-toggle-row" onclick="toggleTema()">
+        <span class="theme-toggle-label" id="themeLabel">🌙 Tema oscuro</span>
+        <div class="theme-toggle-switch" id="themeSwitch">
+          <div class="theme-toggle-thumb" id="themeThumb"></div>
+        </div>
+      </div>
+
+      <div class="user-row" style="margin-top:14px">
         <div class="avatar">JR</div><!-- Iniciales del usuario -->
         <div class="user-info">
           <div class="user-name">Juan Rodríguez</div>

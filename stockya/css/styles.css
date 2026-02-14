@@ -1146,3 +1146,296 @@ tbody td { padding: 14px; vertical-align: middle; }
     flex-wrap: wrap;
   }
 }
+
+
+/* ----------------------------
+   SETTINGS — Secciones
+   Cada sección agrupa campos relacionados
+   como los cajones de un archivero
+---------------------------- */
+.settings-section {
+  margin-bottom: 28px;
+}
+
+.settings-section-title {
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Tarjeta contenedora de cada sección */
+.settings-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+/* Línea separadora dentro de la tarjeta */
+.settings-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 20px 0;
+}
+
+/* Texto de ayuda debajo de cada campo */
+.settings-field-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+  display: block;
+}
+
+/* ----------------------------
+   SETTINGS — Logo del negocio
+   Zona de previsualización + botones
+---------------------------- */
+.settings-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 4px;
+}
+
+/* Cuadrado de previsualización del logo */
+.settings-logo-preview {
+  width: 88px;
+  height: 88px;
+  background: var(--bg3);
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-head);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--verde);
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.settings-logo-preview:hover {
+  border-color: var(--verde);
+}
+
+.settings-logo-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.settings-logo-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ----------------------------
+   SETTINGS — Selector de color
+   Combina el picker nativo con el input de texto hex
+---------------------------- */
+.settings-color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* El cuadrito de color nativo del navegador */
+.settings-color-picker {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  padding: 2px;
+  background: var(--bg3);
+  flex-shrink: 0;
+}
+
+/* ----------------------------
+   SETTINGS — Campo contraseña
+   Fila con input + botón ojo
+---------------------------- */
+.settings-pass-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-pass-row .form-input {
+  flex: 1;
+}
+
+/* Botón para mostrar/ocultar contraseña */
+.settings-eye-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.settings-eye-btn:hover {
+  background: var(--card);
+  border-color: rgba(255,255,255,0.15);
+}
+
+/* ----------------------------
+   SETTINGS — Barra de fuerza de contraseña
+   Verde = fuerte, Amarillo = media, Rojo = débil
+   Analogía: como el medidor de combustible del auto
+---------------------------- */
+.pass-strength-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.pass-strength-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--bg3);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.pass-strength-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s ease, background 0.3s ease;
+  width: 0%;
+}
+
+.pass-strength-label {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ----------------------------
+   SETTINGS — Responsive móvil
+---------------------------- */
+@media (max-width: 768px) {
+  .settings-logo-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .settings-color-row {
+    flex-wrap: wrap;
+  }
+}
+
+
+/* ============================================================
+   TEMA CLARO — Se activa agregando la clase .tema-claro al <body>
+   Analogía: es como cambiar el fondo del escritorio —
+   todos los elementos se adaptan automáticamente.
+   ============================================================ */
+body.tema-claro {
+  --bg:     #F0F2F7;       /* Fondo principal claro          */
+  --bg2:    #FFFFFF;       /* Fondo sidebar y login          */
+  --bg3:    #E4E7EF;       /* Fondo inputs                   */
+  --card:   #FFFFFF;       /* Fondo tarjetas                 */
+  --border: rgba(0,0,0,0.08); /* Bordes sutiles              */
+  --text:   #111827;       /* Texto principal oscuro         */
+  --muted:  #6B7280;       /* Texto secundario               */
+  --shadow: 0 8px 32px rgba(0,0,0,0.10); /* Sombra suave    */
+}
+
+/* En tema claro el sidebar tiene sombra lateral */
+body.tema-claro .sidebar {
+  box-shadow: 2px 0 16px rgba(0,0,0,0.06);
+}
+
+/* En tema claro las tablas tienen hover más visible */
+body.tema-claro tbody tr:hover {
+  background: rgba(0,0,0,0.03);
+}
+
+/* En tema claro los inputs tienen borde más definido */
+body.tema-claro .form-input,
+body.tema-claro .search-input,
+body.tema-claro .filter-select {
+  border-color: rgba(0,0,0,0.15);
+}
+
+/* ----------------------------
+   TOGGLE CLARO/OSCURO
+   El interruptor en el footer del sidebar
+---------------------------- */
+.theme-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 2px;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.theme-toggle-row:hover {
+  background: var(--bg3);
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.theme-toggle-label {
+  font-size: 13px;
+  color: var(--muted);
+  user-select: none;
+  transition: color 0.2s;
+}
+
+/* El switch visual — como un interruptor de luz real */
+.theme-toggle-switch {
+  width: 40px;
+  height: 22px;
+  background: var(--bg3);
+  border-radius: 99px;
+  position: relative;
+  border: 1px solid var(--border);
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+
+/* Cuando está en tema claro el switch se pone verde */
+.theme-toggle-switch.activo {
+  background: var(--verde);
+  border-color: var(--verde);
+}
+
+/* La bolita que se mueve dentro del switch */
+.theme-toggle-thumb {
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+/* Cuando está activo la bolita se mueve a la derecha */
+.theme-toggle-switch.activo .theme-toggle-thumb {
+  transform: translateX(18px);
+}
