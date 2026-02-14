@@ -1,102 +1,109 @@
 # ============================================================
-# STOCKYA — Utilidades de autenticación
-# Archivo: backend/auth.py
-# Descripción: Maneja encriptación de contraseñas y tokens JWT
-# Analogía: es el "guardia de seguridad" que verifica
-#           que cada usuario sea quien dice ser
+# STOCKYA — Router de Autenticación
+# Archivo: backend/routers/auth.py
+# Descripción: Endpoints para login y registro de usuarios
 # ============================================================
 
-from datetime import datetime, timedelta
-from typing import Optional
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
-import models
+from auth import encriptar_password, verificar_password, crear_token, get_usuario_actual
+import models, schemas
 
-# --- Configuración de seguridad ---
-# SECRET_KEY: clave secreta para firmar los tokens JWT
-# En producción usa una clave larga y aleatoria
-SECRET_KEY    = "stockya-carora-secret-key-2026-cambiar-en-produccion"
-ALGORITHM     = "HS256"              # Algoritmo de firma
-TOKEN_EXPIRY  = 60 * 24              # Token válido por 24 horas (en minutos)
-
-# --- Contexto de encriptación de contraseñas ---
-# Analogía: bcrypt es la "caja fuerte" que guarda contraseñas
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# --- Esquema OAuth2 para FastAPI ---
-# Define de dónde leer el token en los requests
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+# Crear el router con prefijo /auth
+router = APIRouter(prefix="/auth", tags=["Autenticación"])
 
 
-# --- Funciones de contraseña ---
+# ============================================================
+# POST /auth/registro
+# Crea un usuario nuevo en la base de datos
+# ============================================================
+@router.post("/registro", response_model=schemas.TokenRespuesta, status_code=201)
+def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)):
+    """Registra un usuario nuevo. Si el email ya existe retorna error 400."""
 
-def encriptar_password(password: str) -> str:
-    """Convierte una contraseña en texto plano a hash seguro."""
-    return pwd_context.hash(password)
+    # Verificar si el email ya está registrado
+    existe = db.query(models.Usuario).filter(models.Usuario.email == datos.email).first()
+    if existe:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este correo ya está registrado"
+        )
 
-def verificar_password(password_plano: str, password_hash: str) -> bool:
-    """Verifica si la contraseña ingresada coincide con el hash guardado."""
-    return pwd_context.verify(password_plano, password_hash)
-
-
-# --- Funciones de token JWT ---
-
-def crear_token(data: dict, expiry_minutos: Optional[int] = None) -> str:
-    """
-    Crea un token JWT con los datos del usuario.
-    Analogía: es como crear una tarjeta de acceso temporal con fecha de vencimiento.
-    """
-    payload = data.copy()
-    expira  = datetime.utcnow() + timedelta(minutes=expiry_minutos or TOKEN_EXPIRY)
-    payload.update({"exp": expira})
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-
-def verificar_token(token: str) -> Optional[dict]:
-    """
-    Decodifica y verifica un token JWT.
-    Retorna los datos si es válido, None si expiró o es inválido.
-    """
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except JWTError:
-        return None
-
-
-# --- Dependencia: obtener usuario actual ---
-
-def get_usuario_actual(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-) -> models.Usuario:
-    """
-    Dependencia de FastAPI que extrae el usuario del token JWT.
-    Se usa en los endpoints protegidos con: Depends(get_usuario_actual)
-    Analogía: es el torniquete que valida tu credencial antes de dejarte pasar.
-    """
-    credenciales_error = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="No autenticado o token inválido",
-        headers={"WWW-Authenticate": "Bearer"},
+    # Crear el usuario con contraseña encriptada
+    nuevo_usuario = models.Usuario(
+        nombre        = datos.nombre,
+        email         = datos.email,
+        password_hash = encriptar_password(datos.password)
     )
+    db.add(nuevo_usuario)
+    db.commit()
+    db.refresh(nuevo_usuario)
 
-    # Verificar y decodificar el token
-    payload = verificar_token(token)
-    if payload is None:
-        raise credenciales_error
+    # Crear configuración inicial del negocio para el usuario
+    config_inicial = models.Configuracion(
+        usuario_id      = nuevo_usuario.id,
+        nombre_negocio  = "Mi Negocio",
+        moneda          = "CLP",
+        color_principal = "#00C77B"
+    )
+    db.add(config_inicial)
+    db.commit()
 
-    # Extraer el email del payload
-    email: str = payload.get("sub")
-    if email is None:
-        raise credenciales_error
+    # Generar token JWT — el usuario queda logueado de inmediato
+    token = crear_token({"sub": nuevo_usuario.email})
 
-    # Buscar el usuario en la base de datos
-    usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    if usuario is None or not usuario.activo:
-        raise credenciales_error
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "usuario": nuevo_usuario
+    }
 
-    return usuario
+
+# ============================================================
+# POST /auth/login
+# Verifica credenciales y retorna token JWT
+# ============================================================
+@router.post("/login", response_model=schemas.TokenRespuesta)
+def login(datos: schemas.LoginRequest, db: Session = Depends(get_db)):
+    """
+    Inicia sesión con email y contraseña.
+    Analogía: la recepcionista que verifica tu carnet y te da el pase.
+    """
+    # Buscar usuario por email
+    usuario = db.query(models.Usuario).filter(models.Usuario.email == datos.email).first()
+
+    # Verificar que existe y que la contraseña es correcta
+    if not usuario or not verificar_password(datos.password, usuario.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Correo o contraseña incorrectos"
+        )
+
+    # Verificar que la cuenta está activa
+    if not usuario.activo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta cuenta está desactivada"
+        )
+
+    # Generar y retornar el token JWT
+    token = crear_token({"sub": usuario.email})
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "usuario": usuario
+    }
+
+
+# ============================================================
+# GET /auth/yo
+# Retorna los datos del usuario autenticado actual
+# ============================================================
+@router.get("/yo", response_model=schemas.UsuarioRespuesta)
+def obtener_yo(
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
+    """Retorna los datos del usuario autenticado a partir del token JWT."""
+    return usuario_actual
