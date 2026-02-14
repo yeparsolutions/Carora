@@ -121,6 +121,13 @@
       <span class="nav-icon">📊</span> Reportes
     </button>
 
+    <!-- *** NUEVO: Sección Sistema con Configuración *** -->
+    <span class="nav-label">Sistema</span>
+
+    <button class="nav-item" id="nav-settings" onclick="showScreen('settings')">
+      <span class="nav-icon">⚙️</span> Configuración
+    </button>
+
     <!-- Perfil del usuario en la parte inferior -->
     <div class="sidebar-footer">
       <div class="user-row">
@@ -611,7 +618,7 @@
           </div>
           <div class="alert-big-action">
             <div class="alert-stock-num critico">2 und.</div>
-            <button class="btn-primary" style="font-size:12px; padding:7px 14px" onclick="showToast('✅ ¡Movimiento registrado!')">+ Registrar entrada</button>
+            <button class="btn-primary" style="font-size:12px; padding:7px 14px" onclick="showToast('Movimiento registrado!')">+ Registrar entrada</button>
           </div>
         </div>
 
@@ -623,7 +630,7 @@
           </div>
           <div class="alert-big-action">
             <div class="alert-stock-num critico">1 und.</div>
-            <button class="btn-primary" style="font-size:12px; padding:7px 14px" onclick="showToast('✅ ¡Movimiento registrado!')">+ Registrar entrada</button>
+            <button class="btn-primary" style="font-size:12px; padding:7px 14px" onclick="showToast('Movimiento registrado!')">+ Registrar entrada</button>
           </div>
         </div>
 
@@ -635,7 +642,7 @@
           </div>
           <div class="alert-big-action">
             <div class="alert-stock-num critico">3 und.</div>
-            <button class="btn-primary" style="font-size:12px; padding:7px 14px" onclick="showToast('✅ ¡Movimiento registrado!')">+ Registrar entrada</button>
+            <button class="btn-primary" style="font-size:12px; padding:7px 14px" onclick="showToast('Movimiento registrado!')">+ Registrar entrada</button>
           </div>
         </div>
       </div>
@@ -654,7 +661,7 @@
           </div>
           <div class="alert-big-action">
             <div class="alert-stock-num alerta">8 und.</div>
-            <button class="btn-secondary" style="font-size:12px; padding:7px 14px" onclick="showToast('✅ ¡Movimiento registrado!')">+ Entrada</button>
+            <button class="btn-secondary" style="font-size:12px; padding:7px 14px" onclick="showToast('Movimiento registrado!')">+ Entrada</button>
           </div>
         </div>
 
@@ -666,7 +673,7 @@
           </div>
           <div class="alert-big-action">
             <div class="alert-stock-num alerta">5 packs</div>
-            <button class="btn-secondary" style="font-size:12px; padding:7px 14px" onclick="showToast('✅ ¡Movimiento registrado!')">+ Entrada</button>
+            <button class="btn-secondary" style="font-size:12px; padding:7px 14px" onclick="showToast('Movimiento registrado!')">+ Entrada</button>
           </div>
         </div>
       </div>
@@ -690,7 +697,7 @@
             <option>Este mes</option>
             <option>Últimos 30 días</option>
           </select>
-          <button class="btn-secondary" onclick="showToast('📥 Exportando reporte...')">📥 Exportar</button>
+          <button class="btn-secondary" onclick="showToast('Exportando reporte...')">📥 Exportar</button>
         </div>
       </div>
 
@@ -720,7 +727,6 @@
         <div class="card">
           <div class="card-title">📦 Movimientos por Categoría</div>
           <div class="chart-placeholder">
-            <!-- Cada barra representa una categoría. Cambia el height% para ajustar -->
             <div class="chart-bar-v" style="background: linear-gradient(to top, #5B8EFF, #8AADFF); height: 80%"><span>Bebestibles</span></div>
             <div class="chart-bar-v" style="background: linear-gradient(to top, var(--verde), #00F59B); height: 55%"><span>Lácteos</span></div>
             <div class="chart-bar-v" style="background: linear-gradient(to top, var(--amarillo), #FFD560); height: 40%"><span>Granos</span></div>
@@ -784,13 +790,179 @@
     </div><!-- fin screen-reportes -->
 
 
+    <!-- ==========================================
+         PANTALLA 7: CONFIGURACIÓN (SETTINGS)
+         *** NUEVO — Permite personalizar el negocio ***
+    ========================================== -->
+    <div class="screen" id="screen-settings">
+
+      <div class="page-header">
+        <div>
+          <div class="page-title">⚙️ Configuración</div>
+          <div class="page-subtitle">Personaliza tu negocio y cuenta</div>
+        </div>
+        <button class="btn-primary" onclick="guardarConfiguracion()">✓ Guardar cambios</button>
+      </div>
+
+      <!-- SECCIÓN 1: DATOS DEL NEGOCIO -->
+      <div class="settings-section">
+        <div class="settings-section-title">🏢 Datos del negocio</div>
+        <div class="settings-card">
+
+          <!-- Logo del negocio -->
+          <div class="settings-logo-row">
+            <div class="settings-logo-preview" id="logoPreview">
+              <span id="logoInitials">MR</span>
+              <img id="logoImg" src="" alt="Logo" style="display:none; width:100%; height:100%; object-fit:contain; border-radius:12px;">
+            </div>
+            <div class="settings-logo-info">
+              <div class="settings-logo-label">Logo del negocio</div>
+              <div class="settings-logo-hint">PNG, JPG o SVG · Máximo 2MB · Recomendado 200×200px</div>
+              <div style="display:flex; gap:10px; margin-top:12px">
+                <input type="file" id="inputLogo" accept="image/*" style="display:none" onchange="previewLogo(event)">
+                <button class="btn-secondary" style="font-size:13px; padding:8px 16px" onclick="document.getElementById('inputLogo').click()">
+                  📁 Subir logo
+                </button>
+                <button class="btn-secondary" style="font-size:13px; padding:8px 16px" onclick="quitarLogo()">
+                  🗑️ Quitar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-divider"></div>
+
+          <!-- Nombre del negocio y moneda -->
+          <div class="form-grid">
+            <div class="form-group form-full">
+              <label class="form-label">Nombre del negocio *</label>
+              <input id="inputNegocio" class="form-input" type="text"
+                     placeholder="Ej: Minimarket El Rincón"
+                     value="Minimarket El Rincón">
+              <span class="settings-field-hint">Aparece en el dashboard y reportes</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Moneda</label>
+              <select id="inputMoneda" class="form-input">
+                <option value="CLP" selected>🇨🇱 CLP — Peso chileno</option>
+                <option value="USD">🇺🇸 USD — Dólar</option>
+                <option value="EUR">🇪🇺 EUR — Euro</option>
+                <option value="PEN">🇵🇪 PEN — Sol peruano</option>
+                <option value="COP">🇨🇴 COP — Peso colombiano</option>
+                <option value="MXN">🇲🇽 MXN — Peso mexicano</option>
+                <option value="ARS">🇦🇷 ARS — Peso argentino</option>
+                <option value="VES">🇻🇪 VES — Bolívar venezolano</option>
+              </select>
+              <span class="settings-field-hint">Se usa en precios e inventario</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Color principal</label>
+              <div class="settings-color-row">
+                <input type="color" id="inputColor" value="#00C77B"
+                       class="settings-color-picker"
+                       oninput="previsualizarColor(this.value)">
+                <input id="inputColorHex" class="form-input" type="text"
+                       value="#00C77B" placeholder="#00C77B"
+                       maxlength="7"
+                       oninput="sincronizarColor(this.value)"
+                       style="font-family: monospace; letter-spacing:1px">
+              </div>
+              <span class="settings-field-hint">Cambia botones, íconos activos y acentos</span>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- fin sección negocio -->
+
+
+      <!-- SECCIÓN 2: DATOS DEL USUARIO -->
+      <div class="settings-section">
+        <div class="settings-section-title">👤 Tu cuenta</div>
+        <div class="settings-card">
+          <div class="form-grid">
+
+            <div class="form-group">
+              <label class="form-label">Nombre completo *</label>
+              <input id="inputNombreUsuario" class="form-input" type="text"
+                     placeholder="Ej: Juan Rodríguez"
+                     value="Juan Rodríguez">
+              <span class="settings-field-hint">Aparece en el saludo del dashboard</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Correo electrónico</label>
+              <input id="inputEmail" class="form-input" type="email"
+                     placeholder="tu@negocio.com"
+                     value="demo@stockya.app">
+              <span class="settings-field-hint">Usado para iniciar sesión</span>
+            </div>
+
+          </div>
+        </div>
+      </div><!-- fin sección usuario -->
+
+
+      <!-- SECCIÓN 3: CAMBIO DE CONTRASEÑA -->
+      <div class="settings-section">
+        <div class="settings-section-title">🔑 Cambiar contraseña</div>
+        <div class="settings-card">
+          <div class="form-grid">
+
+            <div class="form-group form-full">
+              <label class="form-label">Contraseña actual</label>
+              <div class="settings-pass-row">
+                <input id="inputPassActual" class="form-input" type="password"
+                       placeholder="Tu contraseña actual">
+                <button class="settings-eye-btn" onclick="togglePass('inputPassActual', this)">👁️</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Nueva contraseña</label>
+              <div class="settings-pass-row">
+                <input id="inputPassNueva" class="form-input" type="password"
+                       placeholder="Mínimo 8 caracteres"
+                       oninput="evaluarFuerzaPassword(this.value)">
+                <button class="settings-eye-btn" onclick="togglePass('inputPassNueva', this)">👁️</button>
+              </div>
+              <div class="pass-strength-wrap" id="passStrengthWrap" style="display:none">
+                <div class="pass-strength-bar">
+                  <div class="pass-strength-fill" id="passStrengthFill"></div>
+                </div>
+                <span class="pass-strength-label" id="passStrengthLabel"></span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Confirmar nueva contraseña</label>
+              <div class="settings-pass-row">
+                <input id="inputPassConfirm" class="form-input" type="password"
+                       placeholder="Repite la nueva contraseña">
+                <button class="settings-eye-btn" onclick="togglePass('inputPassConfirm', this)">👁️</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div><!-- fin sección contraseña -->
+
+      <!-- Botones al pie -->
+      <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:8px; margin-bottom:32px">
+        <button class="btn-secondary" onclick="descartarCambios()">Descartar cambios</button>
+        <button class="btn-primary" onclick="guardarConfiguracion()">✓ Guardar todos los cambios</button>
+      </div>
+
+    </div><!-- fin screen-settings -->
+
+
   </main><!-- fin main-content -->
 </div><!-- fin appMain -->
 
 
 <!-- ============================================================
      MODAL: AGREGAR NUEVO PRODUCTO
-     Se activa al hacer clic en "+ Agregar producto" o "+ Nuevo producto"
 ============================================================ -->
 <div class="modal-overlay" id="modalAgregar">
   <div class="modal-box">
@@ -800,17 +972,14 @@
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
 
-    <!-- Formulario — id="formProducto" para poder hacer reset() desde js/app.js -->
     <form id="formProducto">
       <div class="form-grid">
 
-        <!-- Nombre del producto — ocupa toda la fila -->
         <div class="form-group form-full">
           <label class="form-label">Nombre del producto *</label>
           <input id="inputNombre" class="form-input" type="text" placeholder="Ej: Leche entera 1L">
         </div>
 
-        <!-- Categoría -->
         <div class="form-group">
           <label class="form-label">Categoría</label>
           <select class="form-input">
@@ -825,40 +994,36 @@
           </select>
         </div>
 
-        <!-- Stock inicial -->
         <div class="form-group">
           <label class="form-label">Stock inicial (unidades) *</label>
           <input id="inputStock" class="form-input" type="number" placeholder="0" min="0">
         </div>
 
-        <!-- Stock mínimo para alertas -->
         <div class="form-group">
           <label class="form-label">Stock mínimo (alerta)</label>
           <input class="form-input" type="number" placeholder="10" min="0">
         </div>
 
-        <!-- Precio de compra -->
         <div class="form-group">
           <label class="form-label">Precio compra (CLP)</label>
           <input class="form-input" type="number" placeholder="$0" min="0">
         </div>
 
-        <!-- Precio de venta -->
         <div class="form-group">
           <label class="form-label">Precio venta (CLP)</label>
           <input class="form-input" type="number" placeholder="$0" min="0">
         </div>
 
-      </div><!-- fin form-grid -->
+      </div>
 
       <div class="form-actions">
         <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
         <button type="button" class="btn-primary"   onclick="saveProduct()">✓ Guardar producto</button>
       </div>
 
-    </form><!-- fin formProducto -->
+    </form>
 
-  </div><!-- fin modal-box -->
+  </div>
 </div><!-- fin modal-overlay -->
 
 
