@@ -1,13 +1,11 @@
-"""
-=============================================================
-  SCRIPT DE SINCRONIZACIÓN - PROYECTO CARORA
-  Autor: YeparSolutions
-  Descripción: Sincroniza automáticamente el proyecto Carora
-               hacia GitHub (yeparsolutions/carora)
-               El disco duro E:\Proyecto Carora actúa como
-               repositorio git local que empuja a GitHub.
-=============================================================
-"""
+# =============================================================
+#   SCRIPT DE SINCRONIZACIÓN - PROYECTO CARORA
+#   Autor: YeparSolutions
+#   Descripción: Sincroniza automáticamente el proyecto Carora
+#                hacia GitHub (yeparsolutions/Carora)
+#                El disco duro E:/Proyecto Carora actua como
+#                repositorio git local que empuja a GitHub.
+# =============================================================
 
 import subprocess  # Para ejecutar comandos de git como si fuera la terminal
 import os          # Para manejar rutas y verificar que existan carpetas
@@ -23,7 +21,7 @@ from datetime import datetime  # Para registrar la hora exacta de cada sincroniz
 # =============================================================
 
 RUTA_PROYECTO = r"E:\Proyecto Carora"          # Carpeta local del proyecto en disco duro
-REPO_GITHUB   = "https://github.com/yeparsolutions/carora"  # Destino remoto en GitHub
+REPO_GITHUB   = "https://github.com/yeparsolutions/Carora.git"  # Destino remoto en GitHub (C mayúscula)
 ARCHIVO_LOG   = os.path.join(RUTA_PROYECTO, "log_sincronizacion.txt")  # Registro de actividad
 
 
@@ -49,8 +47,10 @@ def registrar_log(mensaje: str, tipo: str = "INFO") -> None:
     print(linea.strip())
 
     # Guardar en archivo de log
+    # utf-8-sig agrega BOM al inicio para que PowerShell y Bloc de notas
+    # reconozcan correctamente tildes y caracteres especiales
     try:
-        with open(ARCHIVO_LOG, "a", encoding="utf-8") as log:
+        with open(ARCHIVO_LOG, "a", encoding="utf-8-sig") as log:
             log.write(linea)
     except Exception as e:
         print(f"[ADVERTENCIA] No se pudo escribir en el log: {e}")
@@ -215,8 +215,8 @@ def sincronizar() -> None:
         registrar_log("Verifica tu conexión a internet y credenciales de GitHub.", "INFO")
         sys.exit(1)
 
-    registrar_log("git push completado. Cambios en GitHub ✓", "OK")
-    registrar_log("✅ Sincronización completa — GitHub y Disco E actualizados.", "OK")
+    registrar_log("git push completado. Cambios en GitHub [OK]", "OK")
+    registrar_log("SINCRONIZACION COMPLETA - GitHub y Disco E actualizados.", "OK")
     registrar_log("=" * 50, "INFO")
 
 
