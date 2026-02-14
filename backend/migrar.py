@@ -20,23 +20,24 @@ cursor = conn.cursor()
 # Lista de columnas nuevas a agregar
 # Formato: (nombre_columna, tipo_sql, valor_por_defecto)
 columnas_nuevas = [
-    ("codigo_barra",        "VARCHAR(100)",   None),
-    ("marca",               "VARCHAR(100)",   None),
-    ("proveedor",           "VARCHAR(150)",   None),
-    ("porcentaje_ganancia", "FLOAT",          "0.0"),
-    ("fecha_vencimiento",   "TIMESTAMPTZ",    None),
-    ("dias_alerta_venc",    "INTEGER",        "30"),
+    ("codigo_barra",        "VARCHAR(100)",   None,    "productos"),
+    ("marca",               "VARCHAR(100)",   None,    "productos"),
+    ("proveedor",           "VARCHAR(150)",   None,    "productos"),
+    ("porcentaje_ganancia", "FLOAT",          "0.0",   "productos"),
+    ("fecha_vencimiento",   "TIMESTAMPTZ",    None,    "productos"),
+    ("dias_alerta_venc",    "INTEGER",        "30",    "productos"),
+    ("lote",                "VARCHAR(100)",   None,    "movimientos"),
 ]
 
 print("Iniciando migracion...")
 
-for columna, tipo, default in columnas_nuevas:
+for columna, tipo, default, tabla in columnas_nuevas:
     try:
         # Verificar si la columna ya existe antes de agregarla
         cursor.execute("""
             SELECT COUNT(*) FROM information_schema.columns
-            WHERE table_name = 'productos' AND column_name = %s
-        """, (columna,))
+            WHERE table_name = %s AND column_name = %s
+        """, (tabla, columna,))
 
         existe = cursor.fetchone()[0]
 
@@ -45,9 +46,9 @@ for columna, tipo, default in columnas_nuevas:
         else:
             # Agregar la columna nueva
             if default is not None:
-                sql = f"ALTER TABLE productos ADD COLUMN {columna} {tipo} DEFAULT {default}"
+                sql = f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo} DEFAULT {default}"
             else:
-                sql = f"ALTER TABLE productos ADD COLUMN {columna} {tipo}"
+                sql = f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}"
 
             cursor.execute(sql)
             conn.commit()

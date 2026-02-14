@@ -97,6 +97,7 @@ class Movimiento(Base):
     stock_anterior  = Column(Integer, nullable=False)                # Stock antes del movimiento
     stock_nuevo     = Column(Integer, nullable=False)                # Stock después del movimiento
     nota            = Column(String(255), nullable=True)             # Observación opcional
+    lote            = Column(String(100), nullable=True)             # Número de lote (cuando aplica)
     created_at      = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relaciones inversas

@@ -52,6 +52,7 @@ def listar_movimientos(
             "stock_anterior": m.stock_anterior,
             "stock_nuevo": m.stock_nuevo,
             "nota": m.nota,
+            "lote": m.lote,
             "created_at": m.created_at,
             "producto_nombre": m.producto.nombre if m.producto else None,
             "usuario_nombre": m.usuario.nombre if m.usuario else None,
@@ -119,7 +120,8 @@ def registrar_movimiento(
         cantidad       = datos.cantidad,
         stock_anterior = stock_anterior,
         stock_nuevo    = stock_nuevo,
-        nota           = datos.nota
+        nota           = datos.nota,
+        lote           = datos.lote
     )
     db.add(movimiento)
     db.commit()
@@ -134,6 +136,7 @@ def registrar_movimiento(
         "stock_anterior": movimiento.stock_anterior,
         "stock_nuevo": movimiento.stock_nuevo,
         "nota": movimiento.nota,
+        "lote": movimiento.lote,
         "created_at": movimiento.created_at,
         "producto_nombre": producto.nombre,
         "usuario_nombre": usuario_actual.nombre,

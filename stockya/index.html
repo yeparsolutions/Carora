@@ -499,7 +499,7 @@
           <div class="page-title">Movimientos</div>
           <div class="page-subtitle">Registro de entradas y salidas de bodega</div>
         </div>
-        <button class="btn-primary" onclick="showToast('📝 Registrando movimiento...')">+ Registrar movimiento</button>
+        <button class="btn-primary" onclick="openModalMovimiento()">+ Registrar movimiento</button>
       </div>
 
       <!-- Tabs para filtrar tipo de movimiento -->
@@ -1106,6 +1106,102 @@
   </div>
 </div><!-- fin modal-overlay -->
 
+
+<!-- ============================================================
+     MODAL: Registrar movimiento (entrada/salida)
+============================================================ -->
+<div class="modal-overlay" id="modalMovimiento">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">📝 Registrar movimiento</div>
+      <button class="modal-close" onclick="closeModalMovimiento()">✕</button>
+    </div>
+    <form id="formMovimiento">
+      <div class="form-grid">
+
+        <div class="form-group form-full">
+          <label class="form-label">Producto *</label>
+          <select id="movProductoId" class="form-input">
+            <option value="">Seleccionar producto...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Tipo *</label>
+          <select id="movTipo" class="form-input">
+            <option value="entrada">↑ Entrada (ingreso de stock)</option>
+            <option value="salida">↓ Salida (consumo/venta)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Cantidad *</label>
+          <input id="movCantidad" class="form-input" type="number" placeholder="0" min="1">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Número de lote</label>
+          <input id="movLote" class="form-input" type="text" placeholder="Ej: LOTE-2026-001">
+          <span class="settings-field-hint">Dejar vacío si no aplica</span>
+        </div>
+
+        <div class="form-group form-full">
+          <label class="form-label">Nota u observación</label>
+          <input id="movNota" class="form-input" type="text" placeholder="Ej: Compra a proveedor Norte">
+        </div>
+
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" onclick="closeModalMovimiento()">Cancelar</button>
+        <button type="button" class="btn-primary"   onclick="guardarMovimiento()">✓ Registrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============================================================
+     MODAL: Producto ya existe — sumar stock
+============================================================ -->
+<div class="modal-overlay" id="modalSumarStock">
+  <div class="modal-box" style="max-width:400px">
+    <div class="modal-header">
+      <div class="modal-title">📦 Producto ya registrado</div>
+    </div>
+    <p style="color:var(--muted); font-size:14px; margin-bottom:16px" id="sumarStockMsg">
+      Este producto ya existe. ¿Deseas sumar al stock existente?
+    </p>
+    <div class="form-group" style="margin-bottom:16px">
+      <label class="form-label">Cantidad a sumar *</label>
+      <input id="sumarCantidad" class="form-input" type="number" placeholder="0" min="1" value="1">
+    </div>
+    <div class="form-group" style="margin-bottom:20px">
+      <label class="form-label">Número de lote (opcional)</label>
+      <input id="sumarLote" class="form-input" type="text" placeholder="Ej: LOTE-2026-001">
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" onclick="cerrarModalSumar()">Cancelar</button>
+      <button type="button" class="btn-primary"   onclick="confirmarSumarStock()">➕ Sumar al inventario</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MODAL: Confirmar eliminación de producto
+============================================================ -->
+<div class="modal-overlay" id="modalEliminar">
+  <div class="modal-box" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title" style="color:var(--rojo)">⚠️ Eliminar producto</div>
+    </div>
+    <p style="color:var(--muted); font-size:14px; margin-bottom:24px" id="eliminarMsg">
+      Esta acción no se puede deshacer. El producto y todo su historial serán eliminados permanentemente.
+    </p>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary" onclick="cerrarModalEliminar()">Cancelar</button>
+      <button type="button" class="btn-primary" style="background:var(--rojo)" onclick="confirmarEliminar()">🗑️ Eliminar permanentemente</button>
+    </div>
+  </div>
+</div>
 
 <!-- ============================================================
      TOAST — Notificación temporal

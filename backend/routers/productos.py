@@ -242,7 +242,7 @@ def actualizar_producto(
 
 # ============================================================
 # DELETE /productos/{id}
-# Elimina lógicamente un producto (soft delete)
+# Elimina permanentemente un producto de la BD
 # ============================================================
 @router.delete("/{producto_id}", response_model=schemas.MensajeRespuesta)
 def eliminar_producto(
@@ -250,15 +250,71 @@ def eliminar_producto(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    """Desactiva un producto — no lo borra de la BD."""
+    """
+    Elimina permanentemente un producto y todos sus movimientos.
+    Analogia: no es papelera de reciclaje — es borrar para siempre.
+    """
     p = db.query(models.Producto).filter(
-        models.Producto.id == producto_id,
-        models.Producto.activo == True
+        models.Producto.id == producto_id
     ).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    p.activo = False
+    nombre = p.nombre
+
+    # Primero eliminar movimientos relacionados (integridad referencial)
+    db.query(models.Movimiento).filter(
+        models.Movimiento.producto_id == producto_id
+    ).delete()
+
+    # Luego eliminar el producto
+    db.delete(p)
     db.commit()
 
-    return {"mensaje": f"Producto '{p.nombre}' eliminado correctamente", "ok": True}
+    return {"mensaje": f"Producto '{nombre}' eliminado permanentemente", "ok": True}
+
+
+# ============================================================
+# POST /productos/{id}/sumar-stock
+# Suma stock a un producto existente (cuando codigo ya existe)
+# ============================================================
+@router.post("/{producto_id}/sumar-stock", response_model=schemas.ProductoRespuesta)
+def sumar_stock_existente(
+    producto_id: int,
+    cantidad: int,
+    nota: str = "",
+    lote: str = "",
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
+    """
+    Suma stock a un producto existente y registra el movimiento.
+    Se usa cuando el escaner detecta un producto ya registrado.
+    """
+    p = db.query(models.Producto).filter(
+        models.Producto.id == producto_id
+    ).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    if cantidad <= 0:
+        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
+
+    stock_anterior = p.stock_actual
+    p.stock_actual += cantidad
+
+    # Registrar movimiento automatico
+    mov = models.Movimiento(
+        producto_id    = producto_id,
+        usuario_id     = usuario_actual.id,
+        tipo           = "entrada",
+        cantidad       = cantidad,
+        stock_anterior = stock_anterior,
+        stock_nuevo    = p.stock_actual,
+        nota           = nota or f"Suma de stock via escaner",
+        lote           = lote or None
+    )
+    db.add(mov)
+    db.commit()
+    db.refresh(p)
+
+    return producto_a_dict(p)

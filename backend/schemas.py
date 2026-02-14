@@ -105,9 +105,10 @@ class ProductoRespuesta(ProductoBase):
 
 class MovimientoBase(BaseModel):
     producto_id: int
-    tipo: str          # 'entrada' o 'salida'
+    tipo: str                           # 'entrada' o 'salida'
     cantidad: int
     nota: Optional[str] = None
+    lote: Optional[str] = None          # Numero de lote cuando aplica
 
 class MovimientoCrear(MovimientoBase):
     # Datos para registrar un movimiento nuevo
@@ -123,8 +124,8 @@ class MovimientoRespuesta(BaseModel):
     stock_anterior: int
     stock_nuevo: int
     nota: Optional[str]
+    lote: Optional[str] = None
     created_at: datetime
-    # Datos del producto relacionado (nombre para mostrar en tabla)
     producto_nombre: Optional[str] = None
     usuario_nombre: Optional[str] = None
 
