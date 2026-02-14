@@ -63,45 +63,86 @@ async function api(path, method = "GET", body = null) {
    ============================================================ */
 
 /* ----------------------------
+   mostrarRegistro() / mostrarLogin()
+   Alterna entre el panel de login y el de registro
+   Analogía: como girar el cartel de "abierto/cerrado"
+---------------------------- */
+function mostrarRegistro() {
+  document.getElementById("panelLogin").style.display    = "none";
+  document.getElementById("panelRegistro").style.display = "block";
+}
+
+function mostrarLogin() {
+  document.getElementById("panelRegistro").style.display = "none";
+  document.getElementById("panelLogin").style.display    = "block";
+}
+
+
+/* ----------------------------
+   registrarUsuario()
+   Crea una cuenta nueva desde el frontend
+---------------------------- */
+async function registrarUsuario() {
+  const nombre   = document.getElementById("regNombre").value.trim();
+  const email    = document.getElementById("regEmail").value.trim();
+  const password = document.getElementById("regPassword").value.trim();
+
+  // Validaciones
+  if (!nombre)              { showToast("El nombre es obligatorio"); return; }
+  if (!email)               { showToast("El correo es obligatorio"); return; }
+  if (password.length < 8)  { showToast("La contraseña debe tener al menos 8 caracteres"); return; }
+
+  try {
+    const data = await api("/auth/registro", "POST", { nombre, email, password });
+
+    // Guardar token y entrar directo a la app
+    authToken     = data.access_token;
+    usuarioActual = data.usuario;
+    localStorage.setItem("stockya_token",   authToken);
+    localStorage.setItem("stockya_usuario", JSON.stringify(usuarioActual));
+
+    document.getElementById("loginPage").style.display = "none";
+    document.getElementById("appMain").style.display   = "flex";
+
+    actualizarUIUsuario();
+    await cargarDashboard();
+
+    showToast(`¡Bienvenido/a, ${usuarioActual.nombre.split(" ")[0]}! 🎉`);
+
+  } catch (error) {
+    showToast("❌ " + error.message);
+  }
+}
+
+
+/* ----------------------------
    enterApp()
-   Ahora hace login real contra el backend.
-   Lee email y contraseña del formulario de login.
+   Login real contra el backend.
 ---------------------------- */
 async function enterApp() {
-  // Leer los campos del formulario de login
-  const emailInput = document.querySelector('#loginPage input[type="email"]');
-  const passInput  = document.querySelector('#loginPage input[type="password"]');
+  const email    = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value.trim();
 
-  const email    = emailInput ? emailInput.value.trim() : "";
-  const password = passInput  ? passInput.value.trim()  : "";
-
-  // Validación básica
   if (!email || !password) {
     showToast("Ingresa tu correo y contraseña");
     return;
   }
 
   try {
-    // Llamada real al backend
     const data = await api("/auth/login", "POST", { email, password });
 
-    // Guardar token y usuario en memoria y localStorage
     authToken     = data.access_token;
     usuarioActual = data.usuario;
     localStorage.setItem("stockya_token",   authToken);
     localStorage.setItem("stockya_usuario", JSON.stringify(usuarioActual));
 
-    // Mostrar la app y cargar datos reales
     document.getElementById("loginPage").style.display = "none";
     document.getElementById("appMain").style.display   = "flex";
 
-    // Actualizar nombre en la interfaz con el usuario real
     actualizarUIUsuario();
-
-    // Cargar datos reales del dashboard
     await cargarDashboard();
 
-    showToast(`Bienvenida, ${usuarioActual.nombre.split(" ")[0]} 👋`);
+    showToast(`Bienvenida/o, ${usuarioActual.nombre.split(" ")[0]} 👋`);
 
   } catch (error) {
     showToast("❌ " + error.message);
@@ -157,39 +198,102 @@ function actualizarUIUsuario() {
 
 /* ----------------------------
    cargarDashboard()
-   Carga alertas y movimientos reales desde el backend
+   Carga todos los datos reales del dashboard desde el backend.
+   Analogia: es el "reporte matutino" que llena todos los indicadores.
 ---------------------------- */
 async function cargarDashboard() {
   try {
-    // Cargar alertas reales
-    const alertas = await api("/alertas/");
+    // Cargar todo en paralelo para mayor velocidad
+    const [alertas, productos, movimientos, config] = await Promise.all([
+      api("/alertas/"),
+      api("/productos/"),
+      api("/movimientos/?limit=5"),
+      api("/configuracion/")
+    ]);
 
-    // Actualizar tarjetas de estadísticas
-    const elCriticos = document.querySelector(".stat-card.rojo .stat-value");
-    const elAlertas  = document.querySelector(".stat-card.amarillo .stat-value");
-    if (elCriticos) elCriticos.textContent = alertas.total_criticos;
-    if (elAlertas)  elAlertas.textContent  = alertas.total_alertas;
+    // --- Saludo y subtitulo ---
+    const nombre = usuarioActual?.nombre?.split(" ")[0] || "";
+    const hoy    = new Date().toLocaleDateString("es-CL", { weekday:"long", day:"numeric", month:"long" });
+    setEl("dashTitulo",   `Buen dia, ${nombre} \u{1F44B}`);
+    setEl("dashSubtitulo", `${hoy.charAt(0).toUpperCase() + hoy.slice(1)} \u00B7 ${config.nombre_negocio}`);
 
-    // Actualizar badge del sidebar
+    // --- Tarjetas de estadisticas ---
+    const totalProductos  = productos.length;
+    const valorInventario = productos.reduce((acc, p) => acc + (p.stock_actual * p.precio_venta), 0);
+    const moneda          = config.moneda || "CLP";
+    setEl("statTotal",     totalProductos);
+    setEl("statCriticos",  alertas.total_criticos);
+    setEl("statAlertas",   alertas.total_alertas);
+    setEl("statTotalTrend", totalProductos === 0 ? "Agrega tu primer producto" : `${totalProductos} productos registrados`);
+    const vf = valorInventario >= 1000000 ? `$${(valorInventario/1000000).toFixed(1)}M`
+             : valorInventario >= 1000    ? `$${Math.round(valorInventario/1000)}K`
+             : `$${Math.round(valorInventario)}`;
+    setEl("statValor",  valorInventario > 0 ? vf : "\u2014");
+    setEl("statMoneda", `${moneda} estimado en bodega`);
+
+    // --- Badge sidebar ---
     const badge = document.getElementById("alertBadge");
-    if (badge) badge.textContent = alertas.total_criticos + alertas.total_alertas;
+    const totalAlertas = alertas.total_criticos + alertas.total_alertas;
+    if (badge) { badge.textContent = totalAlertas; badge.style.display = totalAlertas > 0 ? "inline" : "none"; }
 
-    // Cargar configuración del negocio
-    const config = await api("/configuracion/");
-    const elSubtitle = document.querySelector("#screen-dashboard .page-subtitle");
-    if (elSubtitle) {
-      const hoy = new Date().toLocaleDateString("es-CL", { weekday:"long", day:"numeric", month:"long" });
-      elSubtitle.textContent = `${hoy.charAt(0).toUpperCase() + hoy.slice(1)} · ${config.nombre_negocio}`;
+    // --- Lista de alertas urgentes ---
+    const lista = document.getElementById("dashAlertasList");
+    const todasAlertas = [...alertas.productos_criticos, ...alertas.productos_alerta];
+    if (lista) {
+      if (todasAlertas.length === 0) {
+        lista.innerHTML = `<div style="text-align:center; padding:24px; color:var(--muted); font-size:13px">\u2705 Todo en orden \u2014 sin alertas por ahora</div>`;
+      } else {
+        lista.innerHTML = todasAlertas.slice(0, 3).map(p => `
+          <div class="alert-item ${p.estado}">
+            <div class="alert-emoji">${p.estado === "critico" ? "\uD83D\uDD34" : "\uD83D\uDFE1"}</div>
+            <div class="alert-info">
+              <div class="alert-name">${p.nombre}</div>
+              <div class="alert-detail">Min: ${p.stock_minimo} unidades</div>
+            </div>
+            <div class="alert-qty">${p.stock_actual}</div>
+          </div>`).join("");
+      }
     }
 
-    // Aplicar color del negocio
-    if (config.color_principal) {
-      previsualizarColor(config.color_principal);
+    // --- Movimientos recientes ---
+    const tbody = document.getElementById("dashMovTableBody");
+    if (tbody) {
+      if (movimientos.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--muted); padding:32px; font-size:13px">Aun no hay movimientos \u2014 agrega productos y registra entradas o salidas</td></tr>`;
+      } else {
+        tbody.innerHTML = movimientos.map(m => {
+          const es  = m.tipo === "entrada";
+          const col = es ? "var(--azul)" : "var(--rojo)";
+          const hora = new Date(m.created_at).toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
+          return `<tr>
+            <td><strong>${m.producto_nombre || "\u2014"}</strong></td>
+            <td><span style="color:${col}; font-weight:600">${es ? "\u2191 Entrada" : "\u2193 Salida"}</span></td>
+            <td style="color:${col}; font-weight:600">${es ? "+" : "-"}${m.cantidad}</td>
+            <td>${m.stock_nuevo} und.</td>
+            <td style="color:var(--muted)">${hora}</td>
+          </tr>`;
+        }).join("");
+      }
     }
+
+    // --- Contadores movimientos semanales ---
+    const entradas = movimientos.filter(m => m.tipo === "entrada").reduce((a, m) => a + m.cantidad, 0);
+    const salidas  = movimientos.filter(m => m.tipo === "salida").reduce((a, m)  => a + m.cantidad, 0);
+    setEl("dashEntradas", `+${entradas}`);
+    setEl("dashSalidas",  `-${salidas}`);
+
+    // --- Color del negocio ---
+    if (config.color_principal) previsualizarColor(config.color_principal);
 
   } catch (error) {
     console.error("Error cargando dashboard:", error);
   }
+}
+
+/* Funcion auxiliar: setear texto por ID sin romper si no existe */
+function setEl(id, valor) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = valor;
 }
 
 
@@ -556,9 +660,11 @@ function ajustarBrillo(hex, cantidad) {
 }
 
 function evaluarFuerzaPassword(pass) {
-  const wrap  = document.getElementById("passStrengthWrap");
-  const fill  = document.getElementById("passStrengthFill");
-  const label = document.getElementById("passStrengthLabel");
+  // Funciona tanto en Settings como en el panel de Registro
+  const wrap  = document.getElementById("passStrengthWrap")  || document.getElementById("regStrengthWrap");
+  const fill  = document.getElementById("passStrengthFill")  || document.getElementById("regStrengthFill");
+  const label = document.getElementById("passStrengthLabel") || document.getElementById("regStrengthLabel");
+  if (!wrap) return;
   if (!pass) { wrap.style.display = "none"; return; }
   wrap.style.display = "flex";
   let p = 0;
