@@ -1,5 +1,5 @@
 /* ============================================================
-   STOCKYA — app.js completo
+   STOCKYA — app.js completo con módulo de Salidas
    Backend: http://localhost:8000
    ============================================================ */
 
@@ -26,7 +26,6 @@ async function api(path, method = "GET", body = null) {
   const data = await response.json();
 
   if (!response.ok) {
-    // Preservar status y detail completo para manejar 409 correctamente
     const err    = new Error(typeof data.detail === "string" ? data.detail : (data.detail && data.detail.mensaje) || "Error en el servidor");
     err.status   = response.status;
     err.detail   = data.detail;
@@ -72,16 +71,21 @@ async function registrarUsuario() {
   try {
     await api("/auth/registro", "POST", { nombre, email, password });
     showToast("Cuenta creada — inicia sesion");
-    toggleAuthMode();
+    mostrarLogin();
   } catch (error) { showToast("Error: " + error.message); }
 }
 
-function toggleAuthMode() {
-  const loginForm = document.getElementById("loginForm");
-  const regForm   = document.getElementById("regForm");
-  if (loginForm) loginForm.style.display = loginForm.style.display === "none" ? "block" : "none";
-  if (regForm)   regForm.style.display   = regForm.style.display   === "none" ? "block" : "none";
+function mostrarRegistro() {
+  document.getElementById("panelLogin").style.display    = "none";
+  document.getElementById("panelRegistro").style.display = "block";
 }
+
+function mostrarLogin() {
+  document.getElementById("panelLogin").style.display    = "block";
+  document.getElementById("panelRegistro").style.display = "none";
+}
+
+function toggleAuthMode() { mostrarRegistro(); }
 
 function cerrarSesion() {
   authToken     = null;
@@ -103,14 +107,13 @@ function actualizarUIUsuario() {
   if (elAvatar) elAvatar.textContent = iniciales;
 }
 
-/* Auxiliar setEl */
 function setEl(id, val) {
   const el = document.getElementById(id);
   if (el) el.textContent = val;
 }
 
 /* ============================================================
-   DASHBOARD — actualiza en tiempo real
+   DASHBOARD
    ============================================================ */
 async function cargarDashboard() {
   try {
@@ -121,13 +124,11 @@ async function cargarDashboard() {
       api("/configuracion/")
     ]);
 
-    // Saludo
     const nombre = usuarioActual && usuarioActual.nombre ? usuarioActual.nombre.split(" ")[0] : "";
     const hoy    = new Date().toLocaleDateString("es-CL", { weekday:"long", day:"numeric", month:"long" });
     setEl("dashTitulo",    "Buen dia, " + nombre);
     setEl("dashSubtitulo", hoy.charAt(0).toUpperCase() + hoy.slice(1) + " · " + (config.nombre_negocio || "Mi Negocio"));
 
-    // Estadisticas
     const totalProductos  = productos.length;
     const valorInventario = productos.reduce(function(acc,p){ return acc + (p.stock_actual * (p.precio_venta||0)); }, 0);
     setEl("statTotal",    totalProductos);
@@ -141,12 +142,10 @@ async function cargarDashboard() {
     setEl("statValor",  valorInventario > 0 ? vf : "—");
     setEl("statMoneda", (config.moneda||"CLP") + " estimado en bodega");
 
-    // Badge alertas
-    var badge       = document.getElementById("alertBadge");
-    var totalBadge  = (alertas.total_criticos||0) + (alertas.total_alertas||0);
+    var badge      = document.getElementById("alertBadge");
+    var totalBadge = (alertas.total_criticos||0) + (alertas.total_alertas||0);
     if (badge) { badge.textContent = totalBadge; badge.style.display = totalBadge > 0 ? "inline" : "none"; }
 
-    // Lista alertas urgentes
     var lista        = document.getElementById("dashAlertasList");
     var todasAlertas = (alertas.productos_criticos||[]).concat(alertas.productos_alerta||[]);
     if (lista) {
@@ -164,7 +163,6 @@ async function cargarDashboard() {
       }
     }
 
-    // Movimientos recientes — salidas con signo negativo
     var tbody = document.getElementById("dashMovTableBody");
     if (tbody) {
       if (!movimientos || movimientos.length === 0) {
@@ -174,7 +172,7 @@ async function cargarDashboard() {
           var es   = m.tipo === "entrada";
           var col  = es ? "var(--azul)" : "var(--rojo)";
           var hora = new Date(m.created_at).toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
-          var cant = es ? "+" + m.cantidad : "-" + m.cantidad;  // NEGATIVO EN SALIDAS
+          var cant = es ? "+" + m.cantidad : "-" + m.cantidad;
           return "<tr>"
             + "<td><strong>" + (m.producto_nombre||"—") + "</strong></td>"
             + "<td><span style='color:"+col+";font-weight:600'>" + (es?"↑ Entrada":"↓ Salida") + "</span></td>"
@@ -186,7 +184,6 @@ async function cargarDashboard() {
       }
     }
 
-    // Contadores entradas/salidas
     var ent = (movimientos||[]).filter(function(m){return m.tipo==="entrada";}).reduce(function(a,m){return a+m.cantidad;},0);
     var sal = (movimientos||[]).filter(function(m){return m.tipo==="salida"; }).reduce(function(a,m){return a+m.cantidad;},0);
     setEl("dashEntradas", "+" + ent);
@@ -200,7 +197,7 @@ async function cargarDashboard() {
 }
 
 /* ============================================================
-   PRODUCTOS — solo caracteristicas, sin stock
+   PRODUCTOS
    ============================================================ */
 async function cargarProductos(buscar, categoria) {
   buscar    = buscar    || "";
@@ -224,7 +221,6 @@ async function cargarProductos(buscar, categoria) {
       return;
     }
 
-    // Solo caracteristicas — sin columna de stock
     tbody.innerHTML = productos.map(function(p){
       var nombreSafe = p.nombre.split("'").join("&apos;");
       var precioC    = p.precio_compra ? "$" + p.precio_compra.toLocaleString("es-CL") : "—";
@@ -266,7 +262,7 @@ function filtrarProductos() {
 }
 
 /* ============================================================
-   STOCK — igual a productos pero con columnas de stock
+   STOCK
    ============================================================ */
 async function cargarStock(buscar, categoria, estado) {
   buscar    = buscar    || "";
@@ -341,7 +337,7 @@ function abrirMovimientoRapido(id, nombre) {
 }
 
 /* ============================================================
-   MOVIMIENTOS — una fila por movimiento, signo negativo en salidas
+   MOVIMIENTOS
    ============================================================ */
 async function cargarMovimientos(tipo, buscar, categoria, desde, hasta) {
   tipo      = tipo      || "";
@@ -376,14 +372,13 @@ async function cargarMovimientos(tipo, buscar, categoria, desde, hasta) {
       return;
     }
 
-    // Una fila por movimiento — salidas con SIGNO NEGATIVO
     tbody.innerHTML = movimientos.map(function(m){
       var es      = m.tipo === "entrada";
       var col     = es ? "var(--azul)" : "var(--rojo)";
       var fecha   = new Date(m.created_at);
       var fStr    = fecha.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"});
       var hStr    = fecha.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
-      var cant    = es ? "+" + m.cantidad : "-" + m.cantidad;   // NEGATIVO EN SALIDAS
+      var cant    = es ? "+" + m.cantidad : "-" + m.cantidad;
       return "<tr>"
         + "<td style='padding-left:16px;font-size:12px'><div style='font-weight:600'>" + fStr + "</div><div style='color:var(--muted)'>" + hStr + "</div></td>"
         + "<td><strong>" + (m.producto_nombre||"<span style='color:var(--muted);font-style:italic'>Eliminado</span>") + "</strong></td>"
@@ -427,6 +422,311 @@ async function cargarAlertas() {
 }
 
 /* ============================================================
+   SALIDAS — ventas, mermas, cuarentenas, devoluciones
+   Con soporte para escaneo por camara o pistola lectora
+   ============================================================ */
+
+var _streamSalida = null; // Variable global para el escaner de salidas
+
+/* Cargar lista de salidas con filtros */
+async function cargarSalidas(tipo, estado, buscar, desde, hasta) {
+  tipo   = tipo   || "";
+  estado = estado || "";
+  buscar = buscar || "";
+  desde  = desde  || "";
+  hasta  = hasta  || "";
+
+  try {
+    var url = "/salidas/?limit=500";
+    if (tipo)   url += "&tipo_salida=" + encodeURIComponent(tipo);
+    if (estado) url += "&estado="      + encodeURIComponent(estado);
+    if (buscar) url += "&buscar="      + encodeURIComponent(buscar);
+    if (desde)  url += "&desde="       + encodeURIComponent(desde);
+    if (hasta)  url += "&hasta="       + encodeURIComponent(hasta);
+
+    const salidas   = await api(url);
+    const resumen   = await api("/salidas/resumen");
+    const tbody     = document.getElementById("salidaTableBody");
+    const subtitulo = document.getElementById("salidaSubtitulo");
+
+    // Actualizar contadores del resumen
+    setEl("salidaResVentas",      resumen.total_ventas            || 0);
+    setEl("salidaResMermas",      resumen.total_mermas            || 0);
+    setEl("salidaResCuarentenas", resumen.cuarentenas_pendientes  || 0);
+    setEl("salidaResValor",       "$" + (resumen.valor_ventas || 0).toLocaleString("es-CL"));
+
+    if (subtitulo) subtitulo.textContent = salidas.length + " registro" + (salidas.length !== 1 ? "s" : "");
+    if (!tbody) return;
+
+    if (salidas.length === 0) {
+      tbody.innerHTML = "<tr><td colspan='9' style='text-align:center;color:var(--muted);padding:40px;font-size:13px'>Sin salidas registradas aun</td></tr>";
+      return;
+    }
+
+    // Mapas de colores y etiquetas
+    var colorTipo  = { venta:"var(--azul)", merma:"var(--rojo)", cuarentena:"var(--amarillo)", devolucion_proveedor:"var(--muted)" };
+    var labelTipo  = { venta:"Venta", merma:"Merma", cuarentena:"Cuarentena", devolucion_proveedor:"Dev. Proveedor" };
+    var colorEst   = { activo:"var(--verde)", en_revision:"var(--amarillo)", reingresado:"var(--azul)", descartado:"var(--rojo)", enviado_proveedor:"var(--muted)" };
+    var labelEst   = { activo:"Confirmado", en_revision:"En Revision", reingresado:"Reingresado", descartado:"Descartado", enviado_proveedor:"Enviado" };
+    var iconoTipo  = { venta:"🛒", merma:"🗑️", cuarentena:"⚠️", devolucion_proveedor:"↩️" };
+
+    tbody.innerHTML = salidas.map(function(s) {
+      var fecha  = new Date(s.created_at);
+      var fStr   = fecha.toLocaleDateString("es-CL", { day:"2-digit", month:"2-digit", year:"numeric" });
+      var hStr   = fecha.toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
+      var colT   = colorTipo[s.tipo_salida] || "var(--muted)";
+      var labT   = labelTipo[s.tipo_salida] || s.tipo_salida;
+      var colE   = colorEst[s.estado]       || "var(--muted)";
+      var labE   = labelEst[s.estado]       || s.estado;
+      var icono  = iconoTipo[s.tipo_salida] || "📦";
+      var valor  = s.valor_total > 0 ? "$" + s.valor_total.toLocaleString("es-CL") : "—";
+
+      // Boton resolver solo para cuarentenas en_revision
+      var btnResolver = s.estado === "en_revision"
+        ? "<button onclick='abrirModalResolucion(" + s.id + ")'"
+          + " style='background:var(--amarillo);color:#000;border:none;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px'>Resolver</button>"
+        : "";
+
+      return "<tr>"
+        + "<td style='padding-left:16px;font-size:12px'><div style='font-weight:600'>" + fStr + "</div><div style='color:var(--muted)'>" + hStr + "</div></td>"
+        + "<td><strong>" + (s.producto_nombre || "<span style='color:var(--muted);font-style:italic'>Eliminado</span>") + "</strong>"
+        + (s.lote ? "<div style='font-size:11px;color:var(--muted)'>Lote: " + s.lote + "</div>" : "") + "</td>"
+        + "<td><span style='color:" + colT + ";font-weight:600'>" + icono + " " + labT + "</span></td>"
+        + "<td style='color:var(--rojo);font-weight:700'>-" + s.cantidad + "</td>"
+        + "<td style='color:var(--muted);text-align:center'>" + s.stock_anterior + "</td>"
+        + "<td style='font-weight:600;text-align:center'>" + s.stock_nuevo + "</td>"
+        + "<td style='font-size:12px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' title='" + (s.motivo||"") + "'>" + (s.motivo||"—") + "</td>"
+        + "<td>" + btnResolver + "<span style='color:" + colE + ";font-size:12px;font-weight:600;padding:3px 8px;border-radius:6px;background:" + colE + "22'>" + labE + "</span></td>"
+        + "<td style='text-align:center;font-weight:600'>" + valor + "</td>"
+        + "</tr>";
+    }).join("");
+
+  } catch (error) { console.error("Error salidas:", error); }
+}
+
+function filtrarSalidas() {
+  cargarSalidas(
+    document.getElementById("salidaFiltroTipo")?.value   || "",
+    document.getElementById("salidaFiltroEstado")?.value || "",
+    document.getElementById("salidaBuscar")?.value       || "",
+    document.getElementById("salidaFiltroDesde")?.value  || "",
+    document.getElementById("salidaFiltroHasta")?.value  || ""
+  );
+}
+
+/* ============================================================
+   MODAL NUEVA SALIDA — con escaner integrado
+   ============================================================ */
+async function abrirModalSalida() {
+  try {
+    var productos = await api("/productos/");
+    var sel       = document.getElementById("salidaProductoId");
+    if (sel) {
+      sel.innerHTML = "<option value=''>Seleccionar producto...</option>";
+      productos.forEach(function(p) {
+        var opt         = document.createElement("option");
+        opt.value       = p.id;
+        opt.textContent = p.nombre + " (stock: " + p.stock_actual + ")" + (p.codigo_barra ? " — " + p.codigo_barra : "");
+        sel.appendChild(opt);
+      });
+    }
+  } catch(e) {}
+
+  var form = document.getElementById("formSalida");
+  if (form) form.reset();
+  var hint = document.getElementById("salidaScanHint");
+  if (hint) { hint.textContent = ""; hint.style.color = ""; }
+
+  document.getElementById("modalSalida").classList.add("open");
+}
+
+function cerrarModalSalida() {
+  document.getElementById("modalSalida").classList.remove("open");
+  cerrarEscanerSalida();
+}
+
+/* Buscar producto por codigo de barras en el modal de salida */
+var _timerSalidaScan = null;
+function buscarProductoSalida(codigo) {
+  clearTimeout(_timerSalidaScan);
+  var hint = document.getElementById("salidaScanHint");
+  if (!codigo) { if (hint) { hint.textContent = ""; hint.style.color = ""; } return; }
+  if (hint) { hint.textContent = "Buscando..."; hint.style.color = "var(--muted)"; }
+
+  _timerSalidaScan = setTimeout(async function() {
+    try {
+      var p = await api("/productos/buscar-codigo/" + encodeURIComponent(codigo));
+      var sel = document.getElementById("salidaProductoId");
+      if (sel) {
+        for (var o of sel.options) {
+          if (parseInt(o.value) === p.id) { o.selected = true; break; }
+        }
+      }
+      if (hint) {
+        hint.textContent = "✓ " + p.nombre + " — Stock disponible: " + p.stock_actual + " und.";
+        hint.style.color = "var(--verde)";
+      }
+      var precioInput = document.getElementById("salidaPrecioUnitario");
+      if (precioInput && p.precio_venta) precioInput.value = p.precio_venta;
+    } catch(e) {
+      if (hint) { hint.textContent = "Producto no encontrado con ese codigo"; hint.style.color = "var(--rojo)"; }
+    }
+  }, 600);
+}
+
+/* Escaner de camara para salidas */
+function abrirEscanerSalida() {
+  var vid = document.getElementById("videoEscanerSalida");
+  if (!vid) return;
+  vid.style.display = "block";
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(function(stream) {
+      _streamSalida = stream;
+      vid.srcObject = stream;
+      vid.play();
+      if (!("BarcodeDetector" in window)) {
+        cerrarEscanerSalida();
+        showToast("Escaner no soportado en este navegador");
+        return;
+      }
+      var detector = new BarcodeDetector({ formats: ["ean_13","ean_8","code_128","qr_code"] });
+      var _scan = setInterval(async function() {
+        try {
+          var codes = await detector.detect(vid);
+          if (codes.length > 0) {
+            clearInterval(_scan);
+            cerrarEscanerSalida();
+            var inputScan = document.getElementById("salidaCodigoBarra");
+            if (inputScan) { inputScan.value = codes[0].rawValue; buscarProductoSalida(codes[0].rawValue); }
+            showToast("Codigo escaneado: " + codes[0].rawValue);
+          }
+        } catch(e) {}
+      }, 500);
+    })
+    .catch(function() { showToast("No se pudo acceder a la camara"); });
+}
+
+function cerrarEscanerSalida() {
+  if (_streamSalida) { _streamSalida.getTracks().forEach(function(t){ t.stop(); }); _streamSalida = null; }
+  var vid = document.getElementById("videoEscanerSalida");
+  if (vid) vid.style.display = "none";
+}
+
+/* Guardar la salida */
+async function guardarSalida() {
+  var codigoBarra = document.getElementById("salidaCodigoBarra")?.value.trim()          || "";
+  var productoId  = document.getElementById("salidaProductoId")?.value                  || "";
+  var tipoSalida  = document.getElementById("salidaTipoSalida")?.value                  || "";
+  var cantidad    = parseInt(document.getElementById("salidaCantidad")?.value)           || 0;
+  var motivo      = document.getElementById("salidaMotivo")?.value.trim()               || "";
+  var documento   = document.getElementById("salidaDocumento")?.value.trim()            || "";
+  var precioUnit  = parseFloat(document.getElementById("salidaPrecioUnitario")?.value)  || null;
+  var lote        = document.getElementById("salidaLote")?.value.trim()                 || "";
+
+  if (!tipoSalida)   { showToast("Selecciona el tipo de salida"); return; }
+  if (cantidad <= 0) { showToast("La cantidad debe ser mayor a 0"); return; }
+
+  var btn = document.querySelector("#modalSalida .btn-primary");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
+
+  cerrarEscanerSalida();
+
+  try {
+    if (codigoBarra && !productoId) {
+      // Usar endpoint de scan si vino del escaner
+      await api("/salidas/scan", "POST", {
+        codigo_barra:     codigoBarra,
+        tipo_salida:      tipoSalida,
+        cantidad:         cantidad,
+        motivo:           motivo    || null,
+        numero_documento: documento || null,
+        precio_unitario:  precioUnit,
+      });
+    } else {
+      if (!productoId) {
+        showToast("Selecciona un producto o escanea el codigo");
+        if (btn) { btn.disabled = false; btn.textContent = "Registrar salida"; }
+        return;
+      }
+      await api("/salidas/", "POST", {
+        producto_id:      parseInt(productoId),
+        tipo_salida:      tipoSalida,
+        cantidad:         cantidad,
+        motivo:           motivo    || null,
+        numero_documento: documento || null,
+        precio_unitario:  precioUnit,
+        lote:             lote      || null,
+        codigo_barra_scan: codigoBarra || null,
+      });
+    }
+
+    cerrarModalSalida();
+    var labelTipo = { venta:"Venta registrada", merma:"Merma registrada", cuarentena:"Enviado a cuarentena", devolucion_proveedor:"Devolucion registrada" };
+    showToast(labelTipo[tipoSalida] || "Salida registrada correctamente");
+    await cargarSalidas();
+    await cargarStock();
+    await cargarDashboard();
+
+  } catch (error) {
+    if (btn) { btn.disabled = false; btn.textContent = "Registrar salida"; }
+    showToast("Error: " + error.message);
+  }
+}
+
+/* ============================================================
+   MODAL RESOLUCION DE CUARENTENA
+   El supervisor decide el destino del producto en espera
+   ============================================================ */
+var _salidaResolverId = null;
+
+function abrirModalResolucion(salidaId) {
+  _salidaResolverId = salidaId;
+  var form = document.getElementById("formResolucion");
+  if (form) form.reset();
+  document.getElementById("modalResolucion").classList.add("open");
+}
+
+function cerrarModalResolucion() {
+  document.getElementById("modalResolucion").classList.remove("open");
+  _salidaResolverId = null;
+}
+
+async function guardarResolucion() {
+  if (!_salidaResolverId) return;
+  var nuevoEstado = document.getElementById("resolucionEstado")?.value     || "";
+  var nota        = document.getElementById("resolucionNota")?.value.trim() || "";
+
+  if (!nuevoEstado) { showToast("Selecciona una resolucion"); return; }
+
+  var btn = document.querySelector("#modalResolucion .btn-primary");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
+
+  try {
+    await api("/salidas/" + _salidaResolverId + "/estado", "PATCH", {
+      nuevo_estado:    nuevoEstado,
+      resolucion_nota: nota || null,
+    });
+
+    cerrarModalResolucion();
+
+    var labelRes = {
+      reingresado:       "Producto reingresado al stock",
+      descartado:        "Producto descartado",
+      enviado_proveedor: "Devolucion al proveedor registrada",
+    };
+    showToast(labelRes[nuevoEstado] || "Resolucion guardada");
+    await cargarSalidas();
+    await cargarStock();
+    await cargarDashboard();
+
+  } catch (error) {
+    if (btn) { btn.disabled = false; btn.textContent = "Confirmar resolucion"; }
+    showToast("Error: " + error.message);
+  }
+}
+
+/* ============================================================
    NAVEGACION
    ============================================================ */
 async function showScreen(name) {
@@ -445,6 +745,7 @@ async function showScreen(name) {
   if (name === "stock")       await cargarStock();
   if (name === "movimientos") await cargarMovimientos();
   if (name === "alertas")     await cargarAlertas();
+  if (name === "salidas")     await cargarSalidas();  // NUEVO
 }
 
 function toggleSidebar() {
@@ -475,7 +776,6 @@ function closeModal() {
   cerrarEscaner();
 }
 
-/* Calcular precio de venta automaticamente segun % ganancia */
 function calcularPrecioVenta() {
   var compra     = parseFloat(document.getElementById("inputPrecioCompra").value) || 0;
   var porcentaje = parseFloat(document.getElementById("inputPorcentaje").value)   || 0;
@@ -489,7 +789,6 @@ function calcularPrecioVenta() {
   }
 }
 
-/* Buscar por codigo de barras con debounce */
 var _timerBusq = null;
 function buscarPorCodigo(codigo) {
   clearTimeout(_timerBusq);
@@ -499,7 +798,6 @@ function buscarPorCodigo(codigo) {
   _timerBusq = setTimeout(async function(){
     try {
       var p = await api("/productos/buscar-codigo/" + encodeURIComponent(codigo));
-      // Producto encontrado — llenar campos
       document.getElementById("inputNombre").value       = p.nombre;
       document.getElementById("inputMarca").value        = p.marca     || "";
       document.getElementById("inputProveedor").value    = p.proveedor || "";
@@ -512,7 +810,6 @@ function buscarPorCodigo(codigo) {
   }, 600);
 }
 
-/* Escaner de camara */
 var _streamCam = null;
 function abrirEscaner() {
   var vid = document.getElementById("videoEscaner");
@@ -545,7 +842,6 @@ function cerrarEscaner() {
   if (vid) vid.style.display = "none";
 }
 
-/* Guardar producto */
 async function saveProduct() {
   var nombre       = document.getElementById("inputNombre").value.trim().toUpperCase();
   var codigoBarra  = document.getElementById("inputCodigoBarra").value.trim().toUpperCase();
@@ -565,7 +861,6 @@ async function saveProduct() {
   if (!nombre) { showToast("El nombre del producto es obligatorio"); return; }
   if (parseInt(stockActual) < 0) { showToast("El stock no puede ser negativo"); return; }
 
-  // Deshabilitar boton para evitar doble clic
   var btn = document.querySelector("#modalAgregar .btn-primary");
   if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
 
@@ -592,12 +887,11 @@ async function saveProduct() {
 
   } catch (error) {
     if (btn) { btn.disabled = false; btn.textContent = "Guardar producto"; }
-    // 409 = codigo de barras ya existe → sumar stock directamente
     if (error.status === 409 && codigoBarra) {
       try {
-        var prod      = await api("/productos/buscar-codigo/" + encodeURIComponent(codigoBarra));
-        var cantNum   = parseInt(stockActual) || 1;
-        var params    = "cantidad=" + cantNum + (lote ? "&lote=" + encodeURIComponent(lote) : "");
+        var prod    = await api("/productos/buscar-codigo/" + encodeURIComponent(codigoBarra));
+        var cantNum = parseInt(stockActual) || 1;
+        var params  = "cantidad=" + cantNum + (lote ? "&lote=" + encodeURIComponent(lote) : "");
         await api("/productos/" + prod.id + "/sumar-stock?" + params, "POST");
         closeModal();
         showToast("Se sumaron " + cantNum + " unidades a " + prod.nombre);
@@ -611,7 +905,6 @@ async function saveProduct() {
   }
 }
 
-/* Sumar stock directo */
 async function sumarStockDirecto(productoId, cantidad, lote) {
   var params = "cantidad=" + cantidad + (lote ? "&lote=" + encodeURIComponent(lote) : "");
   return await api("/productos/" + productoId + "/sumar-stock?" + params, "POST");
@@ -701,7 +994,7 @@ async function guardarEdicion() {
 }
 
 /* ============================================================
-   ELIMINAR PRODUCTO — registra movimiento de baja antes de borrar
+   ELIMINAR PRODUCTO
    ============================================================ */
 var _eliminarId   = null;
 var _eliminarNomb = "";
@@ -850,7 +1143,6 @@ function togglePass(inputId, btn) {
 
 async function guardarConfiguracion() {
   var negocio = document.getElementById("inputNegocio").value.trim();
-  var usuario = document.getElementById("inputNombreUsuario").value.trim();
   var moneda  = document.getElementById("inputMoneda").value;
   var passN   = document.getElementById("inputPassNueva").value;
   var passC   = document.getElementById("inputPassConfirm").value;
@@ -858,8 +1150,6 @@ async function guardarConfiguracion() {
   if (passN && passN !== passC) { showToast("Las contrasenas no coinciden"); return; }
   try {
     await api("/configuracion/", "PUT", { nombre_negocio:negocio, moneda, color_principal:configTemporal.color, logo_base64:configTemporal.logoData });
-    var sidebarNombre = document.querySelector(".user-name");
-    if (sidebarNombre) sidebarNombre.textContent = usuario;
     document.getElementById("inputPassActual").value  = "";
     document.getElementById("inputPassNueva").value   = "";
     document.getElementById("inputPassConfirm").value = "";
@@ -905,7 +1195,7 @@ async function filterMov(btn, type) {
 /* Inicializacion al cargar la pagina */
 document.addEventListener("DOMContentLoaded", function(){
   // Cerrar modales al hacer clic fuera
-  ["modalAgregar","modalEditar","modalEliminar","modalMovimiento"].forEach(function(id){
+  ["modalAgregar","modalEditar","modalEliminar","modalMovimiento","modalSalida","modalResolucion"].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.addEventListener("click", function(e){ if(e.target===this) e.target.classList.remove("open"); });
   });
