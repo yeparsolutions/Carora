@@ -20,17 +20,15 @@ class UsuarioBase(BaseModel):
     email: EmailStr
 
 class UsuarioCrear(UsuarioBase):
-    # Se usa al registrar un usuario nuevo
     password: str
 
 class UsuarioRespuesta(UsuarioBase):
-    # Lo que devuelve la API (sin la contrasena)
     id: int
     activo: bool
     created_at: datetime
 
     class Config:
-        from_attributes = True   # Permite convertir objeto SQLAlchemy a dict
+        from_attributes = True
 
 
 # ============================================================
@@ -38,12 +36,10 @@ class UsuarioRespuesta(UsuarioBase):
 # ============================================================
 
 class LoginRequest(BaseModel):
-    # Datos que envia el frontend al hacer login
     email: EmailStr
     password: str
 
 class TokenRespuesta(BaseModel):
-    # Lo que devuelve la API al hacer login exitoso
     access_token: str
     token_type: str = "bearer"
     usuario: UsuarioRespuesta
@@ -55,8 +51,8 @@ class TokenRespuesta(BaseModel):
 
 class ProductoBase(BaseModel):
     nombre: str
-    codigo_barra: Optional[str] = None          # Codigo de barras EAN/UPC
-    codigo: Optional[str] = None                # Codigo interno
+    codigo_barra: Optional[str] = None
+    codigo: Optional[str] = None
     categoria: Optional[str] = None
     marca: Optional[str] = None
     proveedor: Optional[str] = None
@@ -64,17 +60,15 @@ class ProductoBase(BaseModel):
     stock_minimo: int = 0
     precio_compra: float = 0.0
     precio_venta: float = 0.0
-    porcentaje_ganancia: float = 0.0            # % ganancia sobre precio compra
+    porcentaje_ganancia: float = 0.0
     fecha_vencimiento: Optional[datetime] = None
-    dias_alerta_venc: int = 30                  # Dias de anticipacion para alerta
-    lote: Optional[str] = None                  # Numero de lote
+    dias_alerta_venc: int = 30
+    lote: Optional[str] = None
 
 class ProductoCrear(ProductoBase):
-    # Datos para crear un producto nuevo
     pass
 
 class ProductoActualizar(BaseModel):
-    # Todos los campos son opcionales al actualizar
     nombre: Optional[str] = None
     codigo_barra: Optional[str] = None
     codigo: Optional[str] = None
@@ -90,38 +84,33 @@ class ProductoActualizar(BaseModel):
     lote: Optional[str] = None
 
 class ProductoRespuesta(ProductoBase):
-    # Lo que devuelve la API
     id: int
     activo: bool
     created_at: datetime
-    estado: Optional[str] = None        # 'ok' | 'alerta' | 'critico'
-    estado_venc: Optional[str] = None   # 'ok' | 'proximo' | 'vencido'
+    estado: Optional[str] = None
+    estado_venc: Optional[str] = None
 
     class Config:
         from_attributes = True
 
 
 # ============================================================
-# SCHEMAS: MOVIMIENTO
+# SCHEMAS: MOVIMIENTO (entradas)
 # ============================================================
 
 class MovimientoBase(BaseModel):
     producto_id: int
-    tipo: str                           # 'entrada' o 'salida'
+    tipo: str
     cantidad: int
     nota: Optional[str] = None
-    lote: Optional[str] = None          # Numero de lote cuando aplica
+    lote: Optional[str] = None
 
 class MovimientoCrear(MovimientoBase):
-    # Datos para registrar un movimiento nuevo
     pass
 
 class MovimientoRespuesta(BaseModel):
-    # Lo que devuelve la API
-    # producto_id es Optional porque el producto pudo haber sido eliminado
-    # Analogia: es como una factura que menciona un producto que ya no esta en catalogo
     id: int
-    producto_id: Optional[int] = None   # CORREGIDO: era int, fallaba con NULL en BD
+    producto_id: Optional[int] = None
     usuario_id: int
     tipo: str
     cantidad: int
@@ -138,6 +127,82 @@ class MovimientoRespuesta(BaseModel):
 
 
 # ============================================================
+# SCHEMAS: SALIDAS
+# Analogia: el "formulario de egreso" que explica por que
+#           salio el producto y en que estado queda
+# ============================================================
+
+class SalidaCrear(BaseModel):
+    # Campos obligatorios
+    producto_id: int
+    tipo_salida: str            # venta | merma | cuarentena | devolucion_proveedor
+    cantidad: int
+
+    # Campos opcionales segun el tipo
+    motivo: Optional[str] = None
+    numero_documento: Optional[str] = None
+    codigo_barra_scan: Optional[str] = None
+    precio_unitario: Optional[float] = None
+    lote: Optional[str] = None
+    fecha_vencimiento: Optional[datetime] = None
+
+class SalidaPorScan(BaseModel):
+    # Para registrar desde escaner de codigo de barras o celular
+    # Analogia: el cajero que pasa el producto y solo elige tipo + cantidad
+    codigo_barra: str
+    tipo_salida: str
+    cantidad: int
+    motivo: Optional[str] = None
+    numero_documento: Optional[str] = None
+    precio_unitario: Optional[float] = None
+
+class SalidaActualizarEstado(BaseModel):
+    # Para cambiar el estado de una cuarentena
+    # Analogia: el supervisor que decide el destino del producto en cuarentena
+    nuevo_estado: str           # reingresado | descartado | enviado_proveedor
+    resolucion_nota: Optional[str] = None
+
+class SalidaRespuesta(BaseModel):
+    id: int
+    producto_id: Optional[int] = None
+    usuario_id: int
+    cantidad: int
+    stock_anterior: int
+    stock_nuevo: int
+    tipo_salida: str
+    motivo: Optional[str] = None
+    numero_documento: Optional[str] = None
+    codigo_barra_scan: Optional[str] = None
+    precio_unitario: float
+    valor_total: float
+    estado: str
+    estado_anterior: Optional[str] = None
+    resolucion_nota: Optional[str] = None
+    resolucion_at: Optional[datetime] = None
+    lote: Optional[str] = None
+    fecha_vencimiento: Optional[datetime] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    producto_nombre: Optional[str] = None
+    usuario_nombre: Optional[str] = None
+    resolucion_usuario_nombre: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class ResumenSalidas(BaseModel):
+    # Dashboard rapido de salidas
+    total_ventas: int
+    total_mermas: int
+    total_cuarentenas: int
+    total_devoluciones: int
+    cuarentenas_pendientes: int
+    valor_ventas: float
+    valor_mermas: float
+    valor_cuarentenas_pendientes: float
+
+
+# ============================================================
 # SCHEMAS: CONFIGURACION
 # ============================================================
 
@@ -148,7 +213,6 @@ class ConfiguracionBase(BaseModel):
     logo_base64: Optional[str] = None
 
 class ConfiguracionActualizar(ConfiguracionBase):
-    # Datos para actualizar la configuracion del negocio
     pass
 
 class ConfiguracionRespuesta(ConfiguracionBase):
@@ -164,9 +228,8 @@ class ConfiguracionRespuesta(ConfiguracionBase):
 # ============================================================
 
 class AlertaRespuesta(BaseModel):
-    # Resumen de alertas del sistema
-    total_criticos: int           # Stock por debajo del minimo
-    total_alertas: int            # Stock cerca del minimo (< minimo * 1.5)
+    total_criticos: int
+    total_alertas: int
     productos_criticos: list[ProductoRespuesta]
     productos_alerta: list[ProductoRespuesta]
 
@@ -176,6 +239,5 @@ class AlertaRespuesta(BaseModel):
 # ============================================================
 
 class MensajeRespuesta(BaseModel):
-    # Respuesta simple con mensaje de exito o error
     mensaje: str
     ok: bool = True
