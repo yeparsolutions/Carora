@@ -626,6 +626,9 @@ function openModal() {
 
 function closeModal() {
   document.getElementById("modalAgregar").classList.remove("open");
+  // Restaurar botón guardar
+  const btnGuardar = document.querySelector("#modalAgregar .btn-primary");
+  if (btnGuardar) { btnGuardar.disabled = false; btnGuardar.textContent = "✓ Guardar producto"; }
   // Limpiar campos del escaner y hints
   cerrarEscaner();
   const hint = document.getElementById("codigoHint");
@@ -964,6 +967,10 @@ async function saveProduct() {
   if (!nombre) { showToast("⚠️ El nombre del producto es obligatorio"); return; }
   if (parseInt(stockActual) < 0) { showToast("⚠️ El stock no puede ser negativo"); return; }
 
+  // Deshabilitar botón para evitar doble clic
+  const btnGuardar = document.querySelector("#modalAgregar .btn-primary");
+  if (btnGuardar) { btnGuardar.disabled = true; btnGuardar.textContent = "Guardando..."; }
+
   // Cerrar escaner si estaba abierto
   cerrarEscaner();
 
@@ -995,18 +1002,20 @@ async function saveProduct() {
 
   } catch (error) {
     // 409 = producto con ese codigo de barras ya existe
-    // Sumamos el stock directamente usando los datos ya escritos en el formulario
-    if (error.status === 409 && error.detail?.producto_id) {
-      const { producto_id, nombre } = error.detail;
-      const cantidadNum = parseInt(stockActual) || 1;
+    // Buscamos el producto por codigo de barra y sumamos directo
+    if (error.status === 409) {
       try {
-        await sumarStockDirecto(producto_id, cantidadNum, lote);
+        // Buscar el producto existente por codigo de barra
+        const prod        = await api(`/productos/buscar-codigo/${encodeURIComponent(codigoBarra)}`);
+        const cantidadNum = parseInt(stockActual) || 1;
+        await sumarStockDirecto(prod.id, cantidadNum, lote);
         closeModal();
-        showToast(`✅ Se sumaron ${cantidadNum} unidades a "${nombre}"`);
+        showToast(`✅ Se sumaron ${cantidadNum} unidades a "${prod.nombre}"`);
         await cargarProductos();
+        await cargarStock();
         await cargarDashboard();
       } catch(e2) {
-        showToast("❌ " + e2.message);
+        showToast("❌ Error al sumar stock: " + e2.message);
       }
     } else {
       showToast("❌ " + error.message);

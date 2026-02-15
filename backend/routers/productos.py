@@ -204,6 +204,23 @@ def crear_producto(
 
     nuevo = models.Producto(**datos_dict)
     db.add(nuevo)
+    db.flush()   # Obtener el ID sin hacer commit todavia
+
+    # Si el stock inicial es > 0, registrar movimiento de entrada automatico
+    # Analogia: la primera caja que entra a la bodega queda anotada en el libro
+    if nuevo.stock_actual > 0:
+        mov_inicial = models.Movimiento(
+            producto_id    = nuevo.id,
+            usuario_id     = usuario_actual.id,
+            tipo           = "entrada",
+            cantidad       = nuevo.stock_actual,
+            stock_anterior = 0,
+            stock_nuevo    = nuevo.stock_actual,
+            nota           = "Stock inicial al crear el producto",
+            lote           = nuevo.lote
+        )
+        db.add(mov_inicial)
+
     db.commit()
     db.refresh(nuevo)
 
