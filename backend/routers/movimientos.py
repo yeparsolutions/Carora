@@ -23,21 +23,49 @@ router = APIRouter(prefix="/movimientos", tags=["Movimientos"])
 @router.get("/", response_model=List[schemas.MovimientoRespuesta])
 def listar_movimientos(
     tipo: Optional[str] = None,           # 'entrada' o 'salida'
-    producto_id: Optional[int] = None,    # Filtrar por producto específico
-    limit: int = 50,                       # Máximo de registros a retornar
+    producto_id: Optional[int] = None,    # Filtrar por producto especifico
+    buscar: Optional[str] = None,         # Buscar por nombre de producto
+    categoria: Optional[str] = None,      # Filtrar por categoria del producto
+    desde: Optional[str] = None,          # Fecha inicio (YYYY-MM-DD)
+    hasta: Optional[str] = None,          # Fecha fin (YYYY-MM-DD)
+    limit: int = 200,
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    """Lista los últimos movimientos registrados."""
+    """
+    Lista movimientos con filtros completos.
+    Analogia: el libro contable donde puedes buscar
+    por fecha, producto, tipo o categoria.
+    """
+    from datetime import datetime, timezone
+    # Hacer join con Producto una sola vez si se necesitan filtros de producto
+    # Analogia: abrir el catalogo una sola vez aunque busques varios campos
+    necesita_join = buscar or categoria
     query = db.query(models.Movimiento)
+    if necesita_join:
+        query = query.outerjoin(models.Producto,
+                                models.Movimiento.producto_id == models.Producto.id)
 
-    # Aplicar filtros
     if tipo:
         query = query.filter(models.Movimiento.tipo == tipo)
     if producto_id:
         query = query.filter(models.Movimiento.producto_id == producto_id)
+    if buscar:
+        query = query.filter(models.Producto.nombre.ilike(f"%{buscar}%"))
+    if categoria:
+        query = query.filter(models.Producto.categoria == categoria)
+    if desde:
+        try:
+            fecha_desde = datetime.strptime(desde, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            query = query.filter(models.Movimiento.created_at >= fecha_desde)
+        except: pass
+    if hasta:
+        try:
+            from datetime import timedelta
+            fecha_hasta = datetime.strptime(hasta, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
+            query = query.filter(models.Movimiento.created_at <= fecha_hasta)
+        except: pass
 
-    # Ordenar del más reciente al más antiguo
     movimientos = query.order_by(models.Movimiento.created_at.desc()).limit(limit).all()
 
     # Construir respuesta con nombres de producto y usuario

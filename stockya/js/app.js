@@ -787,11 +787,11 @@ function calcularPrecioVentaEditar() {
 
 async function guardarEdicion() {
   const id          = document.getElementById("editId").value;
-  const nombre      = document.getElementById("editNombre").value.trim();
-  const codigoBarra = document.getElementById("editCodigoBarra").value.trim();
-  const codigo      = document.getElementById("editCodigo").value.trim();
-  const marca       = document.getElementById("editMarca").value.trim();
-  const proveedor   = document.getElementById("editProveedor").value.trim();
+  const nombre      = document.getElementById("editNombre").value.trim().toUpperCase();
+  const codigoBarra = document.getElementById("editCodigoBarra").value.trim().toUpperCase();
+  const codigo      = document.getElementById("editCodigo").value.trim().toUpperCase();
+  const marca       = document.getElementById("editMarca").value.trim().toUpperCase();
+  const proveedor   = document.getElementById("editProveedor").value.trim().toUpperCase();
   const categoria   = document.getElementById("editCategoria").value;
   const stockMin    = document.getElementById("editStockMin").value;
   const precioComp  = document.getElementById("editPrecioCompra").value;
@@ -944,11 +944,12 @@ function cerrarEscaner() {
 
 async function saveProduct() {
   // Leer todos los campos del modal
-  const nombre       = document.getElementById("inputNombre").value.trim();
-  const codigoBarra  = document.getElementById("inputCodigoBarra").value.trim();
-  const codigo       = document.getElementById("inputCodigo").value.trim();
-  const marca        = document.getElementById("inputMarca").value.trim();
-  const proveedor    = document.getElementById("inputProveedor").value.trim();
+  // Convertir campos de texto a mayúsculas — se guardan así en la BD
+  const nombre       = document.getElementById("inputNombre").value.trim().toUpperCase();
+  const codigoBarra  = document.getElementById("inputCodigoBarra").value.trim().toUpperCase();
+  const codigo       = document.getElementById("inputCodigo").value.trim().toUpperCase();
+  const marca        = document.getElementById("inputMarca").value.trim().toUpperCase();
+  const proveedor    = document.getElementById("inputProveedor").value.trim().toUpperCase();
   const categoria    = document.getElementById("inputCategoria").value;
   const stockActual  = document.getElementById("inputStock").value;
   const stockMin     = document.getElementById("inputStockMin").value;
@@ -1076,7 +1077,12 @@ async function guardarMovimiento() {
 
     closeModalMovimiento();
     showToast(`✅ ${tipo === "entrada" ? "Entrada" : "Salida"} registrada correctamente`);
+    // Recargar movimientos siempre para que la tabla se actualice
     await cargarMovimientos();
+    // Recargar stock si estamos ahí
+    const screenStock = document.getElementById("screen-stock");
+    const screenMov   = document.getElementById("screen-movimientos");
+    if (screenStock && screenStock.classList.contains("active")) await cargarStock();
     await cargarDashboard();
 
   } catch (error) {
