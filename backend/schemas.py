@@ -1,179 +1,67 @@
 # ============================================================
-# STOCKYA — Schemas de validación
-# Archivo: backend/schemas.py
-# Descripción: Define qué datos se esperan en cada request/response
-# Analogía: es el "formulario" que define qué campos son
-#           obligatorios y de qué tipo deben ser
+# STOCKYA – Servidor principal FastAPI
+# Archivo: backend/main.py
+# Descripción: Punto de entrada del backend. Registra todos
+#              los routers y configura CORS para el frontend.
+# Ejecución:  uvicorn main:app --reload --port 8000
 # ============================================================
 
-from pydantic import BaseModel, EmailStr
-from typing import Optional
-from datetime import datetime
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from database import engine, Base
+import models
+
+# --- Importar todos los routers ---
+from routers import auth, productos, movimientos, alertas, config
+
+# --- Crear las tablas en PostgreSQL si no existen ---
+# Analogía: es como crear las hojas de Excel vacías la primera vez
+Base.metadata.create_all(bind=engine)
+
+# --- Crear la aplicación FastAPI ---
+app = FastAPI(
+    title       = "Stockya API",
+    description = "Backend para el sistema de control de inventario Stockya",
+    version     = "1.0.0"
+)
+
+# --- Configurar CORS ---
+# CORS permite que el frontend (archivo HTML abierto en el navegador)
+# pueda hacer peticiones al backend.
+# Analogía: es el permiso que le damos al frontend para
+# "hablar" con el backend aunque estén en puertos distintos.
+#
+# ⚠️  REGLA IMPORTANTE:
+# allow_origins=["*"]  +  allow_credentials=True  → NO se pueden combinar
+# El navegador bloquea esta combinación por seguridad.
+# Solución: usar allow_credentials=False para desarrollo local.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],         # Acepta cualquier origen, incluido null (archivo local)
+    allow_credentials=False,     # ← CORREGIDO: era True, incompatible con origins=["*"]
+    allow_methods=["*"],         # GET, POST, PUT, DELETE
+    allow_headers=["*"],
+)
+
+# --- Registrar todos los routers ---
+app.include_router(auth.router)
+app.include_router(productos.router)
+app.include_router(movimientos.router)
+app.include_router(alertas.router)
+app.include_router(config.router)
 
 
-# ============================================================
-# SCHEMAS: USUARIO
-# ============================================================
-
-class UsuarioBase(BaseModel):
-    nombre: str
-    email: EmailStr
-
-class UsuarioCrear(UsuarioBase):
-    # Se usa al registrar un usuario nuevo
-    password: str
-
-class UsuarioRespuesta(UsuarioBase):
-    # Lo que devuelve la API (sin la contraseña)
-    id: int
-    activo: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True   # Permite convertir objeto SQLAlchemy a dict
+# --- Endpoint raíz para verificar que el servidor está funcionando ---
+@app.get("/")
+def raiz():
+    return {
+        "mensaje": "Stockya API funcionando",
+        "version": "1.0.0",
+        "docs": "http://localhost:8000/docs"
+    }
 
 
-# ============================================================
-# SCHEMAS: LOGIN / AUTH
-# ============================================================
-
-class LoginRequest(BaseModel):
-    # Datos que envía el frontend al hacer login
-    email: EmailStr
-    password: str
-
-class TokenRespuesta(BaseModel):
-    # Lo que devuelve la API al hacer login exitoso
-    access_token: str
-    token_type: str = "bearer"
-    usuario: UsuarioRespuesta
-
-
-# ============================================================
-# SCHEMAS: PRODUCTO
-# ============================================================
-
-class ProductoBase(BaseModel):
-    nombre: str
-    codigo_barra: Optional[str] = None          # Codigo de barras EAN/UPC
-    codigo: Optional[str] = None                # Codigo interno
-    categoria: Optional[str] = None
-    marca: Optional[str] = None
-    proveedor: Optional[str] = None
-    stock_actual: int = 0
-    stock_minimo: int = 0
-    precio_compra: float = 0.0
-    precio_venta: float = 0.0
-    porcentaje_ganancia: float = 0.0            # % ganancia sobre precio compra
-    fecha_vencimiento: Optional[datetime] = None
-    dias_alerta_venc: int = 30                  # Dias de anticipacion para alerta
-    lote: Optional[str] = None                  # Numero de lote
-
-class ProductoCrear(ProductoBase):
-    # Datos para crear un producto nuevo
-    pass
-
-class ProductoActualizar(BaseModel):
-    # Todos los campos son opcionales al actualizar
-    nombre: Optional[str] = None
-    codigo_barra: Optional[str] = None
-    codigo: Optional[str] = None
-    categoria: Optional[str] = None
-    marca: Optional[str] = None
-    proveedor: Optional[str] = None
-    stock_minimo: Optional[int] = None
-    precio_compra: Optional[float] = None
-    precio_venta: Optional[float] = None
-    porcentaje_ganancia: Optional[float] = None
-    fecha_vencimiento: Optional[datetime] = None
-    dias_alerta_venc: Optional[int] = None
-    lote: Optional[str] = None
-
-class ProductoRespuesta(ProductoBase):
-    # Lo que devuelve la API
-    id: int
-    activo: bool
-    created_at: datetime
-    estado: Optional[str] = None        # 'ok' | 'alerta' | 'critico'
-    estado_venc: Optional[str] = None   # 'ok' | 'proximo' | 'vencido'
-
-    class Config:
-        from_attributes = True
-
-
-# ============================================================
-# SCHEMAS: MOVIMIENTO
-# ============================================================
-
-class MovimientoBase(BaseModel):
-    producto_id: int
-    tipo: str                           # 'entrada' o 'salida'
-    cantidad: int
-    nota: Optional[str] = None
-    lote: Optional[str] = None          # Numero de lote cuando aplica
-
-class MovimientoCrear(MovimientoBase):
-    # Datos para registrar un movimiento nuevo
-    pass
-
-class MovimientoRespuesta(BaseModel):
-    # Lo que devuelve la API
-    id: int
-    producto_id: int
-    usuario_id: int
-    tipo: str
-    cantidad: int
-    stock_anterior: int
-    stock_nuevo: int
-    nota: Optional[str]
-    lote: Optional[str] = None
-    created_at: datetime
-    producto_nombre: Optional[str] = None
-    usuario_nombre: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-
-
-# ============================================================
-# SCHEMAS: CONFIGURACIÓN
-# ============================================================
-
-class ConfiguracionBase(BaseModel):
-    nombre_negocio: Optional[str] = "Mi Negocio"
-    moneda: Optional[str] = "CLP"
-    color_principal: Optional[str] = "#00C77B"
-    logo_base64: Optional[str] = None
-
-class ConfiguracionActualizar(ConfiguracionBase):
-    # Datos para actualizar la configuración del negocio
-    pass
-
-class ConfiguracionRespuesta(ConfiguracionBase):
-    id: int
-    usuario_id: int
-
-    class Config:
-        from_attributes = True
-
-
-# ============================================================
-# SCHEMAS: ALERTAS
-# ============================================================
-
-class AlertaRespuesta(BaseModel):
-    # Resumen de alertas del sistema
-    total_criticos: int           # Stock por debajo del mínimo
-    total_alertas: int            # Stock cerca del mínimo (< mínimo * 1.5)
-    productos_criticos: list[ProductoRespuesta]
-    productos_alerta: list[ProductoRespuesta]
-
-
-# ============================================================
-# SCHEMAS: RESPUESTAS GENERALES
-# ============================================================
-
-class MensajeRespuesta(BaseModel):
-    # Respuesta simple con mensaje de éxito o error
-    mensaje: str
-    ok: bool = True
+# --- Endpoint de salud del servidor ---
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}

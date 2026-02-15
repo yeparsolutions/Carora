@@ -1,5 +1,5 @@
 # ============================================================
-# STOCKYA — Servidor principal FastAPI
+# STOCKYA – Servidor principal FastAPI
 # Archivo: backend/main.py
 # Descripción: Punto de entrada del backend. Registra todos
 #              los routers y configura CORS para el frontend.
@@ -30,11 +30,16 @@ app = FastAPI(
 # pueda hacer peticiones al backend.
 # Analogía: es el permiso que le damos al frontend para
 # "hablar" con el backend aunque estén en puertos distintos.
+#
+# ⚠️  REGLA IMPORTANTE:
+# allow_origins=["*"]  +  allow_credentials=True  → NO se pueden combinar
+# El navegador bloquea esta combinación por seguridad.
+# Solución: usar allow_credentials=False para desarrollo local.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # En producción cambiar por la URL real del frontend
-    allow_credentials=True,
-    allow_methods=["*"],        # GET, POST, PUT, DELETE
+    allow_origins=["*"],         # Acepta cualquier origen, incluido null (archivo local)
+    allow_credentials=False,     # ← CORREGIDO: era True, incompatible con origins=["*"]
+    allow_methods=["*"],         # GET, POST, PUT, DELETE
     allow_headers=["*"],
 )
 
