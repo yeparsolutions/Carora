@@ -17,6 +17,17 @@
 
   <!-- Hoja de estilos principal -->
   <link rel="stylesheet" href="css/styles.css">
+<style>
+/* Inputs de texto en modales de producto — se muestran en mayúsculas */
+#modalAgregar .form-input[type="text"],
+#modalEditar  .form-input[type="text"] {
+  text-transform: uppercase;
+}
+#modalAgregar .form-input[type="text"]::placeholder,
+#modalEditar  .form-input[type="text"]::placeholder {
+  text-transform: none;
+}
+</style>
 </head>
 <body>
 
@@ -30,8 +41,11 @@
 
       <!-- Logo -->
       <div class="login-logo">
-        <div class="logo-icon">📦</div>
+        <img id="logoImg" src="img/cubo.png" onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex'"
+             style="width:72px; height:72px; object-fit:contain; margin-bottom:8px">
+        <div id="logoFallback" style="display:none; width:72px; height:72px; align-items:center; justify-content:center; font-size:52px; margin-bottom:8px">📦</div>
         <div class="logo-text">Stock<span>ya</span></div>
+        <div style="font-size:11px; color:var(--muted); margin-top:4px; letter-spacing:1px; text-transform:uppercase; font-weight:600">by YEPARSOLUTIONS</div>
       </div>
 
       <!-- ==========================================
@@ -134,8 +148,11 @@
 
     <!-- Logo -->
     <div class="logo-block">
-      <div class="logo-icon">📦</div>
-      <div class="logo-text">Stock<span>ya</span></div>
+      <img src="img/cubo.png" onerror="this.style.display='none'" style="width:36px; height:36px; object-fit:contain">
+      <div>
+        <div class="logo-text">Stock<span>ya</span></div>
+        <div style="font-size:9px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-top:-2px">by YEPARSOLUTIONS</div>
+      </div>
     </div>
 
     <!-- Sección: Principal -->
@@ -147,6 +164,10 @@
 
     <button class="nav-item" id="nav-productos" onclick="showScreen('productos')">
       <span class="nav-icon">📋</span> Productos
+    </button>
+
+    <button class="nav-item" id="nav-stock" onclick="showScreen('stock')">
+      <span class="nav-icon">📦</span> Stock
     </button>
 
     <button class="nav-item" id="nav-movimientos" onclick="showScreen('movimientos')">
@@ -352,25 +373,26 @@
         </select>
       </div>
 
-      <!-- Tabla dinámica — se llena desde el backend -->
+      <!-- Tabla de características del producto (sin stock — eso va en pestaña Stock) -->
       <div class="card" style="padding:0; overflow:hidden">
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th style="padding-left:20px">Producto</th>
+                <th>Código de barras</th>
                 <th>Categoría</th>
-                <th>Stock</th>
-                <th>Mínimo</th>
+                <th>Marca</th>
+                <th>Proveedor</th>
+                <th>P. Compra</th>
                 <th>P. Venta</th>
-                <th>Vence</th>
-                <th>Estado</th>
+                <th>% Ganancia</th>
                 <th style="text-align:center">Acciones</th>
               </tr>
             </thead>
             <tbody id="prodTableBody">
               <tr>
-                <td colspan="8" style="text-align:center; color:var(--muted); padding:40px; font-size:13px">
+                <td colspan="9" style="text-align:center; color:var(--muted); padding:40px; font-size:13px">
                   Cargando productos...
                 </td>
               </tr>
@@ -381,6 +403,73 @@
 
     </div><!-- fin screen-productos -->
 
+    <!-- ==========================================
+         PANTALLA: STOCK
+    ========================================== -->
+    <div class="screen" id="screen-stock">
+
+      <div class="page-header">
+        <div>
+          <div class="page-title">Stock 📦</div>
+          <div class="page-subtitle" id="stockSubtitulo">Cargando...</div>
+        </div>
+        <button class="btn-primary" onclick="openModal()">+ Agregar stock</button>
+      </div>
+
+      <!-- Filtros -->
+      <div class="search-row">
+        <input id="stockBuscar" class="search-input" placeholder="🔍  Buscar producto..."
+               oninput="filtrarStock()">
+        <select id="stockCategoria" class="filter-select" onchange="filtrarStock()">
+          <option value="">Todas las categorías</option>
+          <option>Lácteos</option>
+          <option>Bebestibles</option>
+          <option>Snacks</option>
+          <option>Granos</option>
+          <option>Limpieza</option>
+          <option>Panadería</option>
+          <option>Congelados</option>
+          <option>Carnes</option>
+          <option>Frutas y Verduras</option>
+          <option>Otro</option>
+        </select>
+        <select id="stockEstado" class="filter-select" onchange="filtrarStock()">
+          <option value="">Todo el stock</option>
+          <option value="critico">🔴 Crítico</option>
+          <option value="alerta">🟡 En alerta</option>
+          <option value="ok">🟢 Stock ok</option>
+        </select>
+      </div>
+
+      <!-- Tabla de stock dinámica -->
+      <div class="card" style="padding:0; overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="padding-left:20px">Producto</th>
+                <th>Categoría</th>
+                <th>Stock actual</th>
+                <th>Mínimo</th>
+                <th>Precio venta</th>
+                <th>Vence</th>
+                <th>Estado</th>
+                <th style="text-align:center">Movimiento</th>
+              </tr>
+            </thead>
+            <tbody id="stockTableBody">
+              <tr>
+                <td colspan="8" style="text-align:center; color:var(--muted); padding:40px; font-size:13px">
+                  Cargando stock...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- fin screen-stock -->
+
 
     <!-- ==========================================
          PANTALLA 4: MOVIMIENTOS
@@ -390,87 +479,59 @@
       <div class="page-header">
         <div>
           <div class="page-title">Movimientos</div>
-          <div class="page-subtitle">Registro de entradas y salidas de bodega</div>
+          <div class="page-subtitle" id="movSubtitulo">Historial completo de entradas y salidas</div>
         </div>
         <button class="btn-primary" onclick="openModalMovimiento()">+ Registrar movimiento</button>
       </div>
 
-      <!-- Tabs para filtrar tipo de movimiento -->
-      <div class="mov-type-tabs">
-        <button class="mov-tab active all"    onclick="filterMov(this,'all')">Todos</button>
-        <button class="mov-tab entrada"       onclick="filterMov(this,'entrada')">↑ Entradas</button>
-        <button class="mov-tab salida"        onclick="filterMov(this,'salida')">↓ Salidas</button>
+      <!-- Filtros completos -->
+      <div class="search-row" style="flex-wrap:wrap; gap:8px">
+        <input id="movBuscar" class="search-input" placeholder="🔍  Buscar por producto..."
+               oninput="filtrarMovimientos()" style="min-width:180px; flex:1">
+        <select id="movFiltroTipo" class="filter-select" onchange="filtrarMovimientos()">
+          <option value="">Entradas y salidas</option>
+          <option value="entrada">↑ Solo entradas</option>
+          <option value="salida">↓ Solo salidas</option>
+        </select>
+        <select id="movFiltroCategoria" class="filter-select" onchange="filtrarMovimientos()">
+          <option value="">Todas las categorías</option>
+          <option>Lácteos</option>
+          <option>Bebestibles</option>
+          <option>Snacks</option>
+          <option>Granos</option>
+          <option>Limpieza</option>
+          <option>Panadería</option>
+          <option>Congelados</option>
+          <option>Carnes</option>
+          <option>Frutas y Verduras</option>
+          <option>Otro</option>
+        </select>
+        <input id="movFiltroDesde" class="filter-select" type="date" onchange="filtrarMovimientos()" title="Desde">
+        <input id="movFiltroHasta" class="filter-select" type="date" onchange="filtrarMovimientos()" title="Hasta">
       </div>
 
-      <!-- Tabla de movimientos — data-type define si es entrada o salida -->
+      <!-- Tabla de movimientos dinámica -->
       <div class="card" style="padding:0; overflow:hidden">
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th style="padding-left:20px">Producto</th>
+                <th style="padding-left:16px">Fecha y hora</th>
+                <th>Producto</th>
                 <th>Tipo</th>
                 <th>Cantidad</th>
                 <th>Stock anterior</th>
-                <th>Stock nuevo</th>
-                <th>Fecha / Hora</th>
-                <th>Registrado por</th>
+                <th>Stock resultante</th>
+                <th>Lote</th>
+                <th>Nota</th>
+                <th>Usuario</th>
               </tr>
             </thead>
             <tbody id="movTableBody">
-              <tr data-type="entrada">
-                <td style="padding-left:20px"><strong>Agua mineral 500ml</strong></td>
-                <td><span class="mov-icon-entrada" style="font-weight:700">↑ Entrada</span></td>
-                <td style="color:var(--azul); font-weight:700">+24</td>
-                <td style="color:var(--muted)">62 und.</td>
-                <td><strong>86 und.</strong></td>
-                <td style="color:var(--muted)">Hoy 09:42</td>
-                <td style="color:var(--muted)">Juan R.</td>
-              </tr>
-              <tr data-type="salida">
-                <td style="padding-left:20px"><strong>Leche entera 1L</strong></td>
-                <td><span class="mov-icon-salida" style="font-weight:700">↓ Salida</span></td>
-                <td style="color:var(--rojo); font-weight:700">-6</td>
-                <td style="color:var(--muted)">8 und.</td>
-                <td><strong>2 und.</strong></td>
-                <td style="color:var(--muted)">Hoy 08:15</td>
-                <td style="color:var(--muted)">Juan R.</td>
-              </tr>
-              <tr data-type="salida">
-                <td style="padding-left:20px"><strong>Coca-Cola 1.5L</strong></td>
-                <td><span class="mov-icon-salida" style="font-weight:700">↓ Salida</span></td>
-                <td style="color:var(--rojo); font-weight:700">-12</td>
-                <td style="color:var(--muted)">46 und.</td>
-                <td><strong>34 und.</strong></td>
-                <td style="color:var(--muted)">Ayer 18:30</td>
-                <td style="color:var(--muted)">María G.</td>
-              </tr>
-              <tr data-type="entrada">
-                <td style="padding-left:20px"><strong>Arroz largo 1kg</strong></td>
-                <td><span class="mov-icon-entrada" style="font-weight:700">↑ Entrada</span></td>
-                <td style="color:var(--azul); font-weight:700">+30</td>
-                <td style="color:var(--muted)">32 und.</td>
-                <td><strong>62 und.</strong></td>
-                <td style="color:var(--muted)">Ayer 14:00</td>
-                <td style="color:var(--muted)">Juan R.</td>
-              </tr>
-              <tr data-type="salida">
-                <td style="padding-left:20px"><strong>Pan de molde grande</strong></td>
-                <td><span class="mov-icon-salida" style="font-weight:700">↓ Salida</span></td>
-                <td style="color:var(--rojo); font-weight:700">-8</td>
-                <td style="color:var(--muted)">9 und.</td>
-                <td><strong>1 und.</strong></td>
-                <td style="color:var(--muted)">Ayer 11:20</td>
-                <td style="color:var(--muted)">Juan R.</td>
-              </tr>
-              <tr data-type="entrada">
-                <td style="padding-left:20px"><strong>Aceite vegetal 1L</strong></td>
-                <td><span class="mov-icon-entrada" style="font-weight:700">↑ Entrada</span></td>
-                <td style="color:var(--azul); font-weight:700">+12</td>
-                <td style="color:var(--muted)">4 und.</td>
-                <td><strong>16 und.</strong></td>
-                <td style="color:var(--muted)">Lun 10:05</td>
-                <td style="color:var(--muted)">María G.</td>
+              <tr>
+                <td colspan="9" style="text-align:center; color:var(--muted); padding:40px; font-size:13px">
+                  Cargando movimientos...
+                </td>
               </tr>
             </tbody>
           </table>

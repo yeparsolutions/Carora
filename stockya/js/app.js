@@ -310,88 +310,61 @@ function setEl(id, valor) {
    cargarProductos()
    Obtiene productos reales del backend y los muestra en la tabla
 ---------------------------- */
-async function cargarProductos(buscar = "", categoria = "", estado = "") {
+async function cargarProductos(buscar = "", categoria = "") {
   try {
-    // Construir URL con filtros
     let url = "/productos/?";
     if (buscar)    url += `buscar=${encodeURIComponent(buscar)}&`;
     if (categoria) url += `categoria=${encodeURIComponent(categoria)}&`;
-    if (estado)    url += `estado=${encodeURIComponent(estado)}&`;
 
     const productos = await api(url);
     const tbody     = document.getElementById("prodTableBody");
     const subtitulo = document.getElementById("prodSubtitulo");
 
-    // Actualizar subtítulo con el total
     if (subtitulo) subtitulo.textContent = `${productos.length} producto${productos.length !== 1 ? "s" : ""} registrado${productos.length !== 1 ? "s" : ""}`;
-
     if (!tbody) return;
 
     if (productos.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--muted); padding:40px; font-size:13px">
-        ${buscar || categoria || estado ? "No se encontraron productos con ese filtro" : "Aún no hay productos — haz clic en '+ Nuevo producto' para comenzar"}
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--muted); padding:40px; font-size:13px">
+        ${buscar || categoria ? "No se encontraron productos con ese filtro" : "Aún no hay productos — haz clic en '+ Nuevo producto' para comenzar"}
       </td></tr>`;
       return;
     }
 
-    // Renderizar cada producto con botones de editar y eliminar
+    // Mostrar solo las características del producto (sin stock)
     tbody.innerHTML = productos.map(p => {
-      const pct   = Math.min(Math.round((p.stock_actual / Math.max(p.stock_minimo * 5, 1)) * 100), 100);
-      const color = p.estado === "critico" ? "var(--rojo)" : p.estado === "alerta" ? "var(--amarillo)" : "var(--verde)";
-      const precio = p.precio_venta ? `$${p.precio_venta.toLocaleString("es-CL")}` : "—";
-
-      // Vencimiento — mostrar fecha corta o estado
-      let venceStr = "—";
-      if (p.fecha_vencimiento) {
-        const dias = Math.ceil((new Date(p.fecha_vencimiento) - new Date()) / 86400000);
-        venceStr = p.estado_venc === "vencido"  ? `<span style="color:var(--rojo); font-weight:600">Vencido</span>`
-                 : p.estado_venc === "proximo"  ? `<span style="color:var(--amarillo); font-weight:600">${dias}d ⏰</span>`
-                 : new Date(p.fecha_vencimiento).toLocaleDateString("es-CL");
-      }
-
-      // Nombre seguro para atributo HTML (escapar comillas)
-      const nombreSafe = p.nombre.split("'").join("&apos;");
+      const nombreSafe  = p.nombre.split("'").join("&apos;");
+      const precioComp  = p.precio_compra ? `$${p.precio_compra.toLocaleString("es-CL")}` : "—";
+      const precioVent  = p.precio_venta  ? `$${p.precio_venta.toLocaleString("es-CL")}`  : "—";
+      const ganancia    = p.porcentaje_ganancia ? `${p.porcentaje_ganancia}%` : "—";
 
       return `<tr>
         <td style="padding-left:16px">
           <strong>${p.nombre}</strong>
-          <div style="font-size:11px; color:var(--muted); margin-top:2px">
-            ${p.codigo_barra ? "📦 " + p.codigo_barra : p.codigo ? p.codigo : "Sin código"}
-            ${p.marca ? " · " + p.marca : ""}
-            ${p.lote ? " · Lote: " + p.lote : ""}
-          </div>
+          ${p.lote ? `<div style="font-size:11px; color:var(--muted)">Lote: ${p.lote}</div>` : ""}
         </td>
+        <td style="font-size:12px; color:var(--muted)">${p.codigo_barra || p.codigo || "—"}</td>
         <td>${p.categoria || "—"}</td>
-        <td>
-          <div class="stock-bar-wrap">
-            <span style="font-weight:700; color:${color}">${p.stock_actual}</span>
-            <div class="stock-bar-track">
-              <div class="stock-bar-fill ${p.estado}" style="width:${pct}%"></div>
-            </div>
-          </div>
+        <td>${p.marca || "—"}</td>
+        <td>${p.proveedor || "—"}</td>
+        <td>${precioComp}</td>
+        <td>${precioVent}</td>
+        <td style="text-align:center">
+          ${p.porcentaje_ganancia > 0
+            ? `<span style="background:rgba(0,245,155,0.15); color:var(--verde); padding:3px 8px; border-radius:6px; font-size:12px; font-weight:600">${ganancia}</span>`
+            : "—"}
         </td>
-        <td style="color:var(--muted)">${p.stock_minimo}</td>
-        <td>${precio}</td>
-        <td style="font-size:12px">${venceStr}</td>
-        <td><span class="badge ${p.estado}"><span class="badge-dot"></span>${p.estado === "critico" ? "Crítico" : p.estado === "alerta" ? "Alerta" : "OK"}</span></td>
         <td style="text-align:center">
           <div style="display:flex; gap:6px; justify-content:center">
-            <button onclick="abrirModalEditar(${p.id})"
-                    title="Editar producto"
+            <button onclick="abrirModalEditar(${p.id})" title="Editar"
                     style="background:none; border:1px solid var(--border); border-radius:8px; color:var(--muted);
                            padding:5px 9px; cursor:pointer; font-size:13px; transition:all 0.2s"
                     onmouseover="this.style.borderColor='var(--azul)';this.style.color='var(--azul)'"
-                    onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-              ✏️
-            </button>
-            <button onclick="abrirModalEliminar(${p.id}, '${nombreSafe}')"
-                    title="Eliminar producto"
+                    onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✏️</button>
+            <button onclick="abrirModalEliminar(${p.id}, '${nombreSafe}')" title="Eliminar"
                     style="background:none; border:1px solid var(--border); border-radius:8px; color:var(--muted);
                            padding:5px 9px; cursor:pointer; font-size:13px; transition:all 0.2s"
                     onmouseover="this.style.borderColor='var(--rojo)';this.style.color='var(--rojo)'"
-                    onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-              🗑️
-            </button>
+                    onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">🗑️</button>
           </div>
         </td>
       </tr>`;
@@ -402,7 +375,105 @@ async function cargarProductos(buscar = "", categoria = "", estado = "") {
   }
 }
 
-/* Filtrar productos en tiempo real desde los controles de la pantalla */
+function filtrarProductos() {
+  const buscar    = document.getElementById("prodBuscar")?.value    || "";
+  const categoria = document.getElementById("prodCategoria")?.value || "";
+  cargarProductos(buscar, categoria);
+}
+
+
+/* ============================================================
+   PANTALLA STOCK — misma data que productos pero con stock
+   ============================================================ */
+async function cargarStock(buscar = "", categoria = "", estado = "") {
+  try {
+    let url = "/productos/?";
+    if (buscar)    url += `buscar=${encodeURIComponent(buscar)}&`;
+    if (categoria) url += `categoria=${encodeURIComponent(categoria)}&`;
+    if (estado)    url += `estado=${encodeURIComponent(estado)}&`;
+
+    const productos = await api(url);
+    const tbody     = document.getElementById("stockTableBody");
+    const subtitulo = document.getElementById("stockSubtitulo");
+
+    if (subtitulo) subtitulo.textContent = `${productos.length} producto${productos.length !== 1 ? "s" : ""} · Total unidades: ${productos.reduce((a,p) => a + p.stock_actual, 0)}`;
+    if (!tbody) return;
+
+    if (productos.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--muted); padding:40px; font-size:13px">
+        ${buscar || categoria || estado ? "Sin resultados para ese filtro" : "Aún no hay productos registrados"}
+      </td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = productos.map(p => {
+      const pct    = Math.min(Math.round((p.stock_actual / Math.max(p.stock_minimo * 5, 1)) * 100), 100);
+      const color  = p.estado === "critico" ? "var(--rojo)" : p.estado === "alerta" ? "var(--amarillo)" : "var(--verde)";
+      const precio = p.precio_venta ? `$${p.precio_venta.toLocaleString("es-CL")}` : "—";
+
+      let venceStr = "—";
+      if (p.fecha_vencimiento) {
+        const dias = Math.ceil((new Date(p.fecha_vencimiento) - new Date()) / 86400000);
+        venceStr = p.estado_venc === "vencido" ? `<span style="color:var(--rojo); font-weight:600">Vencido</span>`
+                 : p.estado_venc === "proximo" ? `<span style="color:var(--amarillo); font-weight:600">${dias}d ⏰</span>`
+                 : new Date(p.fecha_vencimiento).toLocaleDateString("es-CL");
+      }
+
+      return `<tr>
+        <td style="padding-left:16px">
+          <strong>${p.nombre}</strong>
+          <div style="font-size:11px; color:var(--muted)">${p.codigo_barra || p.codigo || "Sin código"}${p.marca ? " · " + p.marca : ""}${p.lote ? " · Lote: " + p.lote : ""}</div>
+        </td>
+        <td>${p.categoria || "—"}</td>
+        <td>
+          <div class="stock-bar-wrap">
+            <span style="font-weight:700; color:${color}">${p.stock_actual}</span>
+            <div class="stock-bar-track"><div class="stock-bar-fill ${p.estado}" style="width:${pct}%"></div></div>
+          </div>
+        </td>
+        <td style="color:var(--muted)">${p.stock_minimo}</td>
+        <td>${precio}</td>
+        <td style="font-size:12px">${venceStr}</td>
+        <td><span class="badge ${p.estado}"><span class="badge-dot"></span>${p.estado === "critico" ? "Crítico" : p.estado === "alerta" ? "Alerta" : "OK"}</span></td>
+        <td style="text-align:center">
+          <button onclick="abrirMovimientoRapido(${p.id}, '${p.nombre.split("'").join("&apos;")}')"
+                  title="Registrar movimiento"
+                  style="background:none; border:1px solid var(--border); border-radius:8px; color:var(--muted);
+                         padding:5px 9px; cursor:pointer; font-size:13px; transition:all 0.2s"
+                  onmouseover="this.style.borderColor='var(--azul)';this.style.color='var(--azul)'"
+                  onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+            ±
+          </button>
+        </td>
+      </tr>`;
+    }).join("");
+
+  } catch (error) {
+    console.error("Error cargando stock:", error);
+  }
+}
+
+function filtrarStock() {
+  const buscar    = document.getElementById("stockBuscar")?.value    || "";
+  const categoria = document.getElementById("stockCategoria")?.value || "";
+  const estado    = document.getElementById("stockEstado")?.value    || "";
+  cargarStock(buscar, categoria, estado);
+}
+
+/* Movimiento rápido desde pantalla stock — abre modal prellenado con el producto */
+function abrirMovimientoRapido(id, nombre) {
+  openModalMovimiento();
+  setTimeout(() => {
+    const sel = document.getElementById("movProductoId");
+    if (sel) {
+      for (let opt of sel.options) {
+        if (parseInt(opt.value) === id) { opt.selected = true; break; }
+      }
+    }
+  }, 400);
+}
+
+
 function filtrarProductos() {
   const buscar    = document.getElementById("prodBuscar")?.value    || "";
   const categoria = document.getElementById("prodCategoria")?.value || "";
@@ -411,47 +482,83 @@ function filtrarProductos() {
 }
 
 
-async function cargarMovimientos(tipo = "") {
+async function cargarMovimientos(tipo = "", buscar = "", categoria = "", desde = "", hasta = "") {
   try {
-    let url = "/movimientos/?limit=50";
-    if (tipo) url += `&tipo=${tipo}`;
+    // Construir URL con todos los filtros disponibles
+    let url = "/movimientos/?limit=200";
+    if (tipo)      url += `&tipo=${encodeURIComponent(tipo)}`;
+    if (buscar)    url += `&buscar=${encodeURIComponent(buscar)}`;
+    if (categoria) url += `&categoria=${encodeURIComponent(categoria)}`;
+    if (desde)     url += `&desde=${encodeURIComponent(desde)}`;
+    if (hasta)     url += `&hasta=${encodeURIComponent(hasta)}`;
 
     const movimientos = await api(url);
-    const tbody = document.getElementById("movTableBody");
+    const tbody       = document.getElementById("movTableBody");
+    const subtitulo   = document.getElementById("movSubtitulo");
+
+    if (subtitulo) {
+      const entradas = movimientos.filter(m => m.tipo === "entrada").reduce((a,m) => a + m.cantidad, 0);
+      const salidas  = movimientos.filter(m => m.tipo === "salida").reduce((a,m)  => a + m.cantidad, 0);
+      subtitulo.textContent = `${movimientos.length} movimientos · +${entradas} entradas · -${salidas} salidas`;
+    }
+
     if (!tbody) return;
 
     if (movimientos.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--muted); padding:32px">
-        No hay movimientos registrados aún
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--muted); padding:40px; font-size:13px">
+        ${tipo || buscar || categoria || desde ? "Sin movimientos para ese filtro" : "Aún no hay movimientos registrados"}
       </td></tr>`;
       return;
     }
 
+    // Una fila por movimiento con todos sus datos
     tbody.innerHTML = movimientos.map(m => {
-      const esEntrada = m.tipo === "entrada";
-      const color     = esEntrada ? "var(--azul)" : "var(--rojo)";
-      const signo     = esEntrada ? "+" : "-";
-      const flecha    = esEntrada ? "↑ Entrada" : "↓ Salida";
-      const fecha     = new Date(m.created_at).toLocaleString("es-CL", {
-        day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"
-      });
+      const es    = m.tipo === "entrada";
+      const col   = es ? "var(--azul)" : "var(--rojo)";
+      const fecha = new Date(m.created_at);
+      const fechaStr = fecha.toLocaleDateString("es-CL", { day:"2-digit", month:"2-digit", year:"numeric" });
+      const horaStr  = fecha.toLocaleTimeString("es-CL", { hour:"2-digit", minute:"2-digit" });
 
-      return `<tr data-type="${m.tipo}">
-        <td style="padding-left:20px"><strong>${m.producto_nombre || "—"}</strong></td>
-        <td><span style="color:${color}; font-weight:700">${flecha}</span></td>
-        <td style="color:${color}; font-weight:700">${signo}${m.cantidad}</td>
-        <td style="color:var(--muted)">${m.stock_anterior} und.</td>
-        <td><strong>${m.stock_nuevo} und.</strong></td>
-        <td style="color:var(--muted)">${fecha}</td>
-        <td style="color:var(--muted)">${m.usuario_nombre || "—"}</td>
+      return `<tr>
+        <td style="padding-left:16px; font-size:12px">
+          <div style="font-weight:600">${fechaStr}</div>
+          <div style="color:var(--muted)">${horaStr}</div>
+        </td>
+        <td>
+          <strong>${m.producto_nombre || "<span style='color:var(--muted); font-style:italic'>Eliminado</span>"}</strong>
+        </td>
+        <td>
+          <span style="color:${col}; font-weight:600; font-size:13px">
+            ${es ? "↑ Entrada" : "↓ Salida"}
+          </span>
+        </td>
+        <td style="color:${col}; font-weight:700; font-size:15px">
+          ${es ? "+" : "-"}${m.cantidad}
+        </td>
+        <td style="color:var(--muted); text-align:center">${m.stock_anterior}</td>
+        <td style="font-weight:600; text-align:center">${m.stock_nuevo}</td>
+        <td style="font-size:12px; color:var(--muted)">${m.lote || "—"}</td>
+        <td style="font-size:12px; color:var(--muted); max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${m.nota || ""}">
+          ${m.nota || "—"}
+        </td>
+        <td style="font-size:12px; color:var(--muted)">${m.usuario_nombre || "—"}</td>
       </tr>`;
     }).join("");
 
   } catch (error) {
-    showToast("❌ Error cargando movimientos: " + error.message);
+    console.error("Error cargando movimientos:", error);
   }
 }
 
+/* Filtrar movimientos desde los controles de la pantalla */
+function filtrarMovimientos() {
+  const buscar    = document.getElementById("movBuscar")?.value          || "";
+  const tipo      = document.getElementById("movFiltroTipo")?.value      || "";
+  const categoria = document.getElementById("movFiltroCategoria")?.value || "";
+  const desde     = document.getElementById("movFiltroDesde")?.value     || "";
+  const hasta     = document.getElementById("movFiltroHasta")?.value     || "";
+  cargarMovimientos(tipo, buscar, categoria, desde, hasta);
+}
 
 /* ============================================================
    NAVEGACIÓN
@@ -464,20 +571,23 @@ async function cargarMovimientos(tipo = "") {
 async function showScreen(name) {
   // Ocultar todas las pantallas
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-  document.getElementById("screen-" + name).classList.add("active");
+  const pantalla = document.getElementById("screen-" + name);
+  if (pantalla) pantalla.classList.add("active");
 
   // Actualizar nav activo
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
-  document.getElementById("nav-" + name).classList.add("active");
+  const navBtn = document.getElementById("nav-" + name);
+  if (navBtn) navBtn.classList.add("active");
 
   // Cerrar sidebar en móvil
   if (window.innerWidth <= 768) closeSidebar();
 
-  // Cargar datos reales según la pantalla que se abre
-  if (name === "productos")    await cargarProductos();
-  if (name === "movimientos")  await cargarMovimientos();
-  if (name === "alertas")      await cargarAlertas();
-  if (name === "dashboard")    await cargarDashboard();
+  // Cargar datos reales según la pantalla
+  if (name === "dashboard")   await cargarDashboard();
+  if (name === "productos")   await cargarProductos();
+  if (name === "stock")       await cargarStock();
+  if (name === "movimientos") await cargarMovimientos();
+  if (name === "alertas")     await cargarAlertas();
 }
 
 
