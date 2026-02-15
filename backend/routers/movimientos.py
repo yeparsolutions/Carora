@@ -1,9 +1,8 @@
 # ============================================================
-# STOCKYA — Router de Movimientos
+# STOCKYA - Router de Movimientos
 # Archivo: backend/routers/movimientos.py
 # Descripcion: Registra entradas y salidas de stock
-# Analogia: el libro contable de la bodega —
-#           cada linea queda registrada para siempre
+# Analogia: el libro contable de la bodega
 # ============================================================
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,8 +16,8 @@ import models, schemas
 router = APIRouter(prefix="/movimientos", tags=["Movimientos"])
 
 
-def movimiento_a_dict(m, producto_nombre=None, usuario_nombre=None):
-    """Convierte un objeto Movimiento a dict seguro."""
+def movimiento_a_dict(m):
+    """Convierte Movimiento a dict seguro, sin fallar si producto fue eliminado."""
     return {
         "id":             m.id,
         "producto_id":    m.producto_id,
@@ -30,46 +29,41 @@ def movimiento_a_dict(m, producto_nombre=None, usuario_nombre=None):
         "nota":           m.nota,
         "lote":           m.lote,
         "created_at":     m.created_at,
-        "producto_nombre": producto_nombre or (m.producto.nombre if m.producto else None),
-        "usuario_nombre":  usuario_nombre  or (m.usuario.nombre  if m.usuario  else None),
+        "producto_nombre": m.producto.nombre if m.producto else None,
+        "usuario_nombre":  m.usuario.nombre  if m.usuario  else None,
     }
 
 
 # ============================================================
-# GET /movimientos — Lista con todos los filtros
+# GET /movimientos - Lista con filtros completos
 # ============================================================
 @router.get("/", response_model=List[schemas.MovimientoRespuesta])
 def listar_movimientos(
-    tipo:       Optional[str] = None,
-    buscar:     Optional[str] = None,
-    categoria:  Optional[str] = None,
-    desde:      Optional[str] = None,
-    hasta:      Optional[str] = None,
-    limit:      int = 500,
-    db:         Session = Depends(get_db),
+    tipo:      Optional[str] = None,
+    buscar:    Optional[str] = None,
+    categoria: Optional[str] = None,
+    desde:     Optional[str] = None,
+    hasta:     Optional[str] = None,
+    limit:     int = 500,
+    db:        Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
     """
-    Lista todos los movimientos registrados con filtros.
-    Trae las relaciones producto y usuario de una sola vez
-    para no hacer N consultas adicionales.
+    Lista todos los movimientos con filtros.
+    Usa eager loading para traer producto y usuario en una sola query.
     """
-    # Cargar relaciones en una sola query (eager loading)
-    query = db.query(models.Movimiento)\
-               .options(
-                   joinedload(models.Movimiento.producto),
-                   joinedload(models.Movimiento.usuario)
-               )
+    query = db.query(models.Movimiento).options(
+        joinedload(models.Movimiento.producto),
+        joinedload(models.Movimiento.usuario)
+    )
 
-    # Filtros
     if tipo:
         query = query.filter(models.Movimiento.tipo == tipo)
 
     if buscar or categoria:
-        query = query.join(
+        query = query.outerjoin(
             models.Producto,
-            models.Movimiento.producto_id == models.Producto.id,
-            isouter=True
+            models.Movimiento.producto_id == models.Producto.id
         )
         if buscar:
             query = query.filter(models.Producto.nombre.ilike(f"%{buscar}%"))
@@ -96,7 +90,7 @@ def listar_movimientos(
 
 
 # ============================================================
-# POST /movimientos — Registra un movimiento manual
+# POST /movimientos - Registra un movimiento manual
 # ============================================================
 @router.post("/", response_model=schemas.MovimientoRespuesta, status_code=201)
 def registrar_movimiento(
@@ -106,8 +100,7 @@ def registrar_movimiento(
 ):
     """
     Registra una entrada o salida y actualiza el stock.
-    Analogia: anotar en el cuaderno de bodega Y mover
-    las cajas al mismo tiempo.
+    Analogia: anotar en el cuaderno de bodega y mover las cajas al mismo tiempo.
     """
     if datos.tipo not in ("entrada", "salida"):
         raise HTTPException(status_code=400, detail="El tipo debe ser 'entrada' o 'salida'")
@@ -148,5 +141,19 @@ def registrar_movimiento(
     db.add(movimiento)
     db.commit()
     db.refresh(movimiento)
+    db.refresh(producto)
 
-    return movimiento_a_dict(movimiento, producto.nombre, usuario_actual.nombre)
+    return {
+        "id":             movimiento.id,
+        "producto_id":    movimiento.producto_id,
+        "usuario_id":     movimiento.usuario_id,
+        "tipo":           movimiento.tipo,
+        "cantidad":       movimiento.cantidad,
+        "stock_anterior": movimiento.stock_anterior,
+        "stock_nuevo":    movimiento.stock_nuevo,
+        "nota":           movimiento.nota,
+        "lote":           movimiento.lote,
+        "created_at":     movimiento.created_at,
+        "producto_nombre": producto.nombre,
+        "usuario_nombre":  usuario_actual.nombre,
+    }

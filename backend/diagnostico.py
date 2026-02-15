@@ -87,3 +87,4 @@ except:
 cursor.close()
 conn.close()
 print("\n=== DIAGNOSTICO COMPLETADO ===")
+print("\n=== DIAGNOSTICO COMPLETADO ===")

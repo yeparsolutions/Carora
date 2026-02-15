@@ -288,8 +288,23 @@ def eliminar_producto(
 
     nombre = p.nombre
 
-    # Desconectar movimientos del producto antes de eliminarlo
-    # (se conservan como historial pero sin referencia al producto)
+    # Registrar movimiento de baja ANTES de eliminar
+    # Analogia: antes de sacar el producto del catalogo, anotamos en el libro que salio
+    if p.stock_actual > 0:
+        mov_baja = models.Movimiento(
+            producto_id    = producto_id,
+            usuario_id     = usuario_actual.id,
+            tipo           = "salida",
+            cantidad       = p.stock_actual,
+            stock_anterior = p.stock_actual,
+            stock_nuevo    = 0,
+            nota           = f"Baja por eliminacion del producto '{nombre}'",
+            lote           = p.lote
+        )
+        db.add(mov_baja)
+        db.flush()
+
+    # Desconectar movimientos historicos (se conservan sin referencia)
     db.query(models.Movimiento).filter(
         models.Movimiento.producto_id == producto_id
     ).update({"producto_id": None}, synchronize_session=False)
