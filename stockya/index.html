@@ -629,162 +629,131 @@
   </div>
 </div>
 
-<!-- MODAL: Registrar venta / salida — con modo rapido y detallado -->
+<!-- ============================================================
+     MODAL: CARRITO DE VENTAS — multi-producto
+     Analogia: como una caja registradora real donde agregas
+     varios productos antes de cobrar
+============================================================ -->
 <div class="modal-overlay" id="modalSalida">
-  <div class="modal-box" style="max-width:560px">
+  <div class="modal-box" style="max-width:620px">
 
     <div class="modal-header">
-      <div class="modal-title" id="modalSalidaTitulo">🛒 Registrar venta</div>
+      <div class="modal-title">🛒 Nueva venta</div>
       <button class="modal-close" onclick="cerrarModalSalida()">✕</button>
     </div>
 
-    <!-- Toggle modo rapido / detallado (solo ventas) -->
-    <div id="modoToggleWrap" style="display:flex;background:var(--bg3);border-radius:12px;padding:4px;margin:16px 24px 0;gap:4px">
-      <button id="btnModoRapido" onclick="setModoVenta('rapido')"
-        style="flex:1;padding:9px 12px;border:none;border-radius:9px;font-family:var(--font-body);font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;background:var(--verde);color:#000;box-shadow:0 2px 12px rgba(0,199,123,0.3)">
-        ⚡ Modo rápido
-      </button>
-      <button id="btnModoDetallado" onclick="setModoVenta('detallado')"
-        style="flex:1;padding:9px 12px;border:none;border-radius:9px;font-family:var(--font-body);font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;background:transparent;color:var(--muted)">
-        📋 Modo detallado
-      </button>
-    </div>
-
-    <form id="formSalida" style="padding:16px 24px 0">
-
-      <!-- Campo de escaneo / busqueda destacado -->
-      <div style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px;transition:border-color 0.2s" id="scanBox">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📷 Producto</div>
+    <!-- ZONA DE ESCANEO / BUSQUEDA -->
+    <div style="padding:16px 24px 0">
+      <div id="scanBox" style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📷 Agregar producto al carrito</div>
         <div style="display:flex;gap:8px;align-items:center">
           <input id="salidaCodigoBarra" class="form-input"
                  style="background:none;border:none;font-size:15px;font-weight:600;padding:0;flex:1;outline:none"
                  type="text" placeholder="Escanea el código o escribe el nombre..."
-                 oninput="buscarProductoSalida(this.value)">
+                 oninput="buscarProductoSalida(this.value)"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();agregarAlCarrito()}">
           <button type="button" onclick="abrirEscanerSalida()"
-                  style="background:var(--bg4);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-size:16px;cursor:pointer;transition:all 0.2s">📷</button>
+                  style="background:var(--bg4);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-size:16px;cursor:pointer">📷</button>
         </div>
         <div id="salidaScanHint" style="font-size:12px;color:var(--muted);margin-top:6px">
-          Usa la pistola lectora, cámara o escribe el nombre del producto
+          Escanea o escribe — Enter o "Agregar" para sumarlo al carrito
         </div>
-        <video id="videoEscanerSalida" style="display:none;width:100%;height:200px;object-fit:cover;border-radius:10px;margin-top:8px"></video>
+        <video id="videoEscanerSalida" style="display:none;width:100%;height:180px;object-fit:cover;border-radius:10px;margin-top:8px"></video>
       </div>
 
-      <!-- Chip verde cuando se encuentra el producto -->
-      <div id="productoChip" style="display:none;background:rgba(0,199,123,0.1);border:1px solid rgba(0,199,123,0.3);border-radius:12px;padding:12px 16px;margin-bottom:14px;gap:12px;align-items:center">
-        <div style="font-size:26px">📦</div>
-        <div style="flex:1">
-          <div id="chipNombre" style="font-weight:700;font-size:15px"></div>
-          <div id="chipDetalle" style="font-size:12px;color:var(--muted);margin-top:2px"></div>
+      <!-- Chip producto encontrado + cantidad + agregar -->
+      <div id="productoChip" style="display:none;background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:12px 14px;margin-bottom:12px;align-items:center;gap:10px">
+        <div style="font-size:22px">📦</div>
+        <div style="flex:1;min-width:0">
+          <div id="chipNombre" style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+          <div id="chipDetalle" style="font-size:11px;color:var(--muted);margin-top:1px"></div>
         </div>
-        <div style="text-align:center">
-          <div id="chipStock" style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--verde)">—</div>
-          <div style="font-size:10px;color:var(--muted)">en stock</div>
-        </div>
-      </div>
-
-      <!-- Selector de producto (fallback si no se escanea) -->
-      <div class="form-group" style="margin-bottom:14px">
-        <label class="form-label">Producto *</label>
-        <select id="salidaProductoId" class="form-input" onchange="onProductoSeleccionado()">
-          <option value="">Seleccionar de la lista...</option>
-        </select>
-      </div>
-
-      <!-- Tipo de salida (oculto para ventas, visible para otros tipos) -->
-      <div class="form-group" id="tipoSalidaWrap" style="margin-bottom:14px;display:none">
-        <label class="form-label">Tipo de salida *</label>
-        <select id="salidaTipoSalida" class="form-input">
-          <option value="venta">🛒 Venta</option>
-          <option value="merma">🗑️ Merma (daño / vencimiento)</option>
-          <option value="cuarentena">⚠️ Cuarentena (revisión)</option>
-          <option value="devolucion_proveedor">↩️ Devolución a proveedor</option>
-        </select>
-      </div>
-
-      <!-- Cantidad con botones tactiles + Precio -->
-      <div class="form-grid" style="margin-bottom:14px">
-
-        <div class="form-group">
-          <label class="form-label">Cantidad *</label>
-          <div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:10px;overflow:hidden">
-            <button type="button" onclick="cambiarQtyVenta(-1)"
-                    style="background:var(--bg4);border:none;color:var(--text);font-size:20px;font-weight:700;width:44px;height:44px;cursor:pointer;transition:all 0.15s;flex-shrink:0"
-                    onmouseover="this.style.background='var(--verde)';this.style.color='#000'"
-                    onmouseout="this.style.background='var(--bg4)';this.style.color='var(--text)'">−</button>
-            <input id="salidaCantidad" type="number" value="1" min="1"
-                   style="flex:1;background:none;border:none;color:var(--text);font-family:var(--font-head);font-size:20px;font-weight:800;text-align:center;outline:none;width:60px"
-                   oninput="calcularTotalVenta()">
-            <button type="button" onclick="cambiarQtyVenta(1)"
-                    style="background:var(--bg4);border:none;color:var(--text);font-size:20px;font-weight:700;width:44px;height:44px;cursor:pointer;transition:all 0.15s;flex-shrink:0"
-                    onmouseover="this.style.background='var(--verde)';this.style.color='#000'"
-                    onmouseout="this.style.background='var(--bg4)';this.style.color='var(--text)'">+</button>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Precio unitario</label>
-          <input id="salidaPrecioUnitario" class="form-input" type="number"
-                 placeholder="Se toma del producto" min="0"
+        <!-- Cantidad rapida -->
+        <div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:9px;overflow:hidden;flex-shrink:0">
+          <button type="button" onclick="cambiarQtyVenta(-1)"
+                  style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer"
+                  onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='none'">−</button>
+          <input id="salidaCantidad" type="number" value="1" min="1"
+                 style="width:42px;background:none;border:none;color:var(--text);font-family:var(--font-head);font-size:16px;font-weight:800;text-align:center;outline:none"
                  oninput="calcularTotalVenta()">
+          <button type="button" onclick="cambiarQtyVenta(1)"
+                  style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer"
+                  onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='none'">+</button>
         </div>
-
+        <!-- Precio editable -->
+        <input id="salidaPrecioUnitario" type="number" placeholder="Precio"
+               style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px;color:var(--text);font-size:13px;font-weight:600;outline:none;flex-shrink:0"
+               oninput="calcularTotalVenta()">
+        <!-- Boton agregar -->
+        <button type="button" onclick="agregarAlCarrito()"
+                style="background:var(--verde);border:none;border-radius:9px;padding:8px 14px;color:#000;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">
+          + Agregar
+        </button>
       </div>
 
-      <!-- Total en tiempo real -->
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+      <!-- Selector manual de producto -->
+      <div style="margin-bottom:12px">
+        <select id="salidaProductoId" class="form-input" onchange="onProductoSeleccionado()" style="font-size:13px">
+          <option value="">— O selecciona de la lista —</option>
+        </select>
+      </div>
+
+      <!-- ============================================================
+           CARRITO — lista de productos agregados
+           Analogia: el ticket que se va imprimiendo en la caja
+      ============================================================ -->
+      <div id="carritoWrap" style="display:none;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
+          🧾 Productos en esta venta
+        </div>
+        <div id="carritoLista" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto"></div>
+      </div>
+
+      <!-- TOTAL GENERAL DEL CARRITO -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
         <div>
-          <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase">Total de esta venta</div>
-          <div id="totalDetalle" style="font-size:11px;color:var(--muted);margin-top:2px">1 und × $0</div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase">Total de la venta</div>
+          <div id="totalDetalle" style="font-size:11px;color:var(--muted);margin-top:2px">0 productos</div>
         </div>
-        <div id="totalValor" style="font-family:var(--font-head);font-size:24px;font-weight:800;color:var(--verde)">$0</div>
+        <div id="totalValor" style="font-family:var(--font-head);font-size:26px;font-weight:800;color:var(--verde)">$0</div>
       </div>
 
-      <!-- Campos extra — solo modo detallado -->
-      <div id="camposDetalle" style="display:none">
-        <div class="form-grid">
+      <!-- DATOS ADICIONALES DE LA VENTA -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
 
-          <!-- Cliente con boton generico -->
-          <div class="form-group form-full">
-            <label class="form-label">Cliente</label>
-            <input id="salidaCliente" class="form-input" type="text"
-                   placeholder="Nombre del cliente (opcional)">
-            <div onclick="usarClienteGenerico()"
-                 style="display:flex;align-items:center;gap:8px;background:rgba(91,142,255,0.1);border:1px solid rgba(91,142,255,0.3);border-radius:8px;padding:8px 12px;margin-top:6px;cursor:pointer;font-size:13px;color:var(--azul);font-weight:600;transition:all 0.2s"
-                 onmouseover="this.style.background='rgba(91,142,255,0.2)'"
-                 onmouseout="this.style.background='rgba(91,142,255,0.1)'">
-              👤 Usar "Cliente Genérico" — venta sin identificar
-            </div>
+        <!-- Cliente -->
+        <div class="form-group form-full">
+          <label class="form-label">Cliente</label>
+          <input id="salidaCliente" class="form-input" type="text" placeholder="Nombre del cliente (opcional)">
+          <div onclick="usarClienteGenerico()"
+               style="display:flex;align-items:center;gap:6px;background:rgba(91,142,255,0.1);border:1px solid rgba(91,142,255,0.25);border-radius:8px;padding:7px 12px;margin-top:5px;cursor:pointer;font-size:12px;color:var(--azul);font-weight:600"
+               onmouseover="this.style.background='rgba(91,142,255,0.2)'"
+               onmouseout="this.style.background='rgba(91,142,255,0.1)'">
+            👤 Cliente Genérico
           </div>
-
-          <!-- Documento -->
-          <div class="form-group">
-            <label class="form-label">N° Documento</label>
-            <input id="salidaDocumento" class="form-input" type="text"
-                   placeholder="Boleta, factura...">
-          </div>
-
-          <!-- Nota -->
-          <div class="form-group">
-            <label class="form-label">Nota</label>
-            <input id="salidaMotivo" class="form-input" type="text"
-                   placeholder="Observación opcional">
-          </div>
-
-          <!-- Lote -->
-          <div class="form-group form-full">
-            <label class="form-label">Número de lote</label>
-            <input id="salidaLote" class="form-input" type="text"
-                   placeholder="Dejar vacío si no aplica">
-          </div>
-
         </div>
-      </div>
 
-    </form>
+        <!-- Documento -->
+        <div class="form-group">
+          <label class="form-label">N° Documento</label>
+          <input id="salidaDocumento" class="form-input" type="text" placeholder="Boleta, factura...">
+        </div>
+
+        <!-- Nota -->
+        <div class="form-group">
+          <label class="form-label">Nota</label>
+          <input id="salidaMotivo" class="form-input" type="text" placeholder="Observación opcional">
+        </div>
+
+      </div>
+    </div><!-- fin padding -->
 
     <div class="form-actions">
       <button type="button" class="btn-secondary" onclick="cerrarModalSalida()">Cancelar</button>
-      <button type="button" class="btn-primary" onclick="guardarSalida()">✔ Registrar venta</button>
+      <button type="button" class="btn-primary" id="btnConfirmarVenta" onclick="guardarSalida()" disabled
+              style="opacity:0.5">
+        ✔ Confirmar venta
+      </button>
     </div>
 
   </div>
