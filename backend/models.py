@@ -69,6 +69,9 @@ class Configuracion(Base):
     moneda          = Column(String(10), default="CLP")
     color_principal = Column(String(10), default="#00C77B")
     logo_base64     = Column(Text, nullable=True)
+    rubro           = Column(String(100), nullable=True)
+    nombre_usuario  = Column(String(150), nullable=True)
+    onboarding_completo = Column(Boolean, default=False)
     updated_at      = Column(DateTime(timezone=True), onupdate=func.now())
 
     usuario         = relationship("Usuario", back_populates="configuracion")
