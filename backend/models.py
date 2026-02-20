@@ -6,7 +6,7 @@
 #           define que columnas tiene cada tabla
 # ============================================================
 
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Enum
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -47,6 +47,7 @@ class Usuario(Base):
     # Relaciones
     configuracion = relationship("Configuracion", back_populates="usuario", uselist=False)
     movimientos   = relationship("Movimiento", back_populates="usuario")
+    productos     = relationship("Producto", back_populates="usuario")  # ✅ NUEVO
 
     # CORREGIDO: foreign_keys explicito porque Salida tiene 3 FK hacia usuarios
     salidas       = relationship(
@@ -80,8 +81,17 @@ class Producto(Base):
     __tablename__ = "productos"
 
     id                  = Column(Integer, primary_key=True, index=True)
+
+    # ✅ NUEVO: cada producto pertenece a un usuario
+    # Analogia: cada producto ahora tiene el nombre del inquilino escrito en la caja
+    usuario_id          = Column(Integer, ForeignKey("usuarios.id"), nullable=False, index=True)
+
     nombre              = Column(String(200), nullable=False)
-    codigo_barra        = Column(String(100), unique=True, nullable=True, index=True)
+
+    # ✅ CAMBIO: codigo_barra ya NO es unique global porque dos usuarios
+    #    distintos pueden tener el mismo producto (ej: Coca-Cola 500ml).
+    #    La unicidad ahora es por (usuario_id + codigo_barra) — ver __table_args__
+    codigo_barra        = Column(String(100), nullable=True, index=True)
     codigo              = Column(String(50), nullable=True)
     categoria           = Column(String(100), nullable=True)
     marca               = Column(String(100), nullable=True)
@@ -98,7 +108,14 @@ class Producto(Base):
     created_at          = Column(DateTime(timezone=True), server_default=func.now())
     updated_at          = Column(DateTime(timezone=True), onupdate=func.now())
 
+    # ✅ NUEVO: unicidad compuesta — mismo codigo_barra solo puede existir
+    #    una vez POR usuario, no una vez en toda la base de datos
+    __table_args__ = (
+        UniqueConstraint("usuario_id", "codigo_barra", name="uq_producto_usuario_codigo"),
+    )
+
     # Relaciones
+    usuario             = relationship("Usuario", back_populates="productos")  # ✅ NUEVO
     movimientos         = relationship("Movimiento", back_populates="producto")
     salidas             = relationship(
                             "Salida",
@@ -136,59 +153,59 @@ class Movimiento(Base):
 class Salida(Base):
     __tablename__ = "salidas"
 
-    id                   = Column(Integer, primary_key=True, index=True)
+    id                    = Column(Integer, primary_key=True, index=True)
 
     # FKs - hay 3 hacia usuarios, por eso SQLAlchemy necesita foreign_keys explicito
-    producto_id          = Column(Integer, ForeignKey("productos.id", ondelete="SET NULL"), nullable=True)
-    usuario_id           = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    producto_id           = Column(Integer, ForeignKey("productos.id", ondelete="SET NULL"), nullable=True)
+    usuario_id            = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     resolucion_usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
 
     # Cantidad y stock
-    cantidad             = Column(Integer, nullable=False)
-    stock_anterior       = Column(Integer, nullable=False)
-    stock_nuevo          = Column(Integer, nullable=False)
+    cantidad              = Column(Integer, nullable=False)
+    stock_anterior        = Column(Integer, nullable=False)
+    stock_nuevo           = Column(Integer, nullable=False)
 
     # Tipo y motivo
-    tipo_salida          = Column(Enum(TipoSalida,  name="tipo_salida_enum"),  nullable=False)
-    motivo               = Column(String(255), nullable=True)
-    numero_documento     = Column(String(100), nullable=True)
-    codigo_barra_scan    = Column(String(100), nullable=True)
+    tipo_salida           = Column(Enum(TipoSalida,  name="tipo_salida_enum"),  nullable=False)
+    motivo                = Column(String(255), nullable=True)
+    numero_documento      = Column(String(100), nullable=True)
+    codigo_barra_scan     = Column(String(100), nullable=True)
 
     # Valor economico
-    precio_unitario      = Column(Float, default=0.0)
-    valor_total          = Column(Float, default=0.0)
+    precio_unitario       = Column(Float, default=0.0)
+    valor_total           = Column(Float, default=0.0)
 
     # Estado (clave para cuarentena)
-    estado               = Column(
-                               Enum(EstadoSalida, name="estado_salida_enum"),
-                               default=EstadoSalida.activo,
-                               nullable=False
-                           )
-    estado_anterior      = Column(String(50), nullable=True)
+    estado                = Column(
+                                Enum(EstadoSalida, name="estado_salida_enum"),
+                                default=EstadoSalida.activo,
+                                nullable=False
+                            )
+    estado_anterior       = Column(String(50), nullable=True)
 
     # Resolucion de cuarentena
-    resolucion_nota      = Column(String(255), nullable=True)
-    resolucion_at        = Column(DateTime(timezone=True), nullable=True)
+    resolucion_nota       = Column(String(255), nullable=True)
+    resolucion_at         = Column(DateTime(timezone=True), nullable=True)
 
     # Trazabilidad
-    lote                 = Column(String(100), nullable=True)
-    fecha_vencimiento    = Column(DateTime(timezone=True), nullable=True)
-    created_at           = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at           = Column(DateTime(timezone=True), onupdate=func.now())
+    lote                  = Column(String(100), nullable=True)
+    fecha_vencimiento     = Column(DateTime(timezone=True), nullable=True)
+    created_at            = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at            = Column(DateTime(timezone=True), onupdate=func.now())
 
     # RELACIONES con foreign_keys explicitos para evitar AmbiguousForeignKeysError
     # Analogia: le decimos a SQLAlchemy exactamente por cual "puerta" entrar
-    producto             = relationship(
-                               "Producto",
-                               back_populates="salidas",
-                               foreign_keys=[producto_id]
-                           )
-    usuario              = relationship(
-                               "Usuario",
-                               back_populates="salidas",
-                               foreign_keys=[usuario_id]
-                           )
-    resolucion_usuario   = relationship(
-                               "Usuario",
-                               foreign_keys=[resolucion_usuario_id]
-                           )
+    producto              = relationship(
+                                "Producto",
+                                back_populates="salidas",
+                                foreign_keys=[producto_id]
+                            )
+    usuario               = relationship(
+                                "Usuario",
+                                back_populates="salidas",
+                                foreign_keys=[usuario_id]
+                            )
+    resolucion_usuario    = relationship(
+                                "Usuario",
+                                foreign_keys=[resolucion_usuario_id]
+                            )
