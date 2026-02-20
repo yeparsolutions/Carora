@@ -3,6 +3,8 @@
 # Archivo: backend/routers/movimientos.py
 # Descripcion: Registra entradas y salidas de stock
 # Analogia: el libro contable de la bodega
+# ✅ CORREGIDO: ahora filtra por usuario_actual — cada usuario
+#    ve y opera SOLO sus propios movimientos y productos
 # ============================================================
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,16 +21,16 @@ router = APIRouter(prefix="/movimientos", tags=["Movimientos"])
 def movimiento_a_dict(m):
     """Convierte Movimiento a dict seguro, sin fallar si producto fue eliminado."""
     return {
-        "id":             m.id,
-        "producto_id":    m.producto_id,
-        "usuario_id":     m.usuario_id,
-        "tipo":           m.tipo,
-        "cantidad":       m.cantidad,
-        "stock_anterior": m.stock_anterior,
-        "stock_nuevo":    m.stock_nuevo,
-        "nota":           m.nota,
-        "lote":           m.lote,
-        "created_at":     m.created_at,
+        "id":              m.id,
+        "producto_id":     m.producto_id,
+        "usuario_id":      m.usuario_id,
+        "tipo":            m.tipo,
+        "cantidad":        m.cantidad,
+        "stock_anterior":  m.stock_anterior,
+        "stock_nuevo":     m.stock_nuevo,
+        "nota":            m.nota,
+        "lote":            m.lote,
+        "created_at":      m.created_at,
         "producto_nombre": m.producto.nombre if m.producto else None,
         "usuario_nombre":  m.usuario.nombre  if m.usuario  else None,
     }
@@ -49,12 +51,15 @@ def listar_movimientos(
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
     """
-    Lista todos los movimientos con filtros.
+    Lista todos los movimientos del usuario autenticado con filtros.
     Usa eager loading para traer producto y usuario en una sola query.
     """
     query = db.query(models.Movimiento).options(
         joinedload(models.Movimiento.producto),
         joinedload(models.Movimiento.usuario)
+    ).filter(
+        # ✅ CORREGIDO: solo los movimientos de este usuario
+        models.Movimiento.usuario_id == usuario_actual.id
     )
 
     if tipo:
@@ -101,14 +106,18 @@ def registrar_movimiento(
     """
     Registra una entrada o salida y actualiza el stock.
     Analogia: anotar en el cuaderno de bodega y mover las cajas al mismo tiempo.
+    Solo permite operar sobre productos que pertenecen al usuario autenticado.
     """
     if datos.tipo not in ("entrada", "salida"):
         raise HTTPException(status_code=400, detail="El tipo debe ser 'entrada' o 'salida'")
     if datos.cantidad <= 0:
         raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
 
+    # ✅ CORREGIDO: verificar que el producto pertenece al usuario
+    # Analogia: no puedes mover cajas de la bodega de otro inquilino
     producto = db.query(models.Producto).filter(
-        models.Producto.id == datos.producto_id
+        models.Producto.id         == datos.producto_id,
+        models.Producto.usuario_id == usuario_actual.id   # ← seguridad clave
     ).first()
 
     if not producto:
@@ -144,16 +153,16 @@ def registrar_movimiento(
     db.refresh(producto)
 
     return {
-        "id":             movimiento.id,
-        "producto_id":    movimiento.producto_id,
-        "usuario_id":     movimiento.usuario_id,
-        "tipo":           movimiento.tipo,
-        "cantidad":       movimiento.cantidad,
-        "stock_anterior": movimiento.stock_anterior,
-        "stock_nuevo":    movimiento.stock_nuevo,
-        "nota":           movimiento.nota,
-        "lote":           movimiento.lote,
-        "created_at":     movimiento.created_at,
+        "id":              movimiento.id,
+        "producto_id":     movimiento.producto_id,
+        "usuario_id":      movimiento.usuario_id,
+        "tipo":            movimiento.tipo,
+        "cantidad":        movimiento.cantidad,
+        "stock_anterior":  movimiento.stock_anterior,
+        "stock_nuevo":     movimiento.stock_nuevo,
+        "nota":            movimiento.nota,
+        "lote":            movimiento.lote,
+        "created_at":      movimiento.created_at,
         "producto_nombre": producto.nombre,
         "usuario_nombre":  usuario_actual.nombre,
     }
