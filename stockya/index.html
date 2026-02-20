@@ -93,12 +93,10 @@
     <button class="nav-item"        id="nav-productos"   onclick="showScreen('productos')">  <span class="nav-icon">📋</span> Productos</button>
     <button class="nav-item"        id="nav-stock"       onclick="showScreen('stock')">      <span class="nav-icon">📦</span> Stock</button>
     <button class="nav-item"        id="nav-movimientos" onclick="showScreen('movimientos')"><span class="nav-icon">🔄</span> Movimientos</button>
-
-    <!-- NUEVO: Salidas en seccion principal -->
     <button class="nav-item"        id="nav-salidas"     onclick="showScreen('salidas')">    <span class="nav-icon">📤</span> Salidas</button>
 
     <span class="nav-label">Análisis</span>
-    <button class="nav-item" id="nav-alertas"  onclick="showScreen('alertas')">  <span class="nav-icon">🔔</span> Alertas <span class="nav-badge" id="alertBadge">3</span></button>
+    <button class="nav-item" id="nav-alertas"  onclick="showScreen('alertas')">  <span class="nav-icon">🔔</span> Alertas <span class="nav-badge" id="alertBadge" style="display:none">0</span></button>
     <button class="nav-item" id="nav-reportes" onclick="showScreen('reportes')"> <span class="nav-icon">📊</span> Reportes</button>
 
     <span class="nav-label">Sistema</span>
@@ -279,10 +277,7 @@
       </div>
     </div>
 
-    <!-- ==========================================
-         PANTALLA: SALIDAS
-         Ventas, mermas, cuarentenas, devoluciones
-    ========================================== -->
+    <!-- SALIDAS -->
     <div class="screen" id="screen-salidas">
       <div class="page-header">
         <div>
@@ -291,32 +286,12 @@
         </div>
         <button class="btn-primary" onclick="abrirModalSalida()">+ Registrar salida</button>
       </div>
-
-      <!-- Resumen de 4 tarjetas -->
       <div class="stats-grid" style="margin-bottom:20px">
-        <div class="stat-card azul">
-          <div class="stat-label">VENTAS</div>
-          <div class="stat-value" id="salidaResVentas">—</div>
-          <div class="stat-trend">registros totales</div>
-        </div>
-        <div class="stat-card rojo">
-          <div class="stat-label">MERMAS</div>
-          <div class="stat-value" id="salidaResMermas">—</div>
-          <div class="stat-trend">pérdidas registradas</div>
-        </div>
-        <div class="stat-card amarillo">
-          <div class="stat-label">EN CUARENTENA ⚠️</div>
-          <div class="stat-value" id="salidaResCuarentenas">—</div>
-          <div class="stat-trend">pendientes de resolución</div>
-        </div>
-        <div class="stat-card verde">
-          <div class="stat-label">VALOR VENDIDO</div>
-          <div class="stat-value" id="salidaResValor">—</div>
-          <div class="stat-trend">total en ventas</div>
-        </div>
+        <div class="stat-card azul"><div class="stat-label">VENTAS</div><div class="stat-value" id="salidaResVentas">—</div><div class="stat-trend">registros totales</div></div>
+        <div class="stat-card rojo"><div class="stat-label">MERMAS</div><div class="stat-value" id="salidaResMermas">—</div><div class="stat-trend">pérdidas registradas</div></div>
+        <div class="stat-card amarillo"><div class="stat-label">EN CUARENTENA ⚠️</div><div class="stat-value" id="salidaResCuarentenas">—</div><div class="stat-trend">pendientes de resolución</div></div>
+        <div class="stat-card verde"><div class="stat-label">VALOR VENDIDO</div><div class="stat-value" id="salidaResValor">—</div><div class="stat-trend">total en ventas</div></div>
       </div>
-
-      <!-- Filtros -->
       <div class="search-row" style="flex-wrap:wrap;gap:8px">
         <input id="salidaBuscar" class="search-input" placeholder="🔍  Buscar por producto..." oninput="filtrarSalidas()" style="min-width:180px;flex:1">
         <select id="salidaFiltroTipo" class="filter-select" onchange="filtrarSalidas()">
@@ -337,22 +312,13 @@
         <input id="salidaFiltroDesde" class="filter-select" type="date" onchange="filtrarSalidas()" title="Desde">
         <input id="salidaFiltroHasta" class="filter-select" type="date" onchange="filtrarSalidas()" title="Hasta">
       </div>
-
-      <!-- Tabla -->
       <div class="card" style="padding:0;overflow:hidden">
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th style="padding-left:16px">Fecha</th>
-                <th>Producto</th>
-                <th>Tipo</th>
-                <th>Cantidad</th>
-                <th>Stk. anterior</th>
-                <th>Stk. resultante</th>
-                <th>Motivo</th>
-                <th>Estado</th>
-                <th style="text-align:center">Valor</th>
+                <th style="padding-left:16px">Fecha</th><th>Producto</th><th>Tipo</th><th>Cantidad</th>
+                <th>Stk. anterior</th><th>Stk. resultante</th><th>Motivo</th><th>Estado</th><th style="text-align:center">Valor</th>
               </tr>
             </thead>
             <tbody id="salidaTableBody">
@@ -361,73 +327,113 @@
           </table>
         </div>
       </div>
-    </div><!-- fin screen-salidas -->
+    </div>
 
-    <!-- ALERTAS -->
+    <!-- ✅ ALERTAS — dinámico, se llena desde cargarAlertas() en app.js -->
     <div class="screen" id="screen-alertas">
       <div class="page-header">
-        <div><div class="page-title">Centro de Alertas 🔔</div><div class="page-subtitle">Productos que requieren tu atención</div></div>
+        <div>
+          <div class="page-title">Centro de Alertas 🔔</div>
+          <div class="page-subtitle" id="alertasSubtitulo">0 productos requieren atención</div>
+        </div>
         <button class="btn-secondary" onclick="showToast('✓ Marcadas como revisadas')">✓ Marcar todas como vistas</button>
       </div>
+
+      <!-- Contadores -->
       <div class="stats-grid" style="margin-bottom:24px">
-        <div class="stat-card rojo"><div class="stat-label">CRÍTICOS 🔴</div><div class="stat-value">3</div><div class="stat-trend">Pedir hoy mismo</div></div>
-        <div class="stat-card amarillo"><div class="stat-label">EN ALERTA 🟡</div><div class="stat-value">7</div><div class="stat-trend">Pedir esta semana</div></div>
-      </div>
-      <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">🔴 Stock Crítico — Pedir urgente</div>
-      <div class="alert-big-list" style="margin-bottom:28px">
-        <div class="alert-big-item critico">
-          <div class="alert-icon-big critico">🥛</div>
-          <div class="alert-big-info"><div class="alert-big-name">Leche entera 1L</div><div class="alert-big-detail">Stock mínimo configurado: 20 und. · Categoría: Lácteos</div></div>
-          <div class="alert-big-action"><div class="alert-stock-num critico">2 und.</div><button class="btn-primary" style="font-size:12px;padding:7px 14px" onclick="showToast('Movimiento registrado!')">+ Registrar entrada</button></div>
+        <div class="stat-card rojo">
+          <div class="stat-label">CRÍTICOS 🔴</div>
+          <div class="stat-value" id="alertasCriticosNum">0</div>
+          <div class="stat-trend">Pedir hoy mismo</div>
         </div>
-        <div class="alert-big-item critico">
-          <div class="alert-icon-big critico">🍞</div>
-          <div class="alert-big-info"><div class="alert-big-name">Pan de molde grande</div><div class="alert-big-detail">Stock mínimo configurado: 10 und. · Categoría: Panadería</div></div>
-          <div class="alert-big-action"><div class="alert-stock-num critico">1 und.</div><button class="btn-primary" style="font-size:12px;padding:7px 14px" onclick="showToast('Movimiento registrado!')">+ Registrar entrada</button></div>
+        <div class="stat-card amarillo">
+          <div class="stat-label">EN ALERTA 🟡</div>
+          <div class="stat-value" id="alertasAlertaNum">0</div>
+          <div class="stat-trend">Pedir esta semana</div>
         </div>
       </div>
-      <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">🟡 Stock en Alerta — Pedir pronto</div>
-      <div class="alert-big-list">
-        <div class="alert-big-item alerta">
-          <div class="alert-icon-big alerta">🧃</div>
-          <div class="alert-big-info"><div class="alert-big-name">Jugo Natural One 1L</div><div class="alert-big-detail">Stock mínimo configurado: 15 und. · Actual: 8 und.</div></div>
-          <div class="alert-big-action"><div class="alert-stock-num alerta">8 und.</div><button class="btn-secondary" style="font-size:12px;padding:7px 14px" onclick="showToast('Movimiento registrado!')">+ Entrada</button></div>
-        </div>
+
+      <!-- Sección críticos — oculta si no hay -->
+      <div id="alertasCriticosSec" style="display:none">
+        <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">🔴 Stock Crítico — Pedir urgente</div>
+        <div class="alert-big-list" id="alertasCriticosList" style="margin-bottom:28px"></div>
+      </div>
+
+      <!-- Sección alerta — oculta si no hay -->
+      <div id="alertasAlertaSec" style="display:none">
+        <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">🟡 Stock en Alerta — Pedir pronto</div>
+        <div class="alert-big-list" id="alertasAlertaList" style="margin-bottom:28px"></div>
+      </div>
+
+      <!-- Sección vencidos — oculta si no hay -->
+      <div id="alertasVencidosSec" style="display:none">
+        <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">⛔ Productos Vencidos</div>
+        <div class="alert-big-list" id="alertasVencidosList" style="margin-bottom:28px"></div>
+      </div>
+
+      <!-- Sección próximos a vencer — oculta si no hay -->
+      <div id="alertasProximosSec" style="display:none">
+        <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">⏰ Próximos a Vencer</div>
+        <div class="alert-big-list" id="alertasProximosList" style="margin-bottom:28px"></div>
+      </div>
+
+      <!-- Mensaje vacío — visible solo cuando no hay alertas -->
+      <div id="alertasVacioMsg" style="text-align:center;padding:64px 24px;color:var(--muted)">
+        <div style="font-size:48px;margin-bottom:16px">✅</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px">Todo en orden</div>
+        <div style="font-size:13px">No hay alertas de stock ni vencimientos por ahora</div>
       </div>
     </div>
 
-    <!-- REPORTES -->
+    <!-- ✅ REPORTES — dinámico, se llena desde cargarReportes() en app.js -->
     <div class="screen" id="screen-reportes">
       <div class="page-header">
         <div><div class="page-title">Reportes</div><div class="page-subtitle">Análisis de tu inventario y rotación</div></div>
         <div style="display:flex;gap:10px">
-          <select class="filter-select"><option>Esta semana</option><option>Este mes</option><option>Últimos 30 días</option></select>
+          <select class="filter-select" id="reportePeriodo" onchange="cargarReportes()">
+            <option value="semana">Esta semana</option>
+            <option value="mes">Este mes</option>
+            <option value="30dias">Últimos 30 días</option>
+          </select>
           <button class="btn-secondary" onclick="showToast('Exportando reporte...')">📥 Exportar</button>
         </div>
       </div>
+
+      <!-- Tarjetas de resumen — se llenan dinámicamente -->
       <div class="stats-grid" style="margin-bottom:24px">
-        <div class="stat-card verde"><div class="stat-label">MARGEN BRUTO EST.</div><div class="stat-value">31%</div><div class="stat-trend">Promedio del mes</div></div>
-        <div class="stat-card azul"><div class="stat-label">ROTACIÓN TOTAL</div><div class="stat-value">248</div><div class="stat-trend">Unidades vendidas (est.)</div></div>
-        <div class="stat-card amarillo"><div class="stat-label">VALOR BODEGA</div><div class="stat-value">$842K</div><div class="stat-trend">CLP en inventario</div></div>
+        <div class="stat-card verde">
+          <div class="stat-label">MARGEN BRUTO EST.</div>
+          <div class="stat-value" id="reporteMargen">—</div>
+          <div class="stat-trend">Promedio del inventario</div>
+        </div>
+        <div class="stat-card azul">
+          <div class="stat-label">UNIDADES VENDIDAS</div>
+          <div class="stat-value" id="reporteRotacion">—</div>
+          <div class="stat-trend">Total de salidas registradas</div>
+        </div>
+        <div class="stat-card amarillo">
+          <div class="stat-label">VALOR BODEGA</div>
+          <div class="stat-value" id="reporteValorBodega">—</div>
+          <div class="stat-trend">CLP en inventario actual</div>
+        </div>
       </div>
-      <div class="report-grid">
+
+      <!-- Mensaje vacío si no hay datos -->
+      <div id="reportesVacioMsg" style="display:none;text-align:center;padding:64px 24px;color:var(--muted)">
+        <div style="font-size:48px;margin-bottom:16px">📊</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px">Sin datos aún</div>
+        <div style="font-size:13px">Agrega productos y registra movimientos para ver reportes</div>
+      </div>
+
+      <!-- Grilla de reportes — visible solo con datos -->
+      <div id="reportesContenido" style="display:none" class="report-grid">
         <div class="card">
-          <div class="card-title">📦 Movimientos por Categoría</div>
-          <div class="chart-placeholder">
-            <div class="chart-bar-v" style="background:linear-gradient(to top,#5B8EFF,#8AADFF);height:80%"><span>Bebestibles</span></div>
-            <div class="chart-bar-v" style="background:linear-gradient(to top,var(--verde),#00F59B);height:55%"><span>Lácteos</span></div>
-            <div class="chart-bar-v" style="background:linear-gradient(to top,var(--amarillo),#FFD560);height:40%"><span>Granos</span></div>
-            <div class="chart-bar-v" style="background:linear-gradient(to top,#FF6B9D,#FFB3CC);height:35%"><span>Panadería</span></div>
-            <div class="chart-bar-v" style="background:linear-gradient(to top,#A78BFA,#C4B5FD);height:25%"><span>Limpieza</span></div>
-          </div>
+          <div class="card-title">📦 Top Productos más Movidos</div>
+          <div id="reporteTopProductos" class="top-products"></div>
         </div>
         <div class="card">
-          <div class="card-title">🏆 Top Productos más Movidos</div>
-          <div class="top-products">
-            <div class="top-product-row"><div class="top-rank gold">1</div><div style="flex:1"><div style="font-size:13px;font-weight:500;margin-bottom:5px">Agua mineral 500ml</div><div class="top-bar-track"><div class="top-bar-fill" style="width:100%"></div></div></div><div class="top-qty">86 und.</div></div>
-            <div class="top-product-row"><div class="top-rank silver">2</div><div style="flex:1"><div style="font-size:13px;font-weight:500;margin-bottom:5px">Coca-Cola 1.5L</div><div class="top-bar-track"><div class="top-bar-fill" style="width:78%"></div></div></div><div class="top-qty">67 und.</div></div>
-            <div class="top-product-row"><div class="top-rank bronze">3</div><div style="flex:1"><div style="font-size:13px;font-weight:500;margin-bottom:5px">Leche entera 1L</div><div class="top-bar-track"><div class="top-bar-fill" style="width:58%"></div></div></div><div class="top-qty">50 und.</div></div>
-          </div>
+          <div class="card-title">📂 Stock por Categoría</div>
+          <div id="reporteCategorias" style="display:flex;flex-direction:column;gap:10px;padding:8px 0"></div>
         </div>
       </div>
     </div>
@@ -629,20 +635,13 @@
   </div>
 </div>
 
-<!-- ============================================================
-     MODAL: CARRITO DE VENTAS — multi-producto
-     Analogia: como una caja registradora real donde agregas
-     varios productos antes de cobrar
-============================================================ -->
+<!-- MODAL: Carrito de ventas -->
 <div class="modal-overlay" id="modalSalida">
   <div class="modal-box" style="max-width:620px">
-
     <div class="modal-header">
       <div class="modal-title">🛒 Nueva venta</div>
       <button class="modal-close" onclick="cerrarModalSalida()">✕</button>
     </div>
-
-    <!-- ZONA DE ESCANEO / BUSQUEDA -->
     <div style="padding:16px 24px 0">
       <div id="scanBox" style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📷 Agregar producto al carrito</div>
@@ -655,61 +654,32 @@
           <button type="button" onclick="abrirEscanerSalida()"
                   style="background:var(--bg4);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-size:16px;cursor:pointer">📷</button>
         </div>
-        <div id="salidaScanHint" style="font-size:12px;color:var(--muted);margin-top:6px">
-          Escanea o escribe — Enter o "Agregar" para sumarlo al carrito
-        </div>
+        <div id="salidaScanHint" style="font-size:12px;color:var(--muted);margin-top:6px">Escanea o escribe — Enter o "Agregar" para sumarlo al carrito</div>
         <video id="videoEscanerSalida" style="display:none;width:100%;height:180px;object-fit:cover;border-radius:10px;margin-top:8px"></video>
       </div>
-
-      <!-- Chip producto encontrado + cantidad + agregar -->
       <div id="productoChip" style="display:none;background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:12px 14px;margin-bottom:12px;align-items:center;gap:10px">
         <div style="font-size:22px">📦</div>
         <div style="flex:1;min-width:0">
           <div id="chipNombre" style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
           <div id="chipDetalle" style="font-size:11px;color:var(--muted);margin-top:1px"></div>
         </div>
-        <!-- Cantidad rapida -->
         <div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:9px;overflow:hidden;flex-shrink:0">
-          <button type="button" onclick="cambiarQtyVenta(-1)"
-                  style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer"
-                  onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='none'">−</button>
-          <input id="salidaCantidad" type="number" value="1" min="1"
-                 style="width:42px;background:none;border:none;color:var(--text);font-family:var(--font-head);font-size:16px;font-weight:800;text-align:center;outline:none"
-                 oninput="calcularTotalVenta()">
-          <button type="button" onclick="cambiarQtyVenta(1)"
-                  style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer"
-                  onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='none'">+</button>
+          <button type="button" onclick="cambiarQtyVenta(-1)" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">−</button>
+          <input id="salidaCantidad" type="number" value="1" min="1" style="width:42px;background:none;border:none;color:var(--text);font-family:var(--font-head);font-size:16px;font-weight:800;text-align:center;outline:none" oninput="calcularTotalVenta()">
+          <button type="button" onclick="cambiarQtyVenta(1)" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">+</button>
         </div>
-        <!-- Precio editable -->
-        <input id="salidaPrecioUnitario" type="number" placeholder="Precio"
-               style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px;color:var(--text);font-size:13px;font-weight:600;outline:none;flex-shrink:0"
-               oninput="calcularTotalVenta()">
-        <!-- Boton agregar -->
-        <button type="button" onclick="agregarAlCarrito()"
-                style="background:var(--verde);border:none;border-radius:9px;padding:8px 14px;color:#000;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">
-          + Agregar
-        </button>
+        <input id="salidaPrecioUnitario" type="number" placeholder="Precio" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px;color:var(--text);font-size:13px;font-weight:600;outline:none;flex-shrink:0" oninput="calcularTotalVenta()">
+        <button type="button" onclick="agregarAlCarrito()" style="background:var(--verde);border:none;border-radius:9px;padding:8px 14px;color:#000;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">+ Agregar</button>
       </div>
-
-      <!-- Selector manual de producto -->
       <div style="margin-bottom:12px">
         <select id="salidaProductoId" class="form-input" onchange="onProductoSeleccionado()" style="font-size:13px">
           <option value="">— O selecciona de la lista —</option>
         </select>
       </div>
-
-      <!-- ============================================================
-           CARRITO — lista de productos agregados
-           Analogia: el ticket que se va imprimiendo en la caja
-      ============================================================ -->
       <div id="carritoWrap" style="display:none;margin-bottom:12px">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
-          🧾 Productos en esta venta
-        </div>
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">🧾 Productos en esta venta</div>
         <div id="carritoLista" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto"></div>
       </div>
-
-      <!-- TOTAL GENERAL DEL CARRITO -->
       <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
         <div>
           <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase">Total de la venta</div>
@@ -717,45 +687,20 @@
         </div>
         <div id="totalValor" style="font-family:var(--font-head);font-size:26px;font-weight:800;color:var(--verde)">$0</div>
       </div>
-
-      <!-- DATOS ADICIONALES DE LA VENTA -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
-
-        <!-- Cliente -->
         <div class="form-group form-full">
           <label class="form-label">Cliente</label>
           <input id="salidaCliente" class="form-input" type="text" placeholder="Nombre del cliente (opcional)">
-          <div onclick="usarClienteGenerico()"
-               style="display:flex;align-items:center;gap:6px;background:rgba(91,142,255,0.1);border:1px solid rgba(91,142,255,0.25);border-radius:8px;padding:7px 12px;margin-top:5px;cursor:pointer;font-size:12px;color:var(--azul);font-weight:600"
-               onmouseover="this.style.background='rgba(91,142,255,0.2)'"
-               onmouseout="this.style.background='rgba(91,142,255,0.1)'">
-            👤 Cliente Genérico
-          </div>
+          <div onclick="usarClienteGenerico()" style="display:flex;align-items:center;gap:6px;background:rgba(91,142,255,0.1);border:1px solid rgba(91,142,255,0.25);border-radius:8px;padding:7px 12px;margin-top:5px;cursor:pointer;font-size:12px;color:var(--azul);font-weight:600">👤 Cliente Genérico</div>
         </div>
-
-        <!-- Documento -->
-        <div class="form-group">
-          <label class="form-label">N° Documento</label>
-          <input id="salidaDocumento" class="form-input" type="text" placeholder="Boleta, factura...">
-        </div>
-
-        <!-- Nota -->
-        <div class="form-group">
-          <label class="form-label">Nota</label>
-          <input id="salidaMotivo" class="form-input" type="text" placeholder="Observación opcional">
-        </div>
-
+        <div class="form-group"><label class="form-label">N° Documento</label><input id="salidaDocumento" class="form-input" type="text" placeholder="Boleta, factura..."></div>
+        <div class="form-group"><label class="form-label">Nota</label><input id="salidaMotivo" class="form-input" type="text" placeholder="Observación opcional"></div>
       </div>
-    </div><!-- fin padding -->
-
+    </div>
     <div class="form-actions">
       <button type="button" class="btn-secondary" onclick="cerrarModalSalida()">Cancelar</button>
-      <button type="button" class="btn-primary" id="btnConfirmarVenta" onclick="guardarSalida()" disabled
-              style="opacity:0.5">
-        ✔ Confirmar venta
-      </button>
+      <button type="button" class="btn-primary" id="btnConfirmarVenta" onclick="guardarSalida()" disabled style="opacity:0.5">✔ Confirmar venta</button>
     </div>
-
   </div>
 </div>
 
