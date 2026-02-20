@@ -1,12 +1,15 @@
 # ============================================================
-# STOCKYA — Router de Alertas
+# STOCKYA – Router de Alertas
 # Archivo: backend/routers/alertas.py
 # Descripcion: Stock bajo + vencimientos proximos
+# ✅ CORREGIDO: ahora filtra por usuario_actual — cada usuario
+#    ve SOLO las alertas de sus propios productos
+# Analogia: el panel de alarmas de TU bodega, no de todas
 # ============================================================
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from database import get_db
 from auth import get_usuario_actual
 import models
@@ -23,14 +26,20 @@ def obtener_alertas(
     Retorna alertas de stock bajo Y vencimientos proximos.
     Analogia: el panel de advertencias del tablero del auto —
     distintos tipos de alarma en un solo lugar.
+    Solo muestra alertas de los productos del usuario autenticado.
     """
     ahora = datetime.now(timezone.utc)
-    productos = db.query(models.Producto).filter(models.Producto.activo == True).all()
 
-    criticos  = []   # Stock por debajo del minimo
-    alertas   = []   # Stock cerca del minimo
-    vencidos  = []   # Fecha de vencimiento ya paso
-    proximos  = []   # Vencen pronto (dentro de dias_alerta_venc)
+    # ✅ CORREGIDO: filtrar por usuario_id para ver solo sus productos
+    productos = db.query(models.Producto).filter(
+        models.Producto.activo     == True,
+        models.Producto.usuario_id == usuario_actual.id   # ← clave del cambio
+    ).all()
+
+    criticos = []   # Stock por debajo del minimo
+    alertas  = []   # Stock cerca del minimo
+    vencidos = []   # Fecha de vencimiento ya paso
+    proximos = []   # Vencen pronto (dentro de dias_alerta_venc)
 
     for p in productos:
         d = {
@@ -64,10 +73,10 @@ def obtener_alertas(
                 proximos.append(d.copy())
 
     return {
-        "total_criticos":  len(criticos),
-        "total_alertas":   len(alertas),
-        "total_vencidos":  len(vencidos),
-        "total_proximos":  len(proximos),
+        "total_criticos":     len(criticos),
+        "total_alertas":      len(alertas),
+        "total_vencidos":     len(vencidos),
+        "total_proximos":     len(proximos),
         "productos_criticos": criticos,
         "productos_alerta":   alertas,
         "productos_vencidos": vencidos,
