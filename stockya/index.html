@@ -73,6 +73,70 @@
   </div>
 </div>
 
+<!-- ONBOARDING — solo se muestra a usuarios nuevos, no se puede saltar -->
+<div id="onboardingPage" style="display:none;position:fixed;inset:0;background:var(--bg1);z-index:100;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:36px;width:100%;max-width:460px;box-shadow:0 24px 60px rgba(0,0,0,0.4)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:36px;margin-bottom:8px">🚀</div>
+      <div style="font-family:var(--font-head);font-size:22px;font-weight:800">Configuremos tu negocio</div>
+      <div style="color:var(--muted);font-size:13px;margin-top:6px">Solo toma 1 minuto · Lo puedes cambiar después</div>
+    </div>
+
+    <!-- Logo opcional -->
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+      <div id="onboardingLogoPreview" onclick="document.getElementById('onboardingLogoFile').click()"
+           style="width:64px;height:64px;border-radius:14px;background:var(--bg3);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer;flex-shrink:0">📷</div>
+      <input id="onboardingLogoFile" type="file" accept="image/*" style="display:none" onchange="onboardingPreviewLogo(event)">
+      <div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:2px">Logo del negocio</div>
+        <div style="font-size:11px;color:var(--muted)">Opcional · PNG o JPG · máx 2MB</div>
+        <button type="button" onclick="document.getElementById('onboardingLogoFile').click()"
+                style="background:none;border:1px solid var(--border);border-radius:7px;padding:4px 10px;color:var(--muted);font-size:12px;cursor:pointer;margin-top:4px">Subir logo</button>
+      </div>
+    </div>
+
+    <!-- Nombre del negocio -->
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Nombre del negocio *</label>
+      <input id="onboardingNombreNegocio" class="form-input" type="text" placeholder="Ej: Minimarket Don Pedro">
+    </div>
+
+    <!-- Rubro -->
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Rubro del negocio *</label>
+      <select id="onboardingRubro" class="form-input">
+        <option value="">Selecciona el rubro de tu negocio...</option>
+      </select>
+    </div>
+
+    <!-- Moneda -->
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Moneda</label>
+      <select id="onboardingMoneda" class="form-input">
+        <option value="CLP">🇨🇱 Peso chileno (CLP)</option>
+        <option value="USD">🇺🇸 Dólar (USD)</option>
+        <option value="EUR">🇪🇺 Euro (EUR)</option>
+        <option value="PEN">🇵🇪 Sol peruano (PEN)</option>
+        <option value="COP">🇨🇴 Peso colombiano (COP)</option>
+        <option value="MXN">🇲🇽 Peso mexicano (MXN)</option>
+        <option value="ARS">🇦🇷 Peso argentino (ARS)</option>
+        <option value="VES">🇻🇪 Bolivar venezolano (VES)</option>
+      </select>
+    </div>
+
+    <!-- Nombre del usuario -->
+    <div class="form-group" style="margin-bottom:24px">
+      <label class="form-label">¿Cómo te llamamos? *</label>
+      <input id="onboardingNombreUsuario" class="form-input" type="text" placeholder="Ej: Pedro González">
+    </div>
+
+    <button id="btnGuardarOnboarding" class="btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px" onclick="guardarOnboarding()">
+      ✓ Entrar a mi negocio
+    </button>
+    <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:12px">Tus datos son privados y solo tú los ves</div>
+  </div>
+</div>
+
 <!-- APP PRINCIPAL -->
 <div id="appMain" style="display:none">
   <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>

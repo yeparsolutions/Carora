@@ -35,6 +35,95 @@ async function api(path, method = "GET", body = null) {
 }
 
 /* ============================================================
+   ONBOARDING — pantalla de bienvenida para usuarios nuevos
+   Analogia: la recepcion de un hotel — antes de entrar a tu
+   cuarto debes registrar tu nombre y preferencias del negocio
+   ============================================================ */
+
+var RUBROS = [
+  { value: "minimarket",       label: "🛒 Minimarket" },
+  { value: "tienda_minorista", label: "🏪 Tienda minorista" },
+  { value: "farmacia",         label: "💊 Farmacia / Botiquin" },
+  { value: "panaderia",        label: "🍞 Panaderia / Pasteleria" },
+  { value: "carniceria",       label: "🥩 Carniceria / Frigorifico" },
+  { value: "ferreteria",       label: "🔧 Ferreteria / Materiales" },
+  { value: "libreria",         label: "📚 Libreria / Papeleria" },
+  { value: "restaurante",      label: "🍽️ Restaurante / Cafeteria" },
+  { value: "ropa",             label: "👕 Tienda de ropa / Calzado" },
+  { value: "electronica",      label: "💻 Electronica / Tecnologia" },
+  { value: "cosmetica",        label: "💄 Cosmetica / Belleza" },
+  { value: "deposito",         label: "🏭 Deposito / Almacen" },
+  { value: "otro",             label: "📦 Otro" },
+];
+var _onboardingLogo = null;
+
+function mostrarOnboarding() {
+  document.getElementById("loginPage").style.display      = "none";
+  document.getElementById("appMain").style.display        = "none";
+  document.getElementById("onboardingPage").style.display = "flex";
+
+  // Llenar selector de rubros
+  var selRubro = document.getElementById("onboardingRubro");
+  if (selRubro) {
+    selRubro.innerHTML = '<option value="">Selecciona el rubro de tu negocio...</option>'
+      + RUBROS.map(function(r){ return '<option value="'+r.value+'">'+r.label+'</option>'; }).join("");
+  }
+  // Pre-llenar nombre de usuario si ya lo conocemos
+  if (usuarioActual && usuarioActual.nombre) {
+    var inp = document.getElementById("onboardingNombreUsuario");
+    if (inp) inp.value = usuarioActual.nombre;
+  }
+}
+
+function onboardingPreviewLogo(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { showToast("El logo no puede superar 2MB"); return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    _onboardingLogo = e.target.result;
+    var preview = document.getElementById("onboardingLogoPreview");
+    if (preview) preview.innerHTML = '<img src="' + _onboardingLogo + '" style="width:100%;height:100%;object-fit:contain;border-radius:12px">';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function guardarOnboarding() {
+  var nombreNegocio = document.getElementById("onboardingNombreNegocio")?.value.trim();
+  var rubro         = document.getElementById("onboardingRubro")?.value;
+  var moneda        = document.getElementById("onboardingMoneda")?.value || "CLP";
+  var nombreUsuario = document.getElementById("onboardingNombreUsuario")?.value.trim();
+
+  if (!nombreNegocio) { showToast("Escribe el nombre de tu negocio"); return; }
+  if (!rubro)         { showToast("Selecciona el rubro de tu negocio"); return; }
+  if (!nombreUsuario) { showToast("Escribe tu nombre"); return; }
+
+  var btn = document.getElementById("btnGuardarOnboarding");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
+
+  try {
+    await api("/auth/completar-onboarding", "POST", {
+      nombre_negocio: nombreNegocio, rubro, moneda,
+      logo_base64:    _onboardingLogo || null,
+      nombre_usuario: nombreUsuario,
+    });
+    // Actualizar nombre en memoria local
+    if (usuarioActual) {
+      usuarioActual.nombre = nombreUsuario;
+      localStorage.setItem("stockya_usuario", JSON.stringify(usuarioActual));
+    }
+    document.getElementById("onboardingPage").style.display = "none";
+    document.getElementById("appMain").style.display        = "flex";
+    actualizarUIUsuario();
+    await cargarDashboard();
+    showToast("Bienvenido, " + nombreUsuario.split(" ")[0] + "! Tu negocio esta listo");
+  } catch (error) {
+    if (btn) { btn.disabled = false; btn.textContent = "Entrar a mi negocio"; }
+    showToast("Error: " + error.message);
+  }
+}
+
+/* ============================================================
    AUTENTICACION
    ============================================================ */
 async function enterApp() {
@@ -52,9 +141,16 @@ async function enterApp() {
     localStorage.setItem("stockya_token",   authToken);
     localStorage.setItem("stockya_usuario", JSON.stringify(usuarioActual));
 
+    // ✅ Verificar si debe mostrar onboarding antes de entrar
+    // Analogia: el portero verifica si el inquilino ya paso por recepcion
+    const status = await api("/auth/onboarding-status");
+    if (!status.onboarding_completo) {
+      mostrarOnboarding();
+      return;
+    }
+
     document.getElementById("loginPage").style.display = "none";
     document.getElementById("appMain").style.display   = "flex";
-
     actualizarUIUsuario();
     await cargarDashboard();
     showToast("Bienvenido, " + usuarioActual.nombre.split(" ")[0]);
@@ -69,9 +165,14 @@ async function registrarUsuario() {
   const password = document.getElementById("regPassword").value.trim();
   if (!nombre || !email || !password) { showToast("Completa todos los campos"); return; }
   try {
-    await api("/auth/registro", "POST", { nombre, email, password });
-    showToast("Cuenta creada — inicia sesion");
-    mostrarLogin();
+    // ✅ Registro exitoso → el backend retorna token, entrar al onboarding directamente
+    const data = await api("/auth/registro", "POST", { nombre, email, password });
+    authToken     = data.access_token;
+    usuarioActual = data.usuario;
+    localStorage.setItem("stockya_token",   authToken);
+    localStorage.setItem("stockya_usuario", JSON.stringify(usuarioActual));
+    document.getElementById("loginPage").style.display = "none";
+    mostrarOnboarding();
   } catch (error) { showToast("Error: " + error.message); }
 }
 
@@ -92,8 +193,9 @@ function cerrarSesion() {
   usuarioActual = null;
   localStorage.removeItem("stockya_token");
   localStorage.removeItem("stockya_usuario");
-  document.getElementById("appMain").style.display   = "none";
-  document.getElementById("loginPage").style.display = "block";
+  document.getElementById("appMain").style.display        = "none";
+  document.getElementById("onboardingPage").style.display = "none";
+  document.getElementById("loginPage").style.display      = "block";
 }
 
 function actualizarUIUsuario() {
@@ -487,18 +589,88 @@ function filtrarMovimientos() {
 }
 
 /* ============================================================
-   ALERTAS
+   ALERTAS — dinamico, rellena la pantalla desde el backend
    ============================================================ */
 async function cargarAlertas() {
   try {
     const alertas = await api("/alertas/");
-    var elCrit  = document.querySelector("#screen-alertas .stat-card.rojo .stat-value");
-    var elAlert = document.querySelector("#screen-alertas .stat-card.amarillo .stat-value");
-    if (elCrit)  elCrit.textContent  = alertas.total_criticos;
-    if (elAlert) elAlert.textContent = alertas.total_alertas;
-    var sub   = document.querySelector("#screen-alertas .page-subtitle");
-    var total = (alertas.total_criticos||0) + (alertas.total_alertas||0);
-    if (sub) sub.textContent = total + " productos requieren atencion";
+    const total   = (alertas.total_criticos||0) + (alertas.total_alertas||0)
+                  + (alertas.total_vencidos||0) + (alertas.total_proximos||0);
+
+    // Actualizar contadores y badge de navegacion
+    var elCrit  = document.getElementById("alertasCriticosNum");
+    var elAlert = document.getElementById("alertasAlertaNum");
+    var sub     = document.getElementById("alertasSubtitulo");
+    var badge   = document.getElementById("alertBadge");
+
+    // Compatibilidad: si no hay IDs nuevos usar selectores anteriores
+    if (!elCrit)  elCrit  = document.querySelector("#screen-alertas .stat-card.rojo .stat-value");
+    if (!elAlert) elAlert = document.querySelector("#screen-alertas .stat-card.amarillo .stat-value");
+    if (!sub)     sub     = document.querySelector("#screen-alertas .page-subtitle");
+
+    if (elCrit)  elCrit.textContent  = alertas.total_criticos || 0;
+    if (elAlert) elAlert.textContent = alertas.total_alertas  || 0;
+    if (sub)     sub.textContent     = total + " productos requieren atención";
+    if (badge)   { badge.textContent = total; badge.style.display = total > 0 ? "inline" : "none"; }
+
+    // Construir cada ítem de alerta
+    function buildItem(p, tipo) {
+      var esCritico = (tipo === "critico" || tipo === "vencido");
+      var color     = esCritico ? "var(--rojo)" : "var(--amarillo)";
+      return "<div class='alert-big-item " + tipo + "'>"
+        + "<div class='alert-icon-big " + tipo + "'>📦</div>"
+        + "<div class='alert-big-info'>"
+        +   "<div class='alert-big-name'>" + p.nombre + "</div>"
+        +   "<div class='alert-big-detail'>Stock mínimo: " + p.stock_minimo + " und. · Actual: "
+        +     p.stock_actual + " und." + (p.categoria ? " · " + p.categoria : "") + "</div>"
+        + "</div>"
+        + "<div class='alert-big-action'>"
+        +   "<div style='font-family:var(--font-head);font-size:22px;font-weight:800;color:" + color + "'>"
+        +     p.stock_actual + " und.</div>"
+        +   "<button class='btn-primary' style='font-size:12px;padding:7px 14px' "
+        +     "onclick='abrirMovimientoRapido(" + p.id + ",\"" + p.nombre.replace(/"/g,"'") + "\")'>+ Registrar entrada</button>"
+        + "</div>"
+        + "</div>";
+    }
+
+    // Sección críticos
+    var listCrit = document.getElementById("alertasCriticosList");
+    var secCrit  = document.getElementById("alertasCriticosSec");
+    if (listCrit) {
+      listCrit.innerHTML = (alertas.productos_criticos||[]).map(function(p){ return buildItem(p,"critico"); }).join("")
+        || "<div style='text-align:center;color:var(--muted);padding:16px;font-size:13px'>Sin productos críticos</div>";
+    }
+    if (secCrit) secCrit.style.display = (alertas.total_criticos||0) > 0 ? "" : "none";
+
+    // Sección alerta
+    var listAlert = document.getElementById("alertasAlertaList");
+    var secAlert  = document.getElementById("alertasAlertaSec");
+    if (listAlert) {
+      listAlert.innerHTML = (alertas.productos_alerta||[]).map(function(p){ return buildItem(p,"alerta"); }).join("")
+        || "<div style='text-align:center;color:var(--muted);padding:16px;font-size:13px'>Sin productos en alerta</div>";
+    }
+    if (secAlert) secAlert.style.display = (alertas.total_alertas||0) > 0 ? "" : "none";
+
+    // Sección vencidos
+    var listVenc = document.getElementById("alertasVencidosList");
+    var secVenc  = document.getElementById("alertasVencidosSec");
+    if (listVenc) {
+      listVenc.innerHTML = (alertas.productos_vencidos||[]).map(function(p){ return buildItem(p,"vencido"); }).join("");
+    }
+    if (secVenc) secVenc.style.display = (alertas.productos_vencidos||[]).length > 0 ? "" : "none";
+
+    // Sección próximos a vencer
+    var listProx = document.getElementById("alertasProximosList");
+    var secProx  = document.getElementById("alertasProximosSec");
+    if (listProx) {
+      listProx.innerHTML = (alertas.productos_proximos||[]).map(function(p){ return buildItem(p,"proximo"); }).join("");
+    }
+    if (secProx) secProx.style.display = (alertas.productos_proximos||[]).length > 0 ? "" : "none";
+
+    // Mensaje vacío total
+    var vacio = document.getElementById("alertasVacioMsg");
+    if (vacio) vacio.style.display = total === 0 ? "" : "none";
+
   } catch (error) { console.error("Error alertas:", error); }
 }
 
@@ -977,6 +1149,89 @@ async function guardarResolucion() {
 }
 
 /* ============================================================
+   REPORTES — dinamico, calcula desde los datos reales
+   ============================================================ */
+async function cargarReportes() {
+  try {
+    const [productos, movimientos, resumen] = await Promise.all([
+      api("/productos/"),
+      api("/movimientos/?limit=500"),
+      api("/salidas/resumen"),
+    ]);
+
+    // Valor bodega
+    var valorBodega = productos.reduce(function(a,p){ return a + (p.stock_actual*(p.precio_venta||0)); }, 0);
+    var vbStr = valorBodega >= 1000000 ? "$"+(valorBodega/1000000).toFixed(1)+"M"
+              : valorBodega >= 1000    ? "$"+Math.round(valorBodega/1000)+"K"
+              : "$"+Math.round(valorBodega);
+    setEl("reporteValorBodega", productos.length > 0 ? vbStr : "—");
+
+    // Margen bruto promedio
+    var conPrecio = productos.filter(function(p){ return p.precio_compra>0 && p.precio_venta>0; });
+    if (conPrecio.length > 0) {
+      var margen = conPrecio.reduce(function(a,p){ return a + ((p.precio_venta-p.precio_compra)/p.precio_compra*100); }, 0) / conPrecio.length;
+      setEl("reporteMargen", Math.round(margen) + "%");
+    } else {
+      setEl("reporteMargen", "—");
+    }
+
+    // Unidades rotadas (salidas)
+    var rotacion = movimientos.filter(function(m){ return m.tipo==="salida"; }).reduce(function(a,m){ return a+m.cantidad; }, 0);
+    setEl("reporteRotacion", rotacion);
+
+    // Top 5 productos más movidos
+    var conteo = {};
+    movimientos.forEach(function(m){ if(m.producto_nombre) conteo[m.producto_nombre] = (conteo[m.producto_nombre]||0) + m.cantidad; });
+    var top = Object.entries(conteo).sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
+    var maxMov = top.length > 0 ? top[0][1] : 1;
+    var rankIcons = ["🥇","🥈","🥉","4️⃣","5️⃣"];
+    var topEl = document.getElementById("reporteTopProductos");
+    if (topEl) {
+      topEl.innerHTML = top.length === 0
+        ? "<div style='text-align:center;color:var(--muted);padding:24px;font-size:13px'>Sin movimientos aún</div>"
+        : top.map(function(item,i){
+            var pct = Math.round((item[1]/maxMov)*100);
+            return "<div style='display:flex;align-items:center;gap:12px;margin-bottom:12px'>"
+              + "<div style='font-size:18px'>" + (rankIcons[i]||"") + "</div>"
+              + "<div style='flex:1'>"
+              +   "<div style='font-size:13px;font-weight:500;margin-bottom:4px'>" + item[0] + "</div>"
+              +   "<div style='background:var(--bg3);border-radius:6px;height:8px'>"
+              +     "<div style='background:var(--verde);height:8px;border-radius:6px;width:"+pct+"%'></div>"
+              +   "</div>"
+              + "</div>"
+              + "<div style='font-size:13px;font-weight:700;color:var(--muted)'>" + item[1] + " und.</div>"
+              + "</div>";
+          }).join("");
+    }
+
+    // Stock por categoría
+    var porCat = {};
+    productos.forEach(function(p){ var c=p.categoria||"Sin categoría"; if(!porCat[c]) porCat[c]={t:0,v:0}; porCat[c].t+=p.stock_actual; porCat[c].v+=p.stock_actual*(p.precio_venta||0); });
+    var catArr = Object.entries(porCat).sort(function(a,b){ return b[1].t-a[1].t; });
+    var maxCat = catArr.length > 0 ? catArr[0][1].t : 1;
+    var catEl = document.getElementById("reporteCategorias");
+    if (catEl) {
+      catEl.innerHTML = catArr.length === 0
+        ? "<div style='text-align:center;color:var(--muted);padding:24px;font-size:13px'>Sin categorías aún</div>"
+        : catArr.map(function(e){
+            var pct = Math.round((e[1].t/maxCat)*100);
+            var v   = e[1].v>=1000 ? "$"+Math.round(e[1].v/1000)+"K" : "$"+Math.round(e[1].v);
+            return "<div style='margin-bottom:10px'>"
+              + "<div style='display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px'>"
+              +   "<span style='font-weight:500'>" + e[0] + "</span>"
+              +   "<span style='color:var(--muted)'>" + e[1].t + " und · " + v + "</span>"
+              + "</div>"
+              + "<div style='background:var(--bg3);border-radius:6px;height:8px'>"
+              +   "<div style='background:var(--verde);height:8px;border-radius:6px;width:"+pct+"%'></div>"
+              + "</div>"
+              + "</div>";
+          }).join("");
+    }
+
+  } catch(error) { console.error("Error reportes:", error); }
+}
+
+/* ============================================================
    NAVEGACION
    ============================================================ */
 async function showScreen(name) {
@@ -996,6 +1251,7 @@ async function showScreen(name) {
   if (name === "movimientos") await cargarMovimientos();
   if (name === "alertas")     await cargarAlertas();
   if (name === "salidas")     await cargarSalidas();  // NUEVO
+  if (name === "reportes")    await cargarReportes();  // ✅ NUEVO
 }
 
 function toggleSidebar() {
@@ -1481,11 +1737,27 @@ document.addEventListener("DOMContentLoaded", function(){
     if (el) el.addEventListener("click", function(e){ if(e.target===this) e.target.classList.remove("open"); });
   });
 
-  // Si ya hay sesion activa entrar directamente
+  // ✅ Si ya hay sesion activa, verificar onboarding antes de entrar
+  // Analogia: el portero del edificio verifica si ya pasaste por recepcion
   if (authToken && usuarioActual) {
-    document.getElementById("loginPage").style.display = "none";
-    document.getElementById("appMain").style.display   = "flex";
-    actualizarUIUsuario();
-    cargarDashboard();
+    api("/auth/onboarding-status")
+      .then(function(status) {
+        if (!status.onboarding_completo) {
+          document.getElementById("loginPage").style.display = "none";
+          mostrarOnboarding();
+        } else {
+          document.getElementById("loginPage").style.display = "none";
+          document.getElementById("appMain").style.display   = "flex";
+          actualizarUIUsuario();
+          cargarDashboard();
+        }
+      })
+      .catch(function() {
+        // Si falla el check, entrar normal para no bloquear al usuario
+        document.getElementById("loginPage").style.display = "none";
+        document.getElementById("appMain").style.display   = "flex";
+        actualizarUIUsuario();
+        cargarDashboard();
+      });
   }
 });
