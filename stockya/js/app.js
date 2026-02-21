@@ -1252,7 +1252,7 @@ async function showScreen(name) {
   if (name === "alertas")     await cargarAlertas();
   if (name === "salidas")        await cargarSalidas();  // NUEVO
   if (name === "reportes")       await cargarReportes();  // ✅ NUEVO
-  if (name === "configuracion")  await cargarDatosEnConfig(); // ✅ FIX: cargar datos del usuario actual
+  if (name === "settings")  await cargarDatosEnConfig(); // ✅ FIX: cargar datos del usuario actual
 }
 
 function toggleSidebar() {
