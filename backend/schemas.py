@@ -39,6 +39,18 @@ class TokenRespuesta(BaseModel):
     token_type:   str
     usuario:      UsuarioRespuesta
 
+# ✅ NUEVO: para el endpoint PUT /auth/perfil
+class PerfilActualizar(BaseModel):
+    """
+    Datos opcionales para actualizar el perfil del usuario.
+    Analogia: el formulario de cambio de datos en el banco —
+    solo llenas los campos que quieres modificar.
+    """
+    nombre:          Optional[str]      = None
+    email:           Optional[EmailStr] = None
+    password_actual: Optional[str]      = None
+    password_nuevo:  Optional[str]      = None
+
 
 # ============================================================
 # ONBOARDING — datos de bienvenida del usuario nuevo
