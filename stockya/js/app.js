@@ -1702,8 +1702,16 @@ async function guardarConfiguracion() {
 // no los del cliente anterior — esta función asegura eso.
 // ============================================================
 async function cargarDatosEnConfig() {
+  // Limpiar campos primero para evitar que el navegador muestre datos del usuario anterior
+  // Analogia: borrar la pizarra antes de escribir el nombre del nuevo alumno
+  var campos = ["inputNegocio","inputNombreUsuario","inputEmail","inputPassActual","inputPassNueva","inputPassConfirm"];
+  campos.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+
   try {
-    // Cargar datos del negocio desde el API
+    // Cargar datos del negocio desde el API con el token del usuario actual
     var config = await api("/configuracion/");
 
     // Rellenar campos del negocio
@@ -1712,24 +1720,37 @@ async function cargarDatosEnConfig() {
     if (inputNegocio) inputNegocio.value = config.nombre_negocio || "";
     if (inputMoneda)  inputMoneda.value  = config.moneda         || "CLP";
 
-    // Cargar color y logo
+    // Cargar color
     if (config.color_principal) previsualizarColor(config.color_principal);
+
+    // Cargar logo si existe
+    var img = document.getElementById("logoImg");
+    var ini = document.getElementById("logoInitials");
     if (config.logo_base64) {
       configTemporal.logoData = config.logo_base64;
-      var img = document.getElementById("logoImg");
-      var ini = document.getElementById("logoInitials");
       if (img) { img.src = config.logo_base64; img.style.display = "block"; }
       if (ini) ini.style.display = "none";
+    } else {
+      // Limpiar logo del usuario anterior
+      configTemporal.logoData = null;
+      if (img) { img.src = ""; img.style.display = "none"; }
+      if (ini) {
+        // Mostrar iniciales del usuario actual
+        var nombre = usuarioActual?.nombre || "";
+        var partes = nombre.split(" ");
+        ini.textContent = partes.length >= 2 ? (partes[0][0] + partes[1][0]).toUpperCase() : nombre.slice(0,2).toUpperCase();
+        ini.style.display = "flex";
+      }
     }
 
-    // Rellenar datos del usuario actual (siempre desde usuarioActual, no del cache)
+    // Rellenar datos del usuario actual desde usuarioActual (nunca del cache del DOM)
     var inputNombreUsuario = document.getElementById("inputNombreUsuario");
     var inputEmail         = document.getElementById("inputEmail");
     if (inputNombreUsuario) inputNombreUsuario.value = usuarioActual?.nombre || "";
     if (inputEmail)         inputEmail.value         = usuarioActual?.email  || "";
 
   } catch(e) {
-    // Si falla, al menos cargar datos del usuario desde memoria
+    // Si falla el API, al menos cargar datos del usuario desde memoria
     var inputNombreUsuario = document.getElementById("inputNombreUsuario");
     var inputEmail         = document.getElementById("inputEmail");
     if (inputNombreUsuario) inputNombreUsuario.value = usuarioActual?.nombre || "";
