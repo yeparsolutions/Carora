@@ -1250,8 +1250,9 @@ async function showScreen(name) {
   if (name === "stock")       await cargarStock();
   if (name === "movimientos") await cargarMovimientos();
   if (name === "alertas")     await cargarAlertas();
-  if (name === "salidas")     await cargarSalidas();  // NUEVO
-  if (name === "reportes")    await cargarReportes();  // ✅ NUEVO
+  if (name === "salidas")        await cargarSalidas();  // NUEVO
+  if (name === "reportes")       await cargarReportes();  // ✅ NUEVO
+  if (name === "configuracion")  await cargarDatosEnConfig(); // ✅ FIX: cargar datos del usuario actual
 }
 
 function toggleSidebar() {
@@ -1693,6 +1694,47 @@ async function guardarConfiguracion() {
 
     showToast("Configuración guardada correctamente");
   } catch (error) { showToast("Error: " + error.message); }
+}
+
+// ============================================================
+// CARGAR DATOS DEL USUARIO Y NEGOCIO EN PANTALLA CONFIGURACIÓN
+// Analogía: cuando abres tu ficha en el banco, ves TUS datos,
+// no los del cliente anterior — esta función asegura eso.
+// ============================================================
+async function cargarDatosEnConfig() {
+  try {
+    // Cargar datos del negocio desde el API
+    var config = await api("/configuracion/");
+
+    // Rellenar campos del negocio
+    var inputNegocio = document.getElementById("inputNegocio");
+    var inputMoneda  = document.getElementById("inputMoneda");
+    if (inputNegocio) inputNegocio.value = config.nombre_negocio || "";
+    if (inputMoneda)  inputMoneda.value  = config.moneda         || "CLP";
+
+    // Cargar color y logo
+    if (config.color_principal) previsualizarColor(config.color_principal);
+    if (config.logo_base64) {
+      configTemporal.logoData = config.logo_base64;
+      var img = document.getElementById("logoImg");
+      var ini = document.getElementById("logoInitials");
+      if (img) { img.src = config.logo_base64; img.style.display = "block"; }
+      if (ini) ini.style.display = "none";
+    }
+
+    // Rellenar datos del usuario actual (siempre desde usuarioActual, no del cache)
+    var inputNombreUsuario = document.getElementById("inputNombreUsuario");
+    var inputEmail         = document.getElementById("inputEmail");
+    if (inputNombreUsuario) inputNombreUsuario.value = usuarioActual?.nombre || "";
+    if (inputEmail)         inputEmail.value         = usuarioActual?.email  || "";
+
+  } catch(e) {
+    // Si falla, al menos cargar datos del usuario desde memoria
+    var inputNombreUsuario = document.getElementById("inputNombreUsuario");
+    var inputEmail         = document.getElementById("inputEmail");
+    if (inputNombreUsuario) inputNombreUsuario.value = usuarioActual?.nombre || "";
+    if (inputEmail)         inputEmail.value         = usuarioActual?.email  || "";
+  }
 }
 
 function descartarCambios() {
