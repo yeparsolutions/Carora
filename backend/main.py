@@ -12,18 +12,20 @@ from database import engine, Base
 import models
 
 # --- Importar todos los routers ---
+# ✅ auth ahora incluye los endpoints de onboarding:
+#    GET  /auth/onboarding-status
+#    POST /auth/completar-onboarding
 from routers import auth, productos, movimientos, alertas, config, salidas
 
 # --- Crear las tablas en PostgreSQL si no existen ---
 # Analogia: es como crear las hojas de Excel vacias la primera vez
-# La tabla 'salidas' se creara automaticamente al arrancar
 Base.metadata.create_all(bind=engine)
 
 # --- Crear la aplicacion FastAPI ---
 app = FastAPI(
     title       = "Stockya API",
     description = "Backend para el sistema de control de inventario Stockya",
-    version     = "1.1.0"
+    version     = "1.2.0"
 )
 
 # --- Configurar CORS ---
@@ -36,18 +38,18 @@ app.add_middleware(
         "http://localhost:8000",
         "null",
     ],
-    allow_credentials=True,    # ahora sí puede ser True porque tenemos orígenes específicos
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials = True,
+    allow_methods     = ["*"],
+    allow_headers     = ["*"],
 )
 
 # --- Registrar todos los routers ---
-app.include_router(auth.router)
+app.include_router(auth.router)        # login, registro, onboarding
 app.include_router(productos.router)
 app.include_router(movimientos.router)
 app.include_router(alertas.router)
 app.include_router(config.router)
-app.include_router(salidas.router)   # NUEVO: sistema de salidas dinamico
+app.include_router(salidas.router)
 
 
 # --- Endpoint raiz ---
@@ -55,7 +57,7 @@ app.include_router(salidas.router)   # NUEVO: sistema de salidas dinamico
 def raiz():
     return {
         "mensaje": "Stockya API funcionando",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "docs":    "http://localhost:8000/docs"
     }
 
