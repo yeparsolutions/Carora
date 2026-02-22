@@ -1899,9 +1899,10 @@ function renderPlanCard(info) {
     ? " / " + info.max_productos
     : " (ilimitados)";
 
-  // Mostrar botón de upgrade solo si es admin y está en plan básico
+  // Mostrar botón cambiar plan para cualquier admin (puede subir o bajar)
   if (btnUpgrade) {
-    btnUpgrade.style.display = (esAdmin && info.plan === "basico") ? "flex" : "none";
+    btnUpgrade.style.display = esAdmin ? "flex" : "none";
+    btnUpgrade.textContent = info.plan === "pro" ? "🔄 Cambiar Plan" : "⬆️ Mejorar a Pro";
   }
 }
 
