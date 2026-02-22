@@ -164,6 +164,7 @@
     <button class="nav-item" id="nav-reportes" onclick="showScreen('reportes')"> <span class="nav-icon">📊</span> Reportes</button>
 
     <span class="nav-label">Sistema</span>
+    <button class="nav-item" id="nav-equipo"   onclick="showScreen('equipo')">   <span class="nav-icon">👥</span> Mi Equipo <span id="equipoBadge" style="display:none;background:var(--verde);color:#000;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:4px">Admin</span></button>
     <button class="nav-item" id="nav-settings" onclick="showScreen('settings')"> <span class="nav-icon">⚙️</span> Configuración</button>
 
     <div class="sidebar-footer">
@@ -636,6 +637,60 @@
       </div>
     </div>
 
+    <!-- EQUIPO -->
+    <div class="screen" id="screen-equipo">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Mi Equipo 👥</div>
+          <div class="page-subtitle" id="equipoSubtitulo">Gestiona los usuarios de tu negocio</div>
+        </div>
+        <button class="btn-primary" id="btnInvitarUsuario" onclick="abrirModalInvitar()" style="display:none">+ Invitar usuario</button>
+      </div>
+      <!-- Info del plan -->
+      <div class="card" style="margin-bottom:20px" id="equipoPlanCard">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Plan actual</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span id="equipoPlanNombre" style="font-family:var(--font-head);font-size:20px;font-weight:800">—</span>
+              <span id="equipoPlanBadge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:rgba(0,199,123,0.15);color:var(--verde)">Activo</span>
+            </div>
+            <div id="equipoPlanDetalle" style="font-size:12px;color:var(--muted);margin-top:4px">—</div>
+          </div>
+          <div style="display:flex;gap:20px">
+            <div style="text-align:center">
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Usuarios</div>
+              <div style="font-family:var(--font-head);font-size:22px;font-weight:800"><span id="equipoUsersActual">—</span><span style="color:var(--muted);font-size:14px">/<span id="equipoUsersMax">—</span></span></div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Productos</div>
+              <div style="font-family:var(--font-head);font-size:22px;font-weight:800"><span id="equipoProdsActual">—</span><span id="equipoProdsMax" style="color:var(--muted);font-size:14px"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Tabla de usuarios -->
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="padding-left:20px">Usuario</th>
+                <th>Email</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th>Desde</th>
+                <th id="equipoColAcciones" style="text-align:center;display:none">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="equipoTableBody">
+              <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px;font-size:13px">Cargando equipo...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div><!-- fin appMain -->
 
@@ -838,6 +893,47 @@
 
 <!-- TOAST -->
 <div class="toast" id="toast"><span id="toastMsg">¡Guardado!</span></div>
+
+<!-- MODAL: Invitar usuario al equipo -->
+<div class="modal-overlay" id="modalInvitar">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">👤 Invitar usuario al equipo</div>
+      <button class="modal-close" onclick="cerrarModalInvitar()">✕</button>
+    </div>
+    <div style="padding:0 24px 8px;color:var(--muted);font-size:13px">
+      El usuario podrá acceder al inventario de <strong id="invitarEmpresaNombre">tu negocio</strong>.
+    </div>
+    <form id="formInvitar">
+      <div style="padding:0 24px">
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label">Nombre completo *</label>
+          <input id="invitarNombre" class="form-input" type="text" placeholder="Ej: María González">
+        </div>
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label">Correo electrónico *</label>
+          <input id="invitarEmail" class="form-input" type="email" placeholder="empleado@negocio.com">
+        </div>
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label">Contraseña temporal *</label>
+          <input id="invitarPassword" class="form-input" type="text" placeholder="Mínimo 8 caracteres">
+          <span class="settings-field-hint">Comparte esta contraseña con el usuario — puede cambiarla después</span>
+        </div>
+        <div class="form-group" style="margin-bottom:20px">
+          <label class="form-label">Rol *</label>
+          <select id="invitarRol" class="form-input">
+            <option value="operador">👷 Operador — puede registrar ventas y movimientos</option>
+            <option value="admin">🔑 Admin — acceso completo incluyendo configuración</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" onclick="cerrarModalInvitar()">Cancelar</button>
+        <button type="button" class="btn-primary" onclick="guardarInvitacion()">✓ Agregar al equipo</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script src="js/app.js"></script>
 </body>
