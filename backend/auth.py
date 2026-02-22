@@ -6,6 +6,8 @@
 #           que cada usuario sea quien dice ser
 # ============================================================
 
+import os
+from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
@@ -16,19 +18,21 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models
 
+# Cargar variables de entorno
+load_dotenv()
+
 # --- Configuración de seguridad ---
-# SECRET_KEY: clave secreta para firmar los tokens JWT
-# En producción usa una clave larga y aleatoria
-SECRET_KEY    = "stockya-carora-secret-key-2026-cambiar-en-produccion"
-ALGORITHM     = "HS256"              # Algoritmo de firma
-TOKEN_EXPIRY  = 60 * 24              # Token válido por 24 horas (en minutos)
+# SECRET_KEY viene del archivo .env — nunca hardcodeada en el código
+# Analogía: la combinación de la caja fuerte está en un lugar seguro, no pegada en la puerta
+SECRET_KEY   = os.getenv("SECRET_KEY", "clave-local-de-desarrollo-cambiar-en-produccion")
+ALGORITHM    = "HS256"
+TOKEN_EXPIRY = 60 * 24  # Token válido por 24 horas (en minutos)
 
 # --- Contexto de encriptación de contraseñas ---
 # Analogía: bcrypt es la "caja fuerte" que guarda contraseñas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # --- Esquema OAuth2 para FastAPI ---
-# Define de dónde leer el token en los requests
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
@@ -84,17 +88,14 @@ def get_usuario_actual(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # Verificar y decodificar el token
     payload = verificar_token(token)
     if payload is None:
         raise credenciales_error
 
-    # Extraer el email del payload
     email: str = payload.get("sub")
     if email is None:
         raise credenciales_error
 
-    # Buscar el usuario en la base de datos
     usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     if usuario is None or not usuario.activo:
         raise credenciales_error
