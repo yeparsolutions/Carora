@@ -32,18 +32,10 @@ app = FastAPI(
 # REGLA: allow_origins=["*"] + allow_credentials=True NO se pueden combinar.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-        "http://localhost:5500/",
-        "http://127.0.0.1:5500/",
-        "http://localhost:8000",
-        "null",
-        "*",
-    ],
-    allow_credentials = True,
-    allow_methods     = ["*"],
-    allow_headers     = ["*"],
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # --- Registrar todos los routers ---
@@ -53,6 +45,7 @@ app.include_router(movimientos.router)
 app.include_router(alertas.router)
 app.include_router(config.router)
 app.include_router(salidas.router)
+app.include_router(reportes.router)
 
 
 # --- Endpoint raiz ---
@@ -69,5 +62,3 @@ def raiz():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
-
-app.include_router(reportes.router)
