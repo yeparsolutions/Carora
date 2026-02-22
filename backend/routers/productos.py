@@ -2,7 +2,9 @@
 # STOCKYA – Router de Productos
 # Archivo: backend/routers/productos.py
 # Descripción: CRUD completo + búsqueda por código de barras
-# ✅ CORREGIDO: todas las consultas filtran por usuario_actual.id
+# ✅ ACTUALIZADO: filtra por empresa_id para soporte multiusuario
+#    Todos los usuarios de la misma empresa ven el mismo inventario
+#    Analogia: los productos son de la tienda, no del empleado
 # ============================================================
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -55,6 +57,19 @@ def producto_a_dict(p) -> dict:
     }
 
 
+def get_empresa_id(usuario_actual: models.Usuario) -> int:
+    """
+    Obtiene el empresa_id del usuario actual.
+    Analogia: saber a qué tienda pertenece el empleado antes de tocar el inventario.
+    """
+    if not usuario_actual.empresa_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Tu cuenta no está asociada a una empresa. Contacta al administrador."
+        )
+    return usuario_actual.empresa_id
+
+
 # ============================================================
 # GET /productos/buscar-codigo/{codigo_barra}
 # ============================================================
@@ -64,11 +79,12 @@ def buscar_por_codigo_barra(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    # ✅ Solo busca productos del usuario actual
+    # ✅ Busca por empresa — cualquier empleado de la empresa puede ver el producto
+    empresa_id = get_empresa_id(usuario_actual)
     producto = db.query(models.Producto).filter(
         models.Producto.codigo_barra == codigo_barra,
         models.Producto.activo       == True,
-        models.Producto.usuario_id   == usuario_actual.id
+        models.Producto.empresa_id   == empresa_id
     ).first()
 
     if not producto:
@@ -91,10 +107,11 @@ def listar_productos(
     db:          Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    # ✅ Solo productos del usuario actual
+    # ✅ Lista todos los productos de la empresa
+    empresa_id = get_empresa_id(usuario_actual)
     query = db.query(models.Producto).filter(
         models.Producto.activo     == True,
-        models.Producto.usuario_id == usuario_actual.id
+        models.Producto.empresa_id == empresa_id
     )
 
     if buscar:
@@ -129,11 +146,11 @@ def obtener_producto(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    # ✅ Solo si el producto pertenece al usuario
+    empresa_id = get_empresa_id(usuario_actual)
     p = db.query(models.Producto).filter(
         models.Producto.id         == producto_id,
         models.Producto.activo     == True,
-        models.Producto.usuario_id == usuario_actual.id
+        models.Producto.empresa_id == empresa_id
     ).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -149,11 +166,32 @@ def crear_producto(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    # ✅ Verificar codigo de barras duplicado SOLO para este usuario
+    empresa_id = get_empresa_id(usuario_actual)
+
+    # ✅ Verificar límite de productos según el plan
+    # Analogia: el plan basico es como un estacionamiento de 500 espacios
+    empresa = db.query(models.Empresa).filter(models.Empresa.id == empresa_id).first()
+    if empresa and empresa.max_productos > 0:
+        total_productos = db.query(models.Producto).filter(
+            models.Producto.empresa_id == empresa_id,
+            models.Producto.activo     == True
+        ).count()
+        if total_productos >= empresa.max_productos:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "tipo": "limite_plan",
+                    "mensaje": f"Tu plan {empresa.plan} permite máximo {empresa.max_productos} productos. Actualiza a Premium para agregar más.",
+                    "limite": empresa.max_productos,
+                    "total_actual": total_productos
+                }
+            )
+
+    # ✅ Verificar codigo de barras duplicado SOLO para esta empresa
     if datos.codigo_barra:
         existe = db.query(models.Producto).filter(
             models.Producto.codigo_barra == datos.codigo_barra,
-            models.Producto.usuario_id   == usuario_actual.id
+            models.Producto.empresa_id   == empresa_id
         ).first()
         if existe:
             raise HTTPException(
@@ -173,14 +211,19 @@ def crear_producto(
             datos_dict["precio_compra"] * (1 + datos_dict["porcentaje_ganancia"] / 100), 2
         )
 
-    # ✅ Asignar usuario_id al crear
-    nuevo = models.Producto(**datos_dict, usuario_id=usuario_actual.id)
+    # ✅ Asignar empresa_id y usuario_id al crear
+    nuevo = models.Producto(
+        **datos_dict,
+        empresa_id = empresa_id,
+        usuario_id = usuario_actual.id   # quien lo creó
+    )
     db.add(nuevo)
     db.flush()
 
     if nuevo.stock_actual > 0:
         mov_inicial = models.Movimiento(
             producto_id    = nuevo.id,
+            empresa_id     = empresa_id,
             usuario_id     = usuario_actual.id,
             tipo           = "entrada",
             cantidad       = nuevo.stock_actual,
@@ -206,11 +249,11 @@ def actualizar_producto(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    # ✅ Solo puede editar sus propios productos
+    empresa_id = get_empresa_id(usuario_actual)
     p = db.query(models.Producto).filter(
         models.Producto.id         == producto_id,
         models.Producto.activo     == True,
-        models.Producto.usuario_id == usuario_actual.id
+        models.Producto.empresa_id == empresa_id
     ).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -237,10 +280,10 @@ def eliminar_producto(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    # ✅ Solo puede eliminar sus propios productos
+    empresa_id = get_empresa_id(usuario_actual)
     p = db.query(models.Producto).filter(
         models.Producto.id         == producto_id,
-        models.Producto.usuario_id == usuario_actual.id
+        models.Producto.empresa_id == empresa_id
     ).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -250,6 +293,7 @@ def eliminar_producto(
     if p.stock_actual > 0:
         mov_baja = models.Movimiento(
             producto_id    = producto_id,
+            empresa_id     = empresa_id,
             usuario_id     = usuario_actual.id,
             tipo           = "salida",
             cantidad       = p.stock_actual,
@@ -282,10 +326,10 @@ def sumar_stock_existente(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    # ✅ Solo puede sumar stock a sus propios productos
+    empresa_id = get_empresa_id(usuario_actual)
     p = db.query(models.Producto).filter(
         models.Producto.id         == producto_id,
-        models.Producto.usuario_id == usuario_actual.id
+        models.Producto.empresa_id == empresa_id
     ).first()
     if not p:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -300,6 +344,7 @@ def sumar_stock_existente(
 
     mov = models.Movimiento(
         producto_id    = producto_id,
+        empresa_id     = empresa_id,
         usuario_id     = usuario_actual.id,
         tipo           = "entrada",
         cantidad       = cantidad,
