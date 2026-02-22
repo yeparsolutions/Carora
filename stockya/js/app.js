@@ -1839,11 +1839,12 @@ async function cargarEquipo() {
     empresaInfo = infoEmpresa;
     equipoData  = listaEquipo;
 
-    // Determinar si el usuario actual es admin
+    // Determinar si el usuario actual es admin ANTES de renderizar
+    // Analogia: verificar el carnet antes de abrir la puerta, no después
     const yo = listaEquipo.find(function(u){ return u.es_yo; });
-    esAdmin   = yo && yo.rol === "admin";
+    esAdmin   = !!(yo && yo.rol === "admin");
 
-    renderPlanCard(infoEmpresa);
+    renderPlanCard(infoEmpresa);   // usa esAdmin ya seteado
     renderEquipoTabla(listaEquipo);
 
     // Mostrar botón de invitar solo al admin
