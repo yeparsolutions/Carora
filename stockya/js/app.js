@@ -1881,14 +1881,14 @@ function renderPlanCard(info) {
   var prodsMax    = document.getElementById("equipoProdsMax");
   var btnUpgrade  = document.getElementById("btnUpgradePlan");
 
-  if (planNombre) planNombre.textContent = info.plan === "premium" ? "⭐ Premium" : "🔹 Básico";
+  if (planNombre) planNombre.textContent = info.plan === "pro" ? "🔵 Pro" : "🟢 Básico";
 
   if (planDetalle) {
     var esFundador = info.plan_es_fundador ? " · Precio fundador 🎉" : "";
-    var precio     = info.plan_precio > 0  ? " · $" + info.plan_precio + "/mes" : "";
-    planDetalle.textContent = (info.plan === "premium"
-      ? "Hasta 3 usuarios · Productos ilimitados"
-      : "1 usuario · Hasta 500 productos")
+    var precio     = info.plan_precio > 0  ? " · $" + info.plan_precio.toLocaleString("es-CL") + "/mes" : "";
+    planDetalle.textContent = (info.plan === "pro"
+      ? "Hasta 3 usuarios · 1.500 productos · Reportes avanzados"
+      : "1 usuario · Hasta 200 productos · Reportes básicos")
       + precio + esFundador;
   }
 
