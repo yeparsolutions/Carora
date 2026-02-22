@@ -341,3 +341,73 @@ def actualizar_empresa(
     db.refresh(empresa)
 
     return {"ok": True, "mensaje": "Empresa actualizada correctamente."}
+
+
+# ============================================================
+# PATCH /empresa/cambiar-plan
+# Cambia el plan de la empresa (upgrade o downgrade)
+# Analogia: como cambiar la membresía del gimnasio en el mismo
+#           mostrador — sube a Pro o baja a Básico al instante
+# ============================================================
+@router.patch("/cambiar-plan")
+def cambiar_plan(
+    nuevo_plan: str,
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
+    """
+    Cambia el plan de la empresa entre basico y pro.
+    Solo el admin puede hacerlo.
+    """
+    solo_admin(usuario_actual)
+    empresa = get_empresa_o_error(usuario_actual, db)
+
+    # Validar que el plan pedido sea válido
+    planes_validos = ["basico", "pro"]
+    if nuevo_plan not in planes_validos:
+        raise HTTPException(status_code=400, detail=f"Plan inválido. Opciones: {planes_validos}")
+
+    plan_actual = empresa.plan.value if hasattr(empresa.plan, 'value') else empresa.plan
+
+    if plan_actual == nuevo_plan:
+        raise HTTPException(status_code=400, detail=f"Ya estás en el plan {nuevo_plan}.")
+
+    # Downgrade: verificar que la empresa cumpla los límites del plan básico
+    if nuevo_plan == "basico":
+        total_usuarios  = contar_usuarios_activos(empresa.id, db)
+        total_productos = db.query(models.Producto).filter(
+            models.Producto.empresa_id == empresa.id,
+            models.Producto.activo     == True
+        ).count()
+
+        if total_usuarios > 1:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Tienes {total_usuarios} usuarios activos. El plan Básico permite máximo 1. Desactiva los usuarios extra antes de bajar de plan."
+            )
+        if total_productos > 200:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Tienes {total_productos} productos activos. El plan Básico permite máximo 200. Elimina o desactiva productos antes de bajar de plan."
+            )
+
+    # Aplicar el cambio de plan con los nuevos límites
+    if nuevo_plan == "pro":
+        empresa.plan          = "pro"
+        empresa.plan_precio   = 29990
+        empresa.max_usuarios  = 3
+        empresa.max_productos = 1500
+    else:
+        empresa.plan          = "basico"
+        empresa.plan_precio   = 14990
+        empresa.max_usuarios  = 1
+        empresa.max_productos = 200
+
+    db.commit()
+    db.refresh(empresa)
+
+    return {
+        "ok":      True,
+        "plan":    nuevo_plan,
+        "mensaje": f"Plan actualizado a {nuevo_plan} correctamente."
+    }
