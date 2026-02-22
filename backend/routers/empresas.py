@@ -88,7 +88,7 @@ def info_empresa(
         "max_productos":        empresa.max_productos,
         "total_usuarios":       total_usuarios,
         "total_productos":      total_productos,
-        "productos_disponibles": (empresa.max_productos - total_productos) if empresa.max_productos > 0 else None,
+        "productos_disponibles": ((empresa.max_productos - total_productos) if (empresa.max_productos or 0) > 0 else None),
         "created_at":           empresa.created_at,
     }
 
