@@ -2,9 +2,9 @@
 # STOCKYA – Router de Alertas
 # Archivo: backend/routers/alertas.py
 # Descripcion: Stock bajo + vencimientos proximos
-# ✅ CORREGIDO: ahora filtra por usuario_actual — cada usuario
-#    ve SOLO las alertas de sus propios productos
-# Analogia: el panel de alarmas de TU bodega, no de todas
+# ✅ ACTUALIZADO: filtra por empresa_id para soporte multiusuario
+#    Todos los usuarios de la empresa ven las mismas alertas
+# Analogia: el panel de alarmas de LA TIENDA, no del empleado
 # ============================================================
 
 from fastapi import APIRouter, Depends
@@ -24,22 +24,29 @@ def obtener_alertas(
 ):
     """
     Retorna alertas de stock bajo Y vencimientos proximos.
-    Analogia: el panel de advertencias del tablero del auto —
-    distintos tipos de alarma en un solo lugar.
-    Solo muestra alertas de los productos del usuario autenticado.
+    Todos los usuarios de la empresa ven las mismas alertas.
     """
-    ahora = datetime.now(timezone.utc)
+    if not usuario_actual.empresa_id:
+        return {
+            "total_criticos": 0, "total_alertas": 0,
+            "total_vencidos": 0, "total_proximos": 0,
+            "productos_criticos": [], "productos_alerta": [],
+            "productos_vencidos": [], "productos_proximos": [],
+        }
 
-    # ✅ CORREGIDO: filtrar por usuario_id para ver solo sus productos
+    ahora      = datetime.now(timezone.utc)
+    empresa_id = usuario_actual.empresa_id
+
+    # ✅ Filtrar por empresa_id — todos los usuarios ven las mismas alertas
     productos = db.query(models.Producto).filter(
         models.Producto.activo     == True,
-        models.Producto.usuario_id == usuario_actual.id   # ← clave del cambio
+        models.Producto.empresa_id == empresa_id
     ).all()
 
-    criticos = []   # Stock por debajo del minimo
-    alertas  = []   # Stock cerca del minimo
-    vencidos = []   # Fecha de vencimiento ya paso
-    proximos = []   # Vencen pronto (dentro de dias_alerta_venc)
+    criticos = []
+    alertas  = []
+    vencidos = []
+    proximos = []
 
     for p in productos:
         d = {

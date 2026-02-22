@@ -3,7 +3,8 @@
 # Archivo: backend/routers/salidas.py
 # Descripción: Gestiona ventas, mermas, cuarentenas y
 #              devoluciones a proveedor con escaneo de codigo
-# ✅ CORREGIDO: todas las consultas filtran por usuario_actual.id
+# ✅ ACTUALIZADO: filtra por empresa_id para soporte multiusuario
+#    Todos los usuarios de la empresa ven las mismas salidas
 # ============================================================
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -25,6 +26,13 @@ ESTADO_INICIAL     = {
     "cuarentena":           "en_revision",
     "devolucion_proveedor": "activo",
 }
+
+
+def get_empresa_id(usuario_actual: models.Usuario) -> int:
+    """Obtiene empresa_id del usuario actual."""
+    if not usuario_actual.empresa_id:
+        raise HTTPException(status_code=400, detail="Tu cuenta no está asociada a una empresa.")
+    return usuario_actual.empresa_id
 
 
 def salida_a_dict(s) -> dict:
@@ -64,11 +72,12 @@ def registrar_salida_por_scan(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    # ✅ Solo busca productos del usuario actual
+    empresa_id = get_empresa_id(usuario_actual)
+
     producto = db.query(models.Producto).filter(
         models.Producto.codigo_barra == datos.codigo_barra,
         models.Producto.activo       == True,
-        models.Producto.usuario_id   == usuario_actual.id
+        models.Producto.empresa_id   == empresa_id
     ).first()
 
     if not producto:
@@ -89,6 +98,7 @@ def registrar_salida_por_scan(
     producto.stock_actual = stock_nuevo
 
     salida = models.Salida(
+        empresa_id        = empresa_id,
         producto_id       = producto.id,
         usuario_id        = usuario_actual.id,
         cantidad          = datos.cantidad,
@@ -107,6 +117,7 @@ def registrar_salida_por_scan(
     db.add(salida)
 
     movimiento = models.Movimiento(
+        empresa_id     = empresa_id,
         producto_id    = producto.id,
         usuario_id     = usuario_actual.id,
         tipo           = "salida",
@@ -131,14 +142,15 @@ def registrar_salida(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
+    empresa_id = get_empresa_id(usuario_actual)
+
     if datos.tipo_salida not in TIPOS_VALIDOS:
         raise HTTPException(status_code=400, detail=f"Tipo inválido. Debe ser: {', '.join(TIPOS_VALIDOS)}")
 
-    # ✅ Solo puede registrar salidas de sus propios productos
     producto = db.query(models.Producto).filter(
         models.Producto.id         == datos.producto_id,
         models.Producto.activo     == True,
-        models.Producto.usuario_id == usuario_actual.id
+        models.Producto.empresa_id == empresa_id
     ).first()
 
     if not producto:
@@ -157,6 +169,7 @@ def registrar_salida(
     producto.stock_actual = stock_nuevo
 
     salida = models.Salida(
+        empresa_id        = empresa_id,
         producto_id       = producto.id,
         usuario_id        = usuario_actual.id,
         cantidad          = datos.cantidad,
@@ -175,6 +188,7 @@ def registrar_salida(
     db.add(salida)
 
     movimiento = models.Movimiento(
+        empresa_id     = empresa_id,
         producto_id    = producto.id,
         usuario_id     = usuario_actual.id,
         tipo           = "salida",
@@ -204,13 +218,14 @@ def listar_salidas(
     db:          Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
+    empresa_id = get_empresa_id(usuario_actual)
+
     query = db.query(models.Salida).options(
         joinedload(models.Salida.producto),
         joinedload(models.Salida.usuario),
         joinedload(models.Salida.resolucion_usuario),
     ).filter(
-        # ✅ Solo salidas del usuario actual
-        models.Salida.usuario_id == usuario_actual.id
+        models.Salida.empresa_id == empresa_id
     )
 
     if tipo_salida:
@@ -246,12 +261,14 @@ def listar_cuarentenas_pendientes(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
+    empresa_id = get_empresa_id(usuario_actual)
+
     salidas = db.query(models.Salida).options(
         joinedload(models.Salida.producto),
         joinedload(models.Salida.usuario),
     ).filter(
         models.Salida.estado     == "en_revision",
-        models.Salida.usuario_id == usuario_actual.id  # ✅ solo las suyas
+        models.Salida.empresa_id == empresa_id
     ).order_by(models.Salida.created_at.asc()).all()
 
     return [salida_a_dict(s) for s in salidas]
@@ -265,24 +282,24 @@ def resumen_salidas(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    uid = usuario_actual.id  # ✅ shortcut para filtrar siempre por usuario
+    empresa_id = get_empresa_id(usuario_actual)
 
-    total_ventas       = db.query(models.Salida).filter(models.Salida.tipo_salida == "venta",                models.Salida.usuario_id == uid).count()
-    total_mermas       = db.query(models.Salida).filter(models.Salida.tipo_salida == "merma",                models.Salida.usuario_id == uid).count()
-    total_cuarentenas  = db.query(models.Salida).filter(models.Salida.tipo_salida == "cuarentena",           models.Salida.usuario_id == uid).count()
-    total_devoluciones = db.query(models.Salida).filter(models.Salida.tipo_salida == "devolucion_proveedor", models.Salida.usuario_id == uid).count()
-    cuarentenas_pend   = db.query(models.Salida).filter(models.Salida.estado      == "en_revision",          models.Salida.usuario_id == uid).count()
+    total_ventas       = db.query(models.Salida).filter(models.Salida.tipo_salida == "venta",                models.Salida.empresa_id == empresa_id).count()
+    total_mermas       = db.query(models.Salida).filter(models.Salida.tipo_salida == "merma",                models.Salida.empresa_id == empresa_id).count()
+    total_cuarentenas  = db.query(models.Salida).filter(models.Salida.tipo_salida == "cuarentena",           models.Salida.empresa_id == empresa_id).count()
+    total_devoluciones = db.query(models.Salida).filter(models.Salida.tipo_salida == "devolucion_proveedor", models.Salida.empresa_id == empresa_id).count()
+    cuarentenas_pend   = db.query(models.Salida).filter(models.Salida.estado      == "en_revision",          models.Salida.empresa_id == empresa_id).count()
 
     def suma_valor(tipo):
         r = db.query(sqlfunc.sum(models.Salida.valor_total)).filter(
             models.Salida.tipo_salida == tipo,
-            models.Salida.usuario_id  == uid
+            models.Salida.empresa_id  == empresa_id
         ).scalar()
         return r or 0.0
 
     val_cuarentenas_pend = db.query(sqlfunc.sum(models.Salida.valor_total)).filter(
         models.Salida.estado     == "en_revision",
-        models.Salida.usuario_id == uid
+        models.Salida.empresa_id == empresa_id
     ).scalar() or 0.0
 
     return {
@@ -307,13 +324,14 @@ def actualizar_estado_salida(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
+    empresa_id = get_empresa_id(usuario_actual)
+
     if datos.nuevo_estado not in ESTADOS_RESOLUCION:
         raise HTTPException(status_code=400, detail=f"Estado inválido. Opciones: {', '.join(ESTADOS_RESOLUCION)}")
 
-    # ✅ Solo puede resolver sus propias cuarentenas
     salida = db.query(models.Salida).filter(
         models.Salida.id         == salida_id,
-        models.Salida.usuario_id == usuario_actual.id
+        models.Salida.empresa_id == empresa_id
     ).first()
     if not salida:
         raise HTTPException(status_code=404, detail="Registro de salida no encontrado")
@@ -331,12 +349,13 @@ def actualizar_estado_salida(
     if datos.nuevo_estado == "reingresado" and salida.producto_id:
         producto = db.query(models.Producto).filter(
             models.Producto.id         == salida.producto_id,
-            models.Producto.usuario_id == usuario_actual.id
+            models.Producto.empresa_id == empresa_id
         ).first()
         if producto:
             stock_antes            = producto.stock_actual
             producto.stock_actual += salida.cantidad
             db.add(models.Movimiento(
+                empresa_id     = empresa_id,
                 producto_id    = producto.id,
                 usuario_id     = usuario_actual.id,
                 tipo           = "entrada",
@@ -361,14 +380,15 @@ def obtener_salida(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    # ✅ Solo puede ver sus propias salidas
+    empresa_id = get_empresa_id(usuario_actual)
+
     salida = db.query(models.Salida).options(
         joinedload(models.Salida.producto),
         joinedload(models.Salida.usuario),
         joinedload(models.Salida.resolucion_usuario),
     ).filter(
         models.Salida.id         == salida_id,
-        models.Salida.usuario_id == usuario_actual.id
+        models.Salida.empresa_id == empresa_id
     ).first()
 
     if not salida:
