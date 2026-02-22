@@ -164,7 +164,6 @@
     <button class="nav-item" id="nav-reportes" onclick="showScreen('reportes')"> <span class="nav-icon">📊</span> Reportes</button>
 
     <span class="nav-label">Sistema</span>
-    <button class="nav-item" id="nav-equipo"   onclick="showScreen('equipo')">   <span class="nav-icon">👥</span> Mi Equipo <span id="equipoBadge" style="display:none;background:var(--verde);color:#000;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:4px">Admin</span></button>
     <button class="nav-item" id="nav-settings" onclick="showScreen('settings')"> <span class="nav-icon">⚙️</span> Configuración</button>
 
     <div class="sidebar-footer">
@@ -545,6 +544,63 @@
       </div>
     </div>
 
+    <!-- EQUIPO -->
+    <div class="screen" id="screen-equipo">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Mi Equipo 👥</div>
+          <div class="page-subtitle" id="equipoSubtitulo">Gestiona los usuarios de tu negocio</div>
+        </div>
+        <button class="btn-primary" id="btnInvitarUsuario" onclick="abrirModalInvitar()" style="display:none">+ Invitar usuario</button>
+      </div>
+      <!-- Info del plan -->
+      <div class="card" style="margin-bottom:20px" id="equipoPlanCard">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Plan actual</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span id="equipoPlanNombre" style="font-family:var(--font-head);font-size:20px;font-weight:800">—</span>
+              <span id="equipoPlanBadge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:rgba(0,199,123,0.15);color:var(--verde)">Activo</span>
+            </div>
+            <div id="equipoPlanDetalle" style="font-size:12px;color:var(--muted);margin-top:4px">—</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:12px">
+            <div style="display:flex;gap:20px">
+              <div style="text-align:center">
+                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Usuarios</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800"><span id="equipoUsersActual">—</span><span style="color:var(--muted);font-size:14px">/<span id="equipoUsersMax">—</span></span></div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Productos</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800"><span id="equipoProdsActual">—</span><span id="equipoProdsMax" style="color:var(--muted);font-size:14px"></span></div>
+              </div>
+            </div>
+            <button id="btnUpgradePlan" onclick="abrirModalUpgrade()" style="display:none;background:linear-gradient(135deg,#5b8eff,#3b6fff);border:none;border-radius:10px;padding:8px 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">🔄 Cambiar Plan</button>
+          </div>
+        </div>
+      </div>
+      <!-- Tabla de usuarios -->
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="padding-left:20px">Usuario</th>
+                <th>Email</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th>Desde</th>
+                <th id="equipoColAcciones" style="text-align:center;display:none">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="equipoTableBody">
+              <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px;font-size:13px">Cargando equipo...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- CONFIGURACION -->
     <div class="screen" id="screen-settings">
       <div class="page-header">
@@ -634,63 +690,6 @@
       <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:8px;margin-bottom:32px">
         <button class="btn-secondary" onclick="descartarCambios()">Descartar cambios</button>
         <button class="btn-primary" onclick="guardarConfiguracion()">✓ Guardar todos los cambios</button>
-      </div>
-    </div>
-
-    <!-- EQUIPO -->
-    <div class="screen" id="screen-equipo">
-      <div class="page-header">
-        <div>
-          <div class="page-title">Mi Equipo 👥</div>
-          <div class="page-subtitle" id="equipoSubtitulo">Gestiona los usuarios de tu negocio</div>
-        </div>
-        <button class="btn-primary" id="btnInvitarUsuario" onclick="abrirModalInvitar()" style="display:none">+ Invitar usuario</button>
-      </div>
-      <!-- Info del plan -->
-      <div class="card" style="margin-bottom:20px" id="equipoPlanCard">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-          <div>
-            <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Plan actual</div>
-            <div style="display:flex;align-items:center;gap:10px">
-              <span id="equipoPlanNombre" style="font-family:var(--font-head);font-size:20px;font-weight:800">—</span>
-              <span id="equipoPlanBadge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:rgba(0,199,123,0.15);color:var(--verde)">Activo</span>
-            </div>
-            <div id="equipoPlanDetalle" style="font-size:12px;color:var(--muted);margin-top:4px">—</div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:12px">
-            <div style="display:flex;gap:20px">
-              <div style="text-align:center">
-                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Usuarios</div>
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800"><span id="equipoUsersActual">—</span><span style="color:var(--muted);font-size:14px">/<span id="equipoUsersMax">—</span></span></div>
-              </div>
-              <div style="text-align:center">
-                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Productos</div>
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800"><span id="equipoProdsActual">—</span><span id="equipoProdsMax" style="color:var(--muted);font-size:14px"></span></div>
-              </div>
-            </div>
-            <button id="btnUpgradePlan" onclick="abrirModalUpgrade()" style="display:none;background:linear-gradient(135deg,#f59e0b,#f97316);border:none;border-radius:10px;padding:8px 18px;color:#000;font-size:13px;font-weight:700;cursor:pointer">⭐ Mejorar a Premium</button>
-          </div>
-        </div>
-      </div>
-      <!-- Tabla de usuarios -->
-      <div class="card" style="padding:0;overflow:hidden">
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th style="padding-left:20px">Usuario</th>
-                <th>Email</th>
-                <th>Rol</th>
-                <th>Estado</th>
-                <th>Desde</th>
-                <th id="equipoColAcciones" style="text-align:center;display:none">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="equipoTableBody">
-              <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px;font-size:13px">Cargando equipo...</td></tr>
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
 
@@ -897,22 +896,20 @@
 <!-- TOAST -->
 <div class="toast" id="toast"><span id="toastMsg">¡Guardado!</span></div>
 
-<!-- MODAL: Upgrade de plan -->
+<!-- MODAL: Cambio de plan automático -->
 <div class="modal-overlay" id="modalUpgrade">
   <div class="modal-box" style="max-width:520px">
     <div class="modal-header">
-      <div class="modal-title">⭐ Mejorar tu Plan</div>
+      <div class="modal-title">🔄 Cambiar Plan</div>
       <button class="modal-close" onclick="cerrarModalUpgrade()">✕</button>
     </div>
     <div style="padding:0 24px 24px">
-
-      <!-- Comparación de planes -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
 
         <!-- Plan Básico -->
-        <div style="border:1px solid var(--border);border-radius:14px;padding:16px">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">🟢 Básico actual</div>
-          <div style="font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:2px">$14.990<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
+        <div id="cardPlanBasico" style="border:2px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;transition:border 0.2s" onclick="seleccionarPlan('basico')">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">🟢 Básico</div>
+          <div style="font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:8px">$14.990<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
           <div style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:5px">
             <div>✓ Hasta 200 productos</div>
             <div>✓ 1 usuario</div>
@@ -921,39 +918,38 @@
             <div>✓ Alertas de stock bajo</div>
             <div>✓ Soporte WhatsApp</div>
           </div>
-          <div style="margin-top:10px;font-size:11px;color:var(--muted);background:var(--bg3);border-radius:8px;padding:6px 10px">
-            🎯 Bodegas · Minimarkets pequeños · Tiendas de barrio
-          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--muted);background:var(--bg3);border-radius:8px;padding:6px 10px">🎯 Bodegas · Minimarkets pequeños</div>
         </div>
 
         <!-- Plan Pro -->
-        <div style="border:2px solid var(--azul);border-radius:14px;padding:16px;background:rgba(91,142,255,0.04)">
-          <div style="font-size:11px;color:var(--azul);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">🔵 Pro — Recomendado</div>
-          <div style="font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:2px">$29.990<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
+        <div id="cardPlanPro" style="border:2px solid var(--azul);border-radius:14px;padding:16px;cursor:pointer;transition:border 0.2s;background:rgba(91,142,255,0.04)" onclick="seleccionarPlan('pro')">
+          <div style="font-size:11px;color:var(--azul);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">🔵 Pro</div>
+          <div style="font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:8px">$29.990<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
           <div style="font-size:12px;display:flex;flex-direction:column;gap:5px">
             <div style="color:var(--verde)">✓ Hasta 1.500 productos</div>
             <div style="color:var(--verde)">✓ Hasta 3 usuarios</div>
             <div style="color:var(--verde)">✓ Inventario avanzado</div>
-            <div style="color:var(--verde)">✓ Historial por proveedor</div>
             <div style="color:var(--verde)">✓ Reportes de margen y rotación</div>
             <div style="color:var(--verde)">✓ Exportación Excel</div>
             <div style="color:var(--verde)">✓ Soporte prioritario</div>
           </div>
-          <div style="margin-top:10px;font-size:11px;color:var(--azul);background:rgba(91,142,255,0.08);border-radius:8px;padding:6px 10px">
-            🎯 Minimarket grande · Alta rotación · 20–50M CLP/mes
-          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--azul);background:rgba(91,142,255,0.08);border-radius:8px;padding:6px 10px">🎯 Minimarket grande · Alta rotación</div>
         </div>
       </div>
 
       <!-- Precio fundador -->
-      <div style="background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:14px;margin-bottom:20px;font-size:13px">
-        🎉 <strong>Precio fundador:</strong> Si eres de los primeros 100 negocios, accede al Plan Pro por <strong>$24.990/mes de por vida</strong>. ¡Solo quedan pocos cupos!
+      <div style="background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:12px">
+        🎉 <strong>Precio fundador Pro:</strong> Primeros 100 negocios acceden a Pro por <strong>$24.990/mes de por vida</strong>. ¡Pocos cupos disponibles!
       </div>
 
-      <a href="mailto:hola@yeparsolutions.com?subject=Quiero Plan Pro - Stockya&body=Hola, quiero activar el Plan Pro para mi negocio." class="btn-primary" style="width:100%;justify-content:center;display:flex;text-decoration:none;padding:13px;font-size:15px">
-        ✉️ Quiero el Plan Pro — Contáctame
-      </a>
-      <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:12px">Sin compromiso · Te respondemos en menos de 24 horas por WhatsApp</p>
+      <!-- Mensaje de error o advertencia -->
+      <div id="upgradeMensaje" style="display:none;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px"></div>
+
+      <!-- Botón confirmar -->
+      <button id="btnConfirmarPlan" onclick="confirmarCambioPlan()" class="btn-primary" disabled style="width:100%;justify-content:center;padding:13px;font-size:15px;opacity:0.5">
+        Selecciona un plan para continuar
+      </button>
+      <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:10px">El cambio es inmediato · Sin compromiso</p>
     </div>
   </div>
 </div>

@@ -2060,14 +2060,129 @@ async function activarUsuario(usuarioId, nombre) {
 }
 
 /* ============================================================
-   MODAL — Upgrade de plan
-   Analogia: la vitrina que muestra los beneficios del plan
-   superior para que el admin decida si quiere subir
+   MODAL — Cambio de plan automático
+   Analogia: como un menú de membresías donde haces clic
+   en la que quieres y el cambio ocurre al instante,
+   sin llamar a nadie ni enviar correos
    ============================================================ */
+
+var planSeleccionado = null;   // "basico" o "pro"
+
 function abrirModalUpgrade() {
+  planSeleccionado = null;
+
+  // Marcar el plan actual como activo visualmente
+  var planActual = empresaInfo ? (empresaInfo.plan || "basico") : "basico";
+  _resaltarPlanActual(planActual);
+
+  // Resetear botón y mensaje
+  var btn = document.getElementById("btnConfirmarPlan");
+  var msg = document.getElementById("upgradeMensaje");
+  if (btn) { btn.disabled = true; btn.style.opacity = "0.5"; btn.textContent = "Selecciona un plan para continuar"; }
+  if (msg) msg.style.display = "none";
+
   document.getElementById("modalUpgrade").classList.add("open");
+}
+
+function _resaltarPlanActual(plan) {
+  // Resaltar visualmente el plan actual con borde verde
+  var cardBasico = document.getElementById("cardPlanBasico");
+  var cardPro    = document.getElementById("cardPlanPro");
+  if (!cardBasico || !cardPro) return;
+
+  if (plan === "basico") {
+    cardBasico.style.border = "2px solid var(--verde)";
+    cardBasico.style.background = "rgba(0,199,123,0.05)";
+    cardPro.style.border = "2px solid var(--border)";
+    cardPro.style.background = "";
+  } else {
+    cardPro.style.border = "2px solid var(--azul)";
+    cardPro.style.background = "rgba(91,142,255,0.04)";
+    cardBasico.style.border = "2px solid var(--border)";
+    cardBasico.style.background = "";
+  }
+}
+
+function seleccionarPlan(plan) {
+  // Analogia: elegir una opción del menú — resalta la seleccionada
+  var planActual = empresaInfo ? (empresaInfo.plan || "basico") : "basico";
+  planSeleccionado = plan;
+
+  var cardBasico = document.getElementById("cardPlanBasico");
+  var cardPro    = document.getElementById("cardPlanPro");
+  var btn        = document.getElementById("btnConfirmarPlan");
+  var msg        = document.getElementById("upgradeMensaje");
+
+  // Resaltar la tarjeta seleccionada
+  if (plan === "basico") {
+    cardBasico.style.border = "3px solid var(--verde)";
+    cardBasico.style.background = "rgba(0,199,123,0.08)";
+    cardPro.style.border = "2px solid var(--border)";
+    cardPro.style.background = "";
+  } else {
+    cardPro.style.border = "3px solid var(--azul)";
+    cardPro.style.background = "rgba(91,142,255,0.08)";
+    cardBasico.style.border = "2px solid var(--border)";
+    cardBasico.style.background = "";
+  }
+
+  // Ocultar mensaje de error anterior
+  if (msg) msg.style.display = "none";
+
+  // Actualizar botón
+  if (btn) {
+    if (plan === planActual) {
+      btn.disabled = true;
+      btn.style.opacity = "0.5";
+      btn.textContent = "✓ Este es tu plan actual";
+    } else if (plan === "pro") {
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      btn.textContent = "⬆️ Subir a Plan Pro — $29.990/mes";
+    } else {
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      btn.textContent = "⬇️ Bajar a Plan Básico — $14.990/mes";
+    }
+  }
+}
+
+async function confirmarCambioPlan() {
+  if (!planSeleccionado) return;
+
+  var btn = document.getElementById("btnConfirmarPlan");
+  var msg = document.getElementById("upgradeMensaje");
+  var textoOriginal = btn.textContent;
+
+  btn.disabled = true;
+  btn.textContent = "Procesando...";
+  if (msg) msg.style.display = "none";
+
+  try {
+    var resultado = await api("/empresa/cambiar-plan?nuevo_plan=" + planSeleccionado, "PATCH");
+
+    showToast("✅ Plan cambiado a " + planSeleccionado + " correctamente");
+    cerrarModalUpgrade();
+
+    // Recargar pantalla de equipo para reflejar el nuevo plan
+    await cargarEquipo();
+
+  } catch (e) {
+    // Mostrar error inline sin cerrar el modal
+    if (msg) {
+      msg.style.display = "block";
+      msg.style.background = "rgba(255,80,80,0.1)";
+      msg.style.border = "1px solid rgba(255,80,80,0.3)";
+      msg.style.color = "var(--rojo)";
+      msg.textContent = "⚠️ " + (e.message || "No se pudo cambiar el plan");
+    }
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.textContent = textoOriginal;
+  }
 }
 
 function cerrarModalUpgrade() {
   document.getElementById("modalUpgrade").classList.remove("open");
+  planSeleccionado = null;
 }
