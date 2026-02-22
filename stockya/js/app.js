@@ -1151,60 +1151,120 @@ async function guardarResolucion() {
 /* ============================================================
    REPORTES — dinamico, calcula desde los datos reales
    ============================================================ */
+// ============================================================
+// REPORTES — Funcion principal con graficos y valorado
+// Analogia: el panel de control del piloto que muestra
+// todos los indicadores del negocio en un vistazo
+// ============================================================
+var _periodoReporte = "mes"; // periodo activo global
+
+// Muestra/oculta el rango de fechas custom segun la seleccion
+// Analogia: el contador que saca el calendario solo cuando le pides un rango especifico
+document.addEventListener("DOMContentLoaded", function() {
+  var sel = document.getElementById("reportePeriodo");
+  if (sel) sel.addEventListener("change", function() {
+    var wrap = document.getElementById("reporteRangoCustom");
+    if (wrap) wrap.style.display = this.value === "custom" ? "flex" : "none";
+  });
+});
+
 async function cargarReportes() {
+  _periodoReporte = document.getElementById("reportePeriodo")?.value || "mes";
+  var desde = document.getElementById("reporteDesde")?.value || "";
+  var hasta  = document.getElementById("reporteHasta")?.value  || "";
+
   try {
-    const [productos, movimientos, resumen] = await Promise.all([
+    var params = "periodo=" + _periodoReporte;
+    if (desde) params += "&desde=" + desde;
+    if (hasta)  params += "&hasta="  + hasta;
+
+    const [productos, resumen, ventasDia, topProds, porTipo] = await Promise.all([
       api("/productos/"),
-      api("/movimientos/?limit=500"),
-      api("/salidas/resumen"),
+      api("/reportes/ventas-resumen?" + params),
+      api("/reportes/ventas-por-dia?" + params),
+      api("/reportes/top-productos?"  + params),
+      api("/reportes/ventas-por-tipo?" + params),
     ]);
 
-    // Valor bodega
-    var valorBodega = productos.reduce(function(a,p){ return a + (p.stock_actual*(p.precio_venta||0)); }, 0);
-    var vbStr = valorBodega >= 1000000 ? "$"+(valorBodega/1000000).toFixed(1)+"M"
-              : valorBodega >= 1000    ? "$"+Math.round(valorBodega/1000)+"K"
-              : "$"+Math.round(valorBodega);
-    setEl("reporteValorBodega", productos.length > 0 ? vbStr : "—");
+    var hayDatos = productos.length > 0 || resumen.total_registros > 0;
+    var vacio    = document.getElementById("reportesVacioMsg");
+    var contenido = document.getElementById("reportesContenido");
+    if (vacio)    vacio.style.display    = hayDatos ? "none"  : "block";
+    if (contenido) contenido.style.display = hayDatos ? "block" : "none";
+
+    // --- Tarjetas de resumen ---
+    function fmt(n) {
+      return n >= 1000000 ? "$"+(n/1000000).toFixed(1)+"M"
+           : n >= 1000    ? "$"+Math.round(n/1000)+"K"
+           : "$"+Math.round(n);
+    }
+
+    setEl("reporteValorVentas",   resumen.total_registros > 0 ? fmt(resumen.total_valor) : "—");
+    setEl("reporteUnidades",      resumen.total_unidades  > 0 ? resumen.total_unidades   : "—");
+    setEl("reporteTicket",        resumen.total_registros > 0 ? fmt(resumen.ticket_promedio) : "—");
+    setEl("reporteMermas",        resumen.total_mermas    > 0 ? fmt(resumen.total_mermas) : "—");
+
+    // Valor bodega (siempre del inventario actual)
+    var valorBodega = productos.reduce(function(a,p){ return a+(p.stock_actual*(p.precio_venta||0)); }, 0);
+    setEl("reporteValorBodega", productos.length > 0 ? fmt(valorBodega) : "—");
 
     // Margen bruto promedio
     var conPrecio = productos.filter(function(p){ return p.precio_compra>0 && p.precio_venta>0; });
     if (conPrecio.length > 0) {
-      var margen = conPrecio.reduce(function(a,p){ return a + ((p.precio_venta-p.precio_compra)/p.precio_compra*100); }, 0) / conPrecio.length;
+      var margen = conPrecio.reduce(function(a,p){ return a+((p.precio_venta-p.precio_compra)/p.precio_compra*100); }, 0) / conPrecio.length;
       setEl("reporteMargen", Math.round(margen) + "%");
     } else {
       setEl("reporteMargen", "—");
     }
 
-    // Unidades rotadas (salidas)
-    var rotacion = movimientos.filter(function(m){ return m.tipo==="salida"; }).reduce(function(a,m){ return a+m.cantidad; }, 0);
-    setEl("reporteRotacion", rotacion);
+    // --- Grafico de barras: ventas por dia ---
+    var grafEl = document.getElementById("reporteGrafico");
+    if (grafEl && ventasDia.length > 0) {
+      var maxVal = Math.max.apply(null, ventasDia.map(function(d){ return d.valor; })) || 1;
+      // Mostrar maximo 14 dias en el grafico para legibilidad
+      var dias = ventasDia.slice(-14);
+      grafEl.innerHTML = "<div style='display:flex;align-items:flex-end;gap:4px;height:120px;padding:0 4px'>"
+        + dias.map(function(d) {
+            var pct  = Math.max(4, Math.round((d.valor/maxVal)*100));
+            var label = d.fecha.slice(5); // MM-DD
+            var tip   = d.valor > 0 ? fmt(d.valor) : "Sin ventas";
+            return "<div style='flex:1;display:flex;flex-direction:column;align-items:center;gap:3px'>"
+              + "<div style='font-size:9px;color:var(--muted);white-space:nowrap'>" + (d.valor>0?fmt(d.valor):"") + "</div>"
+              + "<div title='" + tip + "' style='width:100%;background:" + (d.valor>0?"var(--verde)":"var(--bg3)") + ";border-radius:4px 4px 0 0;height:" + pct + "%;transition:height .3s'></div>"
+              + "<div style='font-size:9px;color:var(--muted);white-space:nowrap'>" + label + "</div>"
+              + "</div>";
+          }).join("")
+        + "</div>";
+    } else if (grafEl) {
+      grafEl.innerHTML = "<div style='text-align:center;color:var(--muted);padding:40px;font-size:13px'>Sin ventas en este periodo</div>";
+    }
 
-    // Top 5 productos más movidos
-    var conteo = {};
-    movimientos.forEach(function(m){ if(m.producto_nombre) conteo[m.producto_nombre] = (conteo[m.producto_nombre]||0) + m.cantidad; });
-    var top = Object.entries(conteo).sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
-    var maxMov = top.length > 0 ? top[0][1] : 1;
-    var rankIcons = ["🥇","🥈","🥉","4️⃣","5️⃣"];
+    // --- Top productos mas vendidos ---
+    var rankIcons = ["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"];
     var topEl = document.getElementById("reporteTopProductos");
     if (topEl) {
-      topEl.innerHTML = top.length === 0
-        ? "<div style='text-align:center;color:var(--muted);padding:24px;font-size:13px'>Sin movimientos aún</div>"
-        : top.map(function(item,i){
-            var pct = Math.round((item[1]/maxMov)*100);
-            return "<div style='display:flex;align-items:center;gap:12px;margin-bottom:12px'>"
-              + "<div style='font-size:18px'>" + (rankIcons[i]||"") + "</div>"
-              + "<div style='flex:1'>"
-              +   "<div style='font-size:13px;font-weight:500;margin-bottom:4px'>" + item[0] + "</div>"
-              +   "<div style='background:var(--bg3);border-radius:6px;height:8px'>"
-              +     "<div style='background:var(--verde);height:8px;border-radius:6px;width:"+pct+"%'></div>"
+      var maxV = topProds.length > 0 ? topProds[0].valor : 1;
+      topEl.innerHTML = topProds.length === 0
+        ? "<div style='text-align:center;color:var(--muted);padding:24px;font-size:13px'>Sin ventas en este periodo</div>"
+        : topProds.slice(0,8).map(function(p,i) {
+            var pct = Math.round((p.valor/maxV)*100);
+            return "<div style='display:flex;align-items:center;gap:12px;margin-bottom:14px'>"
+              + "<div style='font-size:18px;flex-shrink:0'>" + (rankIcons[i]||"·") + "</div>"
+              + "<div style='flex:1;min-width:0'>"
+              +   "<div style='font-size:13px;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>" + p.nombre + "</div>"
+              +   "<div style='background:var(--bg3);border-radius:6px;height:7px'>"
+              +     "<div style='background:var(--verde);height:7px;border-radius:6px;width:" + pct + "%'></div>"
               +   "</div>"
               + "</div>"
-              + "<div style='font-size:13px;font-weight:700;color:var(--muted)'>" + item[1] + " und.</div>"
+              + "<div style='text-align:right;flex-shrink:0'>"
+              +   "<div style='font-size:13px;font-weight:700'>" + fmt(p.valor) + "</div>"
+              +   "<div style='font-size:11px;color:var(--muted)'>" + p.unidades + " und.</div>"
+              + "</div>"
               + "</div>";
           }).join("");
     }
 
-    // Stock por categoría
+    // --- Stock por categoria ---
     var porCat = {};
     productos.forEach(function(p){ var c=p.categoria||"Sin categoría"; if(!porCat[c]) porCat[c]={t:0,v:0}; porCat[c].t+=p.stock_actual; porCat[c].v+=p.stock_actual*(p.precio_venta||0); });
     var catArr = Object.entries(porCat).sort(function(a,b){ return b[1].t-a[1].t; });
@@ -1213,19 +1273,36 @@ async function cargarReportes() {
     if (catEl) {
       catEl.innerHTML = catArr.length === 0
         ? "<div style='text-align:center;color:var(--muted);padding:24px;font-size:13px'>Sin categorías aún</div>"
-        : catArr.map(function(e){
+        : catArr.map(function(e) {
             var pct = Math.round((e[1].t/maxCat)*100);
-            var v   = e[1].v>=1000 ? "$"+Math.round(e[1].v/1000)+"K" : "$"+Math.round(e[1].v);
+            var v   = fmt(e[1].v);
             return "<div style='margin-bottom:10px'>"
               + "<div style='display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px'>"
               +   "<span style='font-weight:500'>" + e[0] + "</span>"
               +   "<span style='color:var(--muted)'>" + e[1].t + " und · " + v + "</span>"
               + "</div>"
               + "<div style='background:var(--bg3);border-radius:6px;height:8px'>"
-              +   "<div style='background:var(--verde);height:8px;border-radius:6px;width:"+pct+"%'></div>"
+              +   "<div style='background:var(--verde);height:8px;border-radius:6px;width:" + pct + "%'></div>"
               + "</div>"
               + "</div>";
           }).join("");
+    }
+
+    // --- Distribucion por tipo de salida ---
+    var tipoEl = document.getElementById("reportePorTipo");
+    if (tipoEl) {
+      var labels = { venta:"Ventas", merma:"Mermas", cuarentena:"Cuarentenas", devolucion_proveedor:"Dev. Proveedor" };
+      var colores = { venta:"var(--verde)", merma:"var(--rojo)", cuarentena:"var(--amarillo)", devolucion_proveedor:"var(--azul)" };
+      var totalItems = porTipo.reduce(function(a,t){ return a+t.cantidad; }, 0) || 1;
+      tipoEl.innerHTML = porTipo.filter(function(t){ return t.cantidad>0; }).map(function(t) {
+        var pct = Math.round((t.cantidad/totalItems)*100);
+        return "<div style='display:flex;align-items:center;gap:10px;margin-bottom:10px'>"
+          + "<div style='width:10px;height:10px;border-radius:50%;background:" + (colores[t.tipo]||"var(--muted)") + ";flex-shrink:0'></div>"
+          + "<div style='flex:1;font-size:13px'>" + (labels[t.tipo]||t.tipo) + "</div>"
+          + "<div style='font-size:12px;color:var(--muted)'>" + t.cantidad + " (" + pct + "%)</div>"
+          + "<div style='font-size:13px;font-weight:700'>" + fmt(t.valor) + "</div>"
+          + "</div>";
+      }).join("") || "<div style='color:var(--muted);font-size:13px;padding:12px 0'>Sin salidas en este periodo</div>";
     }
 
   } catch(error) { console.error("Error reportes:", error); }
