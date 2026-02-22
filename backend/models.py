@@ -32,8 +32,8 @@ class EstadoSalida(str, enum.Enum):
 
 class PlanEmpresa(str, enum.Enum):
     # Analogia: como los tipos de membresía de un gimnasio
-    basico   = "basico"    # 1 usuario, hasta 500 productos
-    premium  = "premium"   # hasta 3 usuarios, productos ilimitados
+    basico  = "basico"   # 1 usuario, hasta 200 productos — $14.990/mes
+    pro     = "pro"      # hasta 3 usuarios, 1.500 productos — $29.990/mes
 
 class RolUsuario(str, enum.Enum):
     # Analogia: el admin es el dueño del negocio, el operador es el empleado
@@ -65,9 +65,9 @@ class Empresa(Base):
     stripe_customer_id = Column(String(100), nullable=True)   # ID en Stripe
 
     # Límites según plan
-    # Analogia: el plan básico es como un estacionamiento de 500 espacios
-    max_usuarios       = Column(Integer, default=1)           # 1 básico, 3 premium
-    max_productos      = Column(Integer, default=500)         # 500 básico, 0=ilimitado premium
+    # Analogia: básico = estacionamiento de 200 espacios, pro = 1.500 espacios
+    max_usuarios       = Column(Integer, default=1)           # 1 básico, 3 pro
+    max_productos      = Column(Integer, default=200)         # 200 básico, 1500 pro
 
     onboarding_completo = Column(Boolean, default=False)
     created_at         = Column(DateTime(timezone=True), server_default=func.now())

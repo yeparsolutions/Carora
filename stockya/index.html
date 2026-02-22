@@ -899,40 +899,63 @@
 
 <!-- MODAL: Upgrade de plan -->
 <div class="modal-overlay" id="modalUpgrade">
-  <div class="modal-box" style="max-width:480px">
+  <div class="modal-box" style="max-width:520px">
     <div class="modal-header">
-      <div class="modal-title">⭐ Mejorar a Premium</div>
+      <div class="modal-title">⭐ Mejorar tu Plan</div>
       <button class="modal-close" onclick="cerrarModalUpgrade()">✕</button>
     </div>
     <div style="padding:0 24px 24px">
+
       <!-- Comparación de planes -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+
+        <!-- Plan Básico -->
         <div style="border:1px solid var(--border);border-radius:14px;padding:16px">
-          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Básico actual</div>
-          <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:12px">$12<span style="font-size:13px;font-weight:400;color:var(--muted)">/mes</span></div>
-          <div style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">🟢 Básico actual</div>
+          <div style="font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:2px">$14.990<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">hasta $17.990</div>
+          <div style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:5px">
+            <div>✓ Hasta 200 productos</div>
             <div>✓ 1 usuario</div>
-            <div>✓ 500 productos</div>
-            <div>✓ Reportes básicos</div>
+            <div>✓ Inventario básico</div>
+            <div>✓ Reportes diario/mensual</div>
+            <div>✓ Alertas de stock bajo</div>
+            <div>✓ Soporte WhatsApp</div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--muted);background:var(--bg3);border-radius:8px;padding:6px 10px">
+            🎯 Bodegas · Minimarkets pequeños · Tiendas de barrio
           </div>
         </div>
-        <div style="border:2px solid #f59e0b;border-radius:14px;padding:16px;background:rgba(245,158,11,0.05)">
-          <div style="font-size:12px;color:#f59e0b;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;font-weight:700">⭐ Premium</div>
-          <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:12px">$25<span style="font-size:13px;font-weight:400;color:var(--muted)">/mes</span></div>
-          <div style="font-size:12px;display:flex;flex-direction:column;gap:6px">
+
+        <!-- Plan Pro -->
+        <div style="border:2px solid var(--azul);border-radius:14px;padding:16px;background:rgba(91,142,255,0.04)">
+          <div style="font-size:11px;color:var(--azul);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">🔵 Pro — Recomendado</div>
+          <div style="font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:2px">$29.990<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">hasta $34.990</div>
+          <div style="font-size:12px;display:flex;flex-direction:column;gap:5px">
+            <div style="color:var(--verde)">✓ Hasta 1.500 productos</div>
             <div style="color:var(--verde)">✓ Hasta 3 usuarios</div>
-            <div style="color:var(--verde)">✓ Productos ilimitados</div>
-            <div style="color:var(--verde)">✓ Reportes avanzados</div>
+            <div style="color:var(--verde)">✓ Inventario avanzado</div>
+            <div style="color:var(--verde)">✓ Historial por proveedor</div>
+            <div style="color:var(--verde)">✓ Reportes de margen y rotación</div>
+            <div style="color:var(--verde)">✓ Exportación Excel</div>
+            <div style="color:var(--verde)">✓ Soporte prioritario</div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--azul);background:rgba(91,142,255,0.08);border-radius:8px;padding:6px 10px">
+            🎯 Minimarket grande · Alta rotación · 20–50M CLP/mes
           </div>
         </div>
       </div>
-      <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:14px;margin-bottom:20px;font-size:13px">
-        🎉 <strong>Precio fundador disponible:</strong> Si eres de los primeros 100 negocios, accede a Premium por <strong>$22/mes</strong> de por vida. Escríbenos para activarlo.
+
+      <!-- Precio fundador -->
+      <div style="background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:14px;margin-bottom:20px;font-size:13px">
+        🎉 <strong>Precio fundador:</strong> Si eres de los primeros 100 negocios, accede al Plan Pro por <strong>$24.990/mes de por vida</strong>. ¡Solo quedan pocos cupos!
       </div>
-      <a href="mailto:hola@yeparsolutions.com?subject=Quiero Premium - Stockya" class="btn-primary" style="width:100%;justify-content:center;display:flex;text-decoration:none;padding:13px">
-        ✉️ Contactar para activar Premium
+
+      <a href="mailto:hola@yeparsolutions.com?subject=Quiero Plan Pro - Stockya&body=Hola, quiero activar el Plan Pro para mi negocio." class="btn-primary" style="width:100%;justify-content:center;display:flex;text-decoration:none;padding:13px;font-size:15px">
+        ✉️ Quiero el Plan Pro — Contáctame
       </a>
-      <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:12px">Te respondemos en menos de 24 horas · Sin compromiso</p>
+      <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:12px">Sin compromiso · Te respondemos en menos de 24 horas por WhatsApp</p>
     </div>
   </div>
 </div>
