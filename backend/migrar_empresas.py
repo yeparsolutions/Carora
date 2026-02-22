@@ -65,16 +65,39 @@ with engine.connect() as conn:
     print("    ✅ Tabla empresas creada")
 
     # --------------------------------------------------------
-    # PASO 3: Por cada usuario existente crear su empresa
-    # Analogia: cada inquilino que vivía solo ahora tiene
-    # su propia empresa registrada a su nombre
+    # PASO 3: Agregar columnas empresa_id y rol a usuarios
+    # PRIMERO las columnas, DESPUES llenarlas
     # --------------------------------------------------------
-    print("\n[3/8] Creando empresas para usuarios existentes...")
+    print("\n[3/8] Agregando columnas empresa_id y rol a usuarios...")
+    conn.execute(text("""
+        ALTER TABLE usuarios
+        ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id)
+    """))
+    conn.execute(text("""
+        ALTER TABLE usuarios
+        ADD COLUMN IF NOT EXISTS rol rol_usuario_enum DEFAULT 'admin'
+    """))
+    conn.commit()
+    print("    ✅ Columnas agregadas a usuarios")
+
+    # --------------------------------------------------------
+    # PASO 4: Crear una empresa por cada usuario existente
+    # --------------------------------------------------------
+    print("\n[4/8] Creando empresas para usuarios existentes...")
     usuarios = conn.execute(text("SELECT id, nombre, email FROM usuarios")).fetchall()
     print(f"    Usuarios encontrados: {len(usuarios)}")
 
     for usuario in usuarios:
-        # Obtener datos de configuración existente si tiene
+        # Si ya tiene empresa asignada, saltar
+        ya_tiene = conn.execute(text(
+            "SELECT empresa_id FROM usuarios WHERE id = :uid"
+        ), {"uid": usuario.id}).fetchone()
+
+        if ya_tiene and ya_tiene.empresa_id:
+            print(f"    ⏭️  {usuario.email} ya tiene empresa")
+            continue
+
+        # Obtener datos de configuración existente
         config = conn.execute(text("""
             SELECT nombre_negocio, moneda, color_principal, logo_base64, rubro, onboarding_completo
             FROM configuracion WHERE usuario_id = :uid
@@ -87,55 +110,28 @@ with engine.connect() as conn:
         rubro               = config.rubro               if config else None
         onboarding_completo = config.onboarding_completo if config else False
 
-        # Verificar si ya tiene empresa asignada
-        empresa_existente = conn.execute(text("""
-            SELECT e.id FROM empresas e
-            JOIN usuarios u ON u.empresa_id = e.id
-            WHERE u.id = :uid
-        """), {"uid": usuario.id}).fetchone()
-
-        if empresa_existente:
-            print(f"    ⏭️  Usuario {usuario.email} ya tiene empresa asignada")
-            continue
-
-        # Crear empresa para este usuario
+        # Crear empresa
         result = conn.execute(text("""
             INSERT INTO empresas (nombre, rubro, moneda, color_principal, logo_base64, onboarding_completo)
             VALUES (:nombre, :rubro, :moneda, :color, :logo, :onboarding)
             RETURNING id
         """), {
-            "nombre":    nombre_negocio,
-            "rubro":     rubro,
-            "moneda":    moneda,
-            "color":     color_principal,
-            "logo":      logo_base64,
+            "nombre":     nombre_negocio,
+            "rubro":      rubro,
+            "moneda":     moneda,
+            "color":      color_principal,
+            "logo":       logo_base64,
             "onboarding": onboarding_completo,
         })
         empresa_id = result.fetchone().id
         conn.commit()
-        print(f"    ✅ Empresa #{empresa_id} creada para {usuario.email}")
 
-        # Asignar empresa al usuario (lo haremos en el paso 4)
+        # Asignar empresa al usuario
         conn.execute(text("""
             UPDATE usuarios SET empresa_id = :eid WHERE id = :uid
         """), {"eid": empresa_id, "uid": usuario.id})
         conn.commit()
-        print(f"       → Usuario {usuario.email} asignado a empresa #{empresa_id}")
-
-    # --------------------------------------------------------
-    # PASO 4: Agregar columna empresa_id a usuarios si no existe
-    # --------------------------------------------------------
-    print("\n[4/8] Agregando columna empresa_id a usuarios...")
-    conn.execute(text("""
-        ALTER TABLE usuarios
-        ADD COLUMN IF NOT EXISTS empresa_id INTEGER REFERENCES empresas(id)
-    """))
-    conn.execute(text("""
-        ALTER TABLE usuarios
-        ADD COLUMN IF NOT EXISTS rol rol_usuario_enum DEFAULT 'admin'
-    """))
-    conn.commit()
-    print("    ✅ Columnas empresa_id y rol agregadas a usuarios")
+        print(f"    ✅ Empresa #{empresa_id} creada y asignada a {usuario.email}")
 
     # --------------------------------------------------------
     # PASO 5: Agregar empresa_id a productos
