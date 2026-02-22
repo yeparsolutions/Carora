@@ -1151,120 +1151,60 @@ async function guardarResolucion() {
 /* ============================================================
    REPORTES — dinamico, calcula desde los datos reales
    ============================================================ */
-// ============================================================
-// REPORTES — Funcion principal con graficos y valorado
-// Analogia: el panel de control del piloto que muestra
-// todos los indicadores del negocio en un vistazo
-// ============================================================
-var _periodoReporte = "mes"; // periodo activo global
-
-// Muestra/oculta el rango de fechas custom segun la seleccion
-// Analogia: el contador que saca el calendario solo cuando le pides un rango especifico
-document.addEventListener("DOMContentLoaded", function() {
-  var sel = document.getElementById("reportePeriodo");
-  if (sel) sel.addEventListener("change", function() {
-    var wrap = document.getElementById("reporteRangoCustom");
-    if (wrap) wrap.style.display = this.value === "custom" ? "flex" : "none";
-  });
-});
-
 async function cargarReportes() {
-  _periodoReporte = document.getElementById("reportePeriodo")?.value || "mes";
-  var desde = document.getElementById("reporteDesde")?.value || "";
-  var hasta  = document.getElementById("reporteHasta")?.value  || "";
-
   try {
-    var params = "periodo=" + _periodoReporte;
-    if (desde) params += "&desde=" + desde;
-    if (hasta)  params += "&hasta="  + hasta;
-
-    const [productos, resumen, ventasDia, topProds, porTipo] = await Promise.all([
+    const [productos, movimientos, resumen] = await Promise.all([
       api("/productos/"),
-      api("/reportes/ventas-resumen?" + params),
-      api("/reportes/ventas-por-dia?" + params),
-      api("/reportes/top-productos?"  + params),
-      api("/reportes/ventas-por-tipo?" + params),
+      api("/movimientos/?limit=500"),
+      api("/salidas/resumen"),
     ]);
 
-    var hayDatos = productos.length > 0 || resumen.total_registros > 0;
-    var vacio    = document.getElementById("reportesVacioMsg");
-    var contenido = document.getElementById("reportesContenido");
-    if (vacio)    vacio.style.display    = hayDatos ? "none"  : "block";
-    if (contenido) contenido.style.display = hayDatos ? "block" : "none";
-
-    // --- Tarjetas de resumen ---
-    function fmt(n) {
-      return n >= 1000000 ? "$"+(n/1000000).toFixed(1)+"M"
-           : n >= 1000    ? "$"+Math.round(n/1000)+"K"
-           : "$"+Math.round(n);
-    }
-
-    setEl("reporteValorVentas",   resumen.total_registros > 0 ? fmt(resumen.total_valor) : "—");
-    setEl("reporteUnidades",      resumen.total_unidades  > 0 ? resumen.total_unidades   : "—");
-    setEl("reporteTicket",        resumen.total_registros > 0 ? fmt(resumen.ticket_promedio) : "—");
-    setEl("reporteMermas",        resumen.total_mermas    > 0 ? fmt(resumen.total_mermas) : "—");
-
-    // Valor bodega (siempre del inventario actual)
-    var valorBodega = productos.reduce(function(a,p){ return a+(p.stock_actual*(p.precio_venta||0)); }, 0);
-    setEl("reporteValorBodega", productos.length > 0 ? fmt(valorBodega) : "—");
+    // Valor bodega
+    var valorBodega = productos.reduce(function(a,p){ return a + (p.stock_actual*(p.precio_venta||0)); }, 0);
+    var vbStr = valorBodega >= 1000000 ? "$"+(valorBodega/1000000).toFixed(1)+"M"
+              : valorBodega >= 1000    ? "$"+Math.round(valorBodega/1000)+"K"
+              : "$"+Math.round(valorBodega);
+    setEl("reporteValorBodega", productos.length > 0 ? vbStr : "—");
 
     // Margen bruto promedio
     var conPrecio = productos.filter(function(p){ return p.precio_compra>0 && p.precio_venta>0; });
     if (conPrecio.length > 0) {
-      var margen = conPrecio.reduce(function(a,p){ return a+((p.precio_venta-p.precio_compra)/p.precio_compra*100); }, 0) / conPrecio.length;
+      var margen = conPrecio.reduce(function(a,p){ return a + ((p.precio_venta-p.precio_compra)/p.precio_compra*100); }, 0) / conPrecio.length;
       setEl("reporteMargen", Math.round(margen) + "%");
     } else {
       setEl("reporteMargen", "—");
     }
 
-    // --- Grafico de barras: ventas por dia ---
-    var grafEl = document.getElementById("reporteGrafico");
-    if (grafEl && ventasDia.length > 0) {
-      var maxVal = Math.max.apply(null, ventasDia.map(function(d){ return d.valor; })) || 1;
-      // Mostrar maximo 14 dias en el grafico para legibilidad
-      var dias = ventasDia.slice(-14);
-      grafEl.innerHTML = "<div style='display:flex;align-items:flex-end;gap:4px;height:120px;padding:0 4px'>"
-        + dias.map(function(d) {
-            var pct  = Math.max(4, Math.round((d.valor/maxVal)*100));
-            var label = d.fecha.slice(5); // MM-DD
-            var tip   = d.valor > 0 ? fmt(d.valor) : "Sin ventas";
-            return "<div style='flex:1;display:flex;flex-direction:column;align-items:center;gap:3px'>"
-              + "<div style='font-size:9px;color:var(--muted);white-space:nowrap'>" + (d.valor>0?fmt(d.valor):"") + "</div>"
-              + "<div title='" + tip + "' style='width:100%;background:" + (d.valor>0?"var(--verde)":"var(--bg3)") + ";border-radius:4px 4px 0 0;height:" + pct + "%;transition:height .3s'></div>"
-              + "<div style='font-size:9px;color:var(--muted);white-space:nowrap'>" + label + "</div>"
-              + "</div>";
-          }).join("")
-        + "</div>";
-    } else if (grafEl) {
-      grafEl.innerHTML = "<div style='text-align:center;color:var(--muted);padding:40px;font-size:13px'>Sin ventas en este periodo</div>";
-    }
+    // Unidades rotadas (salidas)
+    var rotacion = movimientos.filter(function(m){ return m.tipo==="salida"; }).reduce(function(a,m){ return a+m.cantidad; }, 0);
+    setEl("reporteRotacion", rotacion);
 
-    // --- Top productos mas vendidos ---
-    var rankIcons = ["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"];
+    // Top 5 productos más movidos
+    var conteo = {};
+    movimientos.forEach(function(m){ if(m.producto_nombre) conteo[m.producto_nombre] = (conteo[m.producto_nombre]||0) + m.cantidad; });
+    var top = Object.entries(conteo).sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
+    var maxMov = top.length > 0 ? top[0][1] : 1;
+    var rankIcons = ["🥇","🥈","🥉","4️⃣","5️⃣"];
     var topEl = document.getElementById("reporteTopProductos");
     if (topEl) {
-      var maxV = topProds.length > 0 ? topProds[0].valor : 1;
-      topEl.innerHTML = topProds.length === 0
-        ? "<div style='text-align:center;color:var(--muted);padding:24px;font-size:13px'>Sin ventas en este periodo</div>"
-        : topProds.slice(0,8).map(function(p,i) {
-            var pct = Math.round((p.valor/maxV)*100);
-            return "<div style='display:flex;align-items:center;gap:12px;margin-bottom:14px'>"
-              + "<div style='font-size:18px;flex-shrink:0'>" + (rankIcons[i]||"·") + "</div>"
-              + "<div style='flex:1;min-width:0'>"
-              +   "<div style='font-size:13px;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>" + p.nombre + "</div>"
-              +   "<div style='background:var(--bg3);border-radius:6px;height:7px'>"
-              +     "<div style='background:var(--verde);height:7px;border-radius:6px;width:" + pct + "%'></div>"
+      topEl.innerHTML = top.length === 0
+        ? "<div style='text-align:center;color:var(--muted);padding:24px;font-size:13px'>Sin movimientos aún</div>"
+        : top.map(function(item,i){
+            var pct = Math.round((item[1]/maxMov)*100);
+            return "<div style='display:flex;align-items:center;gap:12px;margin-bottom:12px'>"
+              + "<div style='font-size:18px'>" + (rankIcons[i]||"") + "</div>"
+              + "<div style='flex:1'>"
+              +   "<div style='font-size:13px;font-weight:500;margin-bottom:4px'>" + item[0] + "</div>"
+              +   "<div style='background:var(--bg3);border-radius:6px;height:8px'>"
+              +     "<div style='background:var(--verde);height:8px;border-radius:6px;width:"+pct+"%'></div>"
               +   "</div>"
               + "</div>"
-              + "<div style='text-align:right;flex-shrink:0'>"
-              +   "<div style='font-size:13px;font-weight:700'>" + fmt(p.valor) + "</div>"
-              +   "<div style='font-size:11px;color:var(--muted)'>" + p.unidades + " und.</div>"
-              + "</div>"
+              + "<div style='font-size:13px;font-weight:700;color:var(--muted)'>" + item[1] + " und.</div>"
               + "</div>";
           }).join("");
     }
 
-    // --- Stock por categoria ---
+    // Stock por categoría
     var porCat = {};
     productos.forEach(function(p){ var c=p.categoria||"Sin categoría"; if(!porCat[c]) porCat[c]={t:0,v:0}; porCat[c].t+=p.stock_actual; porCat[c].v+=p.stock_actual*(p.precio_venta||0); });
     var catArr = Object.entries(porCat).sort(function(a,b){ return b[1].t-a[1].t; });
@@ -1273,36 +1213,19 @@ async function cargarReportes() {
     if (catEl) {
       catEl.innerHTML = catArr.length === 0
         ? "<div style='text-align:center;color:var(--muted);padding:24px;font-size:13px'>Sin categorías aún</div>"
-        : catArr.map(function(e) {
+        : catArr.map(function(e){
             var pct = Math.round((e[1].t/maxCat)*100);
-            var v   = fmt(e[1].v);
+            var v   = e[1].v>=1000 ? "$"+Math.round(e[1].v/1000)+"K" : "$"+Math.round(e[1].v);
             return "<div style='margin-bottom:10px'>"
               + "<div style='display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px'>"
               +   "<span style='font-weight:500'>" + e[0] + "</span>"
               +   "<span style='color:var(--muted)'>" + e[1].t + " und · " + v + "</span>"
               + "</div>"
               + "<div style='background:var(--bg3);border-radius:6px;height:8px'>"
-              +   "<div style='background:var(--verde);height:8px;border-radius:6px;width:" + pct + "%'></div>"
+              +   "<div style='background:var(--verde);height:8px;border-radius:6px;width:"+pct+"%'></div>"
               + "</div>"
               + "</div>";
           }).join("");
-    }
-
-    // --- Distribucion por tipo de salida ---
-    var tipoEl = document.getElementById("reportePorTipo");
-    if (tipoEl) {
-      var labels = { venta:"Ventas", merma:"Mermas", cuarentena:"Cuarentenas", devolucion_proveedor:"Dev. Proveedor" };
-      var colores = { venta:"var(--verde)", merma:"var(--rojo)", cuarentena:"var(--amarillo)", devolucion_proveedor:"var(--azul)" };
-      var totalItems = porTipo.reduce(function(a,t){ return a+t.cantidad; }, 0) || 1;
-      tipoEl.innerHTML = porTipo.filter(function(t){ return t.cantidad>0; }).map(function(t) {
-        var pct = Math.round((t.cantidad/totalItems)*100);
-        return "<div style='display:flex;align-items:center;gap:10px;margin-bottom:10px'>"
-          + "<div style='width:10px;height:10px;border-radius:50%;background:" + (colores[t.tipo]||"var(--muted)") + ";flex-shrink:0'></div>"
-          + "<div style='flex:1;font-size:13px'>" + (labels[t.tipo]||t.tipo) + "</div>"
-          + "<div style='font-size:12px;color:var(--muted)'>" + t.cantidad + " (" + pct + "%)</div>"
-          + "<div style='font-size:13px;font-weight:700'>" + fmt(t.valor) + "</div>"
-          + "</div>";
-      }).join("") || "<div style='color:var(--muted);font-size:13px;padding:12px 0'>Sin salidas en este periodo</div>";
     }
 
   } catch(error) { console.error("Error reportes:", error); }
@@ -1327,9 +1250,10 @@ async function showScreen(name) {
   if (name === "stock")       await cargarStock();
   if (name === "movimientos") await cargarMovimientos();
   if (name === "alertas")     await cargarAlertas();
-  if (name === "salidas")        await cargarSalidas();  // NUEVO
-  if (name === "reportes")       await cargarReportes();  // ✅ NUEVO
-  if (name === "settings")  await cargarDatosEnConfig(); // ✅ FIX: cargar datos del usuario actual
+  if (name === "salidas")     await cargarSalidas();
+  if (name === "reportes")    await cargarReportes();
+  if (name === "equipo")      await cargarEquipo();
+  if (name === "settings")    await cargarDatosEnConfig();
 }
 
 function toggleSidebar() {
@@ -1773,68 +1697,6 @@ async function guardarConfiguracion() {
   } catch (error) { showToast("Error: " + error.message); }
 }
 
-// ============================================================
-// CARGAR DATOS DEL USUARIO Y NEGOCIO EN PANTALLA CONFIGURACIÓN
-// Analogía: cuando abres tu ficha en el banco, ves TUS datos,
-// no los del cliente anterior — esta función asegura eso.
-// ============================================================
-async function cargarDatosEnConfig() {
-  // Limpiar campos primero para evitar que el navegador muestre datos del usuario anterior
-  // Analogia: borrar la pizarra antes de escribir el nombre del nuevo alumno
-  var campos = ["inputNegocio","inputNombreUsuario","inputEmail","inputPassActual","inputPassNueva","inputPassConfirm"];
-  campos.forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.value = "";
-  });
-
-  try {
-    // Cargar datos del negocio desde el API con el token del usuario actual
-    var config = await api("/configuracion/");
-
-    // Rellenar campos del negocio
-    var inputNegocio = document.getElementById("inputNegocio");
-    var inputMoneda  = document.getElementById("inputMoneda");
-    if (inputNegocio) inputNegocio.value = config.nombre_negocio || "";
-    if (inputMoneda)  inputMoneda.value  = config.moneda         || "CLP";
-
-    // Cargar color
-    if (config.color_principal) previsualizarColor(config.color_principal);
-
-    // Cargar logo si existe
-    var img = document.getElementById("logoImg");
-    var ini = document.getElementById("logoInitials");
-    if (config.logo_base64) {
-      configTemporal.logoData = config.logo_base64;
-      if (img) { img.src = config.logo_base64; img.style.display = "block"; }
-      if (ini) ini.style.display = "none";
-    } else {
-      // Limpiar logo del usuario anterior
-      configTemporal.logoData = null;
-      if (img) { img.src = ""; img.style.display = "none"; }
-      if (ini) {
-        // Mostrar iniciales del usuario actual
-        var nombre = usuarioActual?.nombre || "";
-        var partes = nombre.split(" ");
-        ini.textContent = partes.length >= 2 ? (partes[0][0] + partes[1][0]).toUpperCase() : nombre.slice(0,2).toUpperCase();
-        ini.style.display = "flex";
-      }
-    }
-
-    // Rellenar datos del usuario actual desde usuarioActual (nunca del cache del DOM)
-    var inputNombreUsuario = document.getElementById("inputNombreUsuario");
-    var inputEmail         = document.getElementById("inputEmail");
-    if (inputNombreUsuario) inputNombreUsuario.value = usuarioActual?.nombre || "";
-    if (inputEmail)         inputEmail.value         = usuarioActual?.email  || "";
-
-  } catch(e) {
-    // Si falla el API, al menos cargar datos del usuario desde memoria
-    var inputNombreUsuario = document.getElementById("inputNombreUsuario");
-    var inputEmail         = document.getElementById("inputEmail");
-    if (inputNombreUsuario) inputNombreUsuario.value = usuarioActual?.nombre || "";
-    if (inputEmail)         inputEmail.value         = usuarioActual?.email  || "";
-  }
-}
-
 function descartarCambios() {
   previsualizarColor(configTemporal.color||"#00C77B");
   document.getElementById("inputPassActual").value  = "";
@@ -1901,3 +1763,241 @@ document.addEventListener("DOMContentLoaded", function(){
       });
   }
 });
+/* ============================================================
+   EQUIPO — Gestión de usuarios del negocio
+   Analogia: el panel de RRHH del negocio — solo el admin
+   puede contratar, cambiar roles y revocar accesos
+   ============================================================ */
+
+// Variables del módulo equipo
+let equipoData  = [];    // Lista de usuarios cargados
+let empresaInfo = null;  // Datos del plan y empresa
+let esAdmin     = false; // Si el usuario actual es admin
+
+/* ============================================================
+   CARGAR EQUIPO — se llama cuando se abre la pantalla
+   ============================================================ */
+async function cargarEquipo() {
+  try {
+    // Llamar ambos endpoints en paralelo
+    // Analogia: pedir el organigrama y la ficha del negocio al mismo tiempo
+    const [infoEmpresa, listaEquipo] = await Promise.all([
+      api("/empresa/info"),
+      api("/empresa/equipo"),
+    ]);
+
+    empresaInfo = infoEmpresa;
+    equipoData  = listaEquipo;
+
+    // Determinar si el usuario actual es admin
+    const yo = listaEquipo.find(function(u){ return u.es_yo; });
+    esAdmin   = yo && yo.rol === "admin";
+
+    renderPlanCard(infoEmpresa);
+    renderEquipoTabla(listaEquipo);
+
+    // Mostrar botón de invitar solo al admin
+    var btnInvitar = document.getElementById("btnInvitarUsuario");
+    if (btnInvitar) btnInvitar.style.display = esAdmin ? "flex" : "none";
+
+    // Mostrar columna de acciones solo al admin
+    var colAcciones = document.getElementById("equipoColAcciones");
+    if (colAcciones) colAcciones.style.display = esAdmin ? "table-cell" : "none";
+
+    // Mostrar badge "Admin" en sidebar si es admin
+    var badge = document.getElementById("equipoBadge");
+    if (badge) badge.style.display = esAdmin ? "inline-block" : "none";
+
+    // Subtítulo con nombre del negocio y cantidad de usuarios
+    var sub = document.getElementById("equipoSubtitulo");
+    if (sub) sub.textContent = infoEmpresa.nombre + " · " + listaEquipo.length + " usuario(s)";
+
+  } catch (e) {
+    console.error("Error cargando equipo:", e);
+    showToast("Error cargando el equipo");
+  }
+}
+
+/* ============================================================
+   RENDER — Tarjeta del plan
+   ============================================================ */
+function renderPlanCard(info) {
+  var planNombre  = document.getElementById("equipoPlanNombre");
+  var planDetalle = document.getElementById("equipoPlanDetalle");
+  var usersActual = document.getElementById("equipoUsersActual");
+  var usersMax    = document.getElementById("equipoUsersMax");
+  var prodsActual = document.getElementById("equipoProdsActual");
+  var prodsMax    = document.getElementById("equipoProdsMax");
+
+  if (planNombre) planNombre.textContent = info.plan === "premium" ? "⭐ Premium" : "🔹 Básico";
+
+  if (planDetalle) {
+    var esFundador = info.plan_es_fundador ? " · Precio fundador 🎉" : "";
+    var precio     = info.plan_precio > 0  ? " · $" + info.plan_precio + "/mes" : "";
+    planDetalle.textContent = (info.plan === "premium"
+      ? "Hasta 3 usuarios · Productos ilimitados"
+      : "1 usuario · Hasta 500 productos")
+      + precio + esFundador;
+  }
+
+  if (usersActual) usersActual.textContent = info.total_usuarios;
+  if (usersMax)    usersMax.textContent    = info.max_usuarios;
+  if (prodsActual) prodsActual.textContent = info.total_productos;
+  if (prodsMax)    prodsMax.textContent    = info.max_productos > 0
+    ? " / " + info.max_productos
+    : " (ilimitados)";
+}
+
+/* ============================================================
+   RENDER — Tabla de usuarios del equipo
+   Analogia: la lista de empleados con su cargo y estado
+   ============================================================ */
+function renderEquipoTabla(usuarios) {
+  var tbody = document.getElementById("equipoTableBody");
+  if (!tbody) return;
+
+  if (!usuarios.length) {
+    tbody.innerHTML = "<tr><td colspan='6' style='text-align:center;color:var(--muted);padding:40px;font-size:13px'>No hay usuarios en el equipo</td></tr>";
+    return;
+  }
+
+  tbody.innerHTML = usuarios.map(function(u) {
+    // Badge de rol
+    var rolBadge = u.rol === "admin"
+      ? "<span style='background:rgba(91,142,255,0.15);color:var(--azul);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px'>🔑 Admin</span>"
+      : "<span style='background:rgba(0,199,123,0.1);color:var(--verde);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px'>👷 Operador</span>";
+
+    // Badge de estado
+    var estadoBadge = u.activo
+      ? "<span style='background:rgba(0,199,123,0.1);color:var(--verde);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px'>● Activo</span>"
+      : "<span style='background:rgba(255,80,80,0.1);color:var(--rojo);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px'>● Inactivo</span>";
+
+    // Iniciales del avatar
+    var partes   = u.nombre.split(" ");
+    var iniciales = partes.length >= 2
+      ? (partes[0][0] + partes[1][0]).toUpperCase()
+      : u.nombre.slice(0,2).toUpperCase();
+
+    // Fecha de ingreso
+    var fecha = u.created_at
+      ? new Date(u.created_at).toLocaleDateString("es-CL", {day:"2-digit",month:"short",year:"numeric"})
+      : "—";
+
+    // Botones de acciones — solo si es admin y no es el mismo usuario
+    var acciones = "";
+    if (esAdmin && !u.es_yo) {
+      var btnRol = u.rol === "admin"
+        ? "<button onclick='cambiarRolUsuario(" + u.id + ",\"operador\")' style='background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;color:var(--muted);font-size:12px;cursor:pointer' title='Cambiar a Operador'>→ Operador</button>"
+        : "<button onclick='cambiarRolUsuario(" + u.id + ",\"admin\")' style='background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;color:var(--muted);font-size:12px;cursor:pointer' title='Cambiar a Admin'>→ Admin</button>";
+
+      var btnEstado = u.activo
+        ? "<button onclick='desactivarUsuario(" + u.id + ",\"" + u.nombre.replace(/"/g,"'") + "\")' style='background:none;border:1px solid rgba(255,80,80,0.3);border-radius:7px;padding:5px 10px;color:var(--rojo);font-size:12px;cursor:pointer'>Desactivar</button>"
+        : "<button onclick='activarUsuario(" + u.id + ",\"" + u.nombre.replace(/"/g,"'") + "\")' style='background:none;border:1px solid rgba(0,199,123,0.3);border-radius:7px;padding:5px 10px;color:var(--verde);font-size:12px;cursor:pointer'>Activar</button>";
+
+      acciones = "<td style='text-align:center'><div style='display:flex;gap:6px;justify-content:center'>" + btnRol + btnEstado + "</div></td>";
+    } else if (esAdmin && u.es_yo) {
+      acciones = "<td style='text-align:center'><span style='font-size:11px;color:var(--muted)'>Tú</span></td>";
+    } else {
+      acciones = "<td></td>";
+    }
+
+    // Resaltar fila del usuario actual
+    var esYoStyle = u.es_yo ? "background:rgba(0,199,123,0.04)" : "";
+
+    return "<tr style='" + esYoStyle + "'>"
+      + "<td style='padding-left:20px'>"
+      +   "<div style='display:flex;align-items:center;gap:10px'>"
+      +     "<div style='width:34px;height:34px;border-radius:50%;background:var(--verde);display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:13px;font-weight:800;color:#000;flex-shrink:0'>" + iniciales + "</div>"
+      +     "<div style='font-weight:600;font-size:14px'>" + u.nombre + (u.es_yo ? " <span style='font-size:11px;color:var(--muted)'>(tú)</span>" : "") + "</div>"
+      +   "</div>"
+      + "</td>"
+      + "<td style='color:var(--muted);font-size:13px'>" + u.email + "</td>"
+      + "<td>" + rolBadge + "</td>"
+      + "<td>" + estadoBadge + "</td>"
+      + "<td style='color:var(--muted);font-size:12px'>" + fecha + "</td>"
+      + acciones
+      + "</tr>";
+  }).join("");
+}
+
+/* ============================================================
+   MODAL — Invitar usuario al equipo
+   ============================================================ */
+function abrirModalInvitar() {
+  if (!esAdmin) return;
+  document.getElementById("modalInvitar").classList.add("open");
+  document.getElementById("formInvitar").reset();
+  if (empresaInfo) {
+    var nomEmp = document.getElementById("invitarEmpresaNombre");
+    if (nomEmp) nomEmp.textContent = empresaInfo.nombre;
+  }
+}
+
+function cerrarModalInvitar() {
+  document.getElementById("modalInvitar").classList.remove("open");
+}
+
+async function guardarInvitacion() {
+  var nombre   = document.getElementById("invitarNombre").value.trim();
+  var email    = document.getElementById("invitarEmail").value.trim();
+  var password = document.getElementById("invitarPassword").value.trim();
+  var rol      = document.getElementById("invitarRol").value;
+
+  if (!nombre || !email || !password) { showToast("Completa todos los campos obligatorios"); return; }
+  if (password.length < 8) { showToast("La contraseña debe tener al menos 8 caracteres"); return; }
+
+  var btn = document.querySelector("#modalInvitar .btn-primary");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
+
+  try {
+    // Analogia: llenar el formulario de contratación y enviarlo a RRHH
+    await api("/empresa/invitar?rol=" + rol, "POST", { nombre, email, password });
+    showToast("✅ " + nombre + " agregado al equipo");
+    cerrarModalInvitar();
+    await cargarEquipo();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "✓ Agregar al equipo"; }
+    showToast("❌ " + (e.message || "Error al invitar usuario"));
+  }
+}
+
+/* ============================================================
+   ACCIONES — Cambiar rol, activar y desactivar usuarios
+   Analogia: el gerente moviendo fichas en el organigrama
+   ============================================================ */
+async function cambiarRolUsuario(usuarioId, nuevoRol) {
+  var usuario  = equipoData.find(function(u){ return u.id === usuarioId; });
+  var nombre   = usuario ? usuario.nombre : "usuario";
+  var rolLabel = nuevoRol === "admin" ? "Admin" : "Operador";
+  if (!confirm("¿Cambiar a " + nombre + " a " + rolLabel + "?")) return;
+
+  try {
+    await api("/empresa/equipo/" + usuarioId + "/rol?nuevo_rol=" + nuevoRol, "PATCH");
+    showToast("✅ Rol de " + nombre + " actualizado a " + rolLabel);
+    await cargarEquipo();
+  } catch (e) {
+    showToast("❌ " + (e.message || "No se pudo cambiar el rol"));
+  }
+}
+
+async function desactivarUsuario(usuarioId, nombre) {
+  if (!confirm("¿Desactivar acceso de " + nombre + "? Podrás reactivarlo después.")) return;
+
+  try {
+    await api("/empresa/equipo/" + usuarioId + "/desactivar", "PATCH");
+    showToast("✅ " + nombre + " desactivado");
+    await cargarEquipo();
+  } catch (e) {
+    showToast("❌ " + (e.message || "No se pudo desactivar"));
+  }
+}
+
+async function activarUsuario(usuarioId, nombre) {
+  try {
+    await api("/empresa/equipo/" + usuarioId + "/activar", "PATCH");
+    showToast("✅ " + nombre + " reactivado");
+    await cargarEquipo();
+  } catch (e) {
+    showToast("❌ " + (e.message || "No se pudo activar"));
+  }
+}
