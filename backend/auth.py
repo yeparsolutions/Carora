@@ -25,8 +25,8 @@ load_dotenv()
 # SECRET_KEY viene del archivo .env — nunca hardcodeada en el código
 # Analogía: la combinación de la caja fuerte está en un lugar seguro, no pegada en la puerta
 SECRET_KEY   = os.getenv("SECRET_KEY", "clave-local-de-desarrollo-cambiar-en-produccion")
-ALGORITHM    = "HS256"
-TOKEN_EXPIRY = 60 * 24  # Token válido por 24 horas (en minutos)
+ALGORITHM    = os.getenv("ALGORITHM", "HS256")
+TOKEN_EXPIRY = int(os.getenv("TOKEN_EXPIRY", "1440"))  # Token válido por 24 horas (en minutos)
 
 # --- Contexto de encriptación de contraseñas ---
 # Analogía: bcrypt es la "caja fuerte" que guarda contraseñas
