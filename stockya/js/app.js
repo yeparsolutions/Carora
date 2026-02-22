@@ -1253,7 +1253,7 @@ async function showScreen(name) {
   if (name === "salidas")     await cargarSalidas();
   if (name === "reportes")    await cargarReportes();
   if (name === "equipo")      await cargarEquipo();
-  if (name === "settings")    await cargarDatosEnConfig();
+  if (name === "settings")    await cargarConfiguracion();
 }
 
 function toggleSidebar() {
@@ -1697,6 +1697,56 @@ async function guardarConfiguracion() {
   } catch (error) { showToast("Error: " + error.message); }
 }
 
+// ============================================================
+// CARGAR DATOS EN PANTALLA CONFIGURACIÓN
+// Analogia: cuando abres tu ficha en el banco, ves TUS datos —
+// esta función garantiza que siempre se carguen datos frescos
+// ============================================================
+async function cargarConfiguracion() {
+  // Limpiar campos primero para evitar datos del usuario anterior
+  var campos = ["inputNegocio","inputNombreUsuario","inputEmail","inputPassActual","inputPassNueva","inputPassConfirm"];
+  campos.forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ""; });
+
+  try {
+    var config = await api("/configuracion/");
+
+    var inputNegocio = document.getElementById("inputNegocio");
+    var inputMoneda  = document.getElementById("inputMoneda");
+    if (inputNegocio) inputNegocio.value = config.nombre_negocio || "";
+    if (inputMoneda)  inputMoneda.value  = config.moneda         || "CLP";
+
+    if (config.color_principal) previsualizarColor(config.color_principal);
+
+    var img = document.getElementById("logoImg");
+    var ini = document.getElementById("logoInitials");
+    if (config.logo_base64) {
+      configTemporal.logoData = config.logo_base64;
+      if (img) { img.src = config.logo_base64; img.style.display = "block"; }
+      if (ini) ini.style.display = "none";
+    } else {
+      configTemporal.logoData = null;
+      if (img) { img.src = ""; img.style.display = "none"; }
+      if (ini) {
+        var nombre = usuarioActual ? usuarioActual.nombre : "";
+        var partes = nombre.split(" ");
+        ini.textContent = partes.length >= 2 ? (partes[0][0]+partes[1][0]).toUpperCase() : nombre.slice(0,2).toUpperCase();
+        ini.style.display = "flex";
+      }
+    }
+
+    var inputNombreUsuario = document.getElementById("inputNombreUsuario");
+    var inputEmail         = document.getElementById("inputEmail");
+    if (inputNombreUsuario) inputNombreUsuario.value = usuarioActual ? usuarioActual.nombre : "";
+    if (inputEmail)         inputEmail.value         = usuarioActual ? usuarioActual.email  : "";
+
+  } catch(e) {
+    var inputNombreUsuario = document.getElementById("inputNombreUsuario");
+    var inputEmail         = document.getElementById("inputEmail");
+    if (inputNombreUsuario) inputNombreUsuario.value = usuarioActual ? usuarioActual.nombre : "";
+    if (inputEmail)         inputEmail.value         = usuarioActual ? usuarioActual.email  : "";
+  }
+}
+
 function descartarCambios() {
   previsualizarColor(configTemporal.color||"#00C77B");
   document.getElementById("inputPassActual").value  = "";
@@ -1734,7 +1784,7 @@ async function filterMov(btn, type) {
 /* Inicializacion al cargar la pagina */
 document.addEventListener("DOMContentLoaded", function(){
   // Cerrar modales al hacer clic fuera
-  ["modalAgregar","modalEditar","modalEliminar","modalMovimiento","modalSalida","modalResolucion"].forEach(function(id){
+  ["modalAgregar","modalEditar","modalEliminar","modalMovimiento","modalSalida","modalResolucion","modalInvitar","modalUpgrade"].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.addEventListener("click", function(e){ if(e.target===this) e.target.classList.remove("open"); });
   });
@@ -1819,7 +1869,7 @@ async function cargarEquipo() {
 }
 
 /* ============================================================
-   RENDER — Tarjeta del plan
+   RENDER — Tarjeta del plan con botón de upgrade
    ============================================================ */
 function renderPlanCard(info) {
   var planNombre  = document.getElementById("equipoPlanNombre");
@@ -1828,6 +1878,7 @@ function renderPlanCard(info) {
   var usersMax    = document.getElementById("equipoUsersMax");
   var prodsActual = document.getElementById("equipoProdsActual");
   var prodsMax    = document.getElementById("equipoProdsMax");
+  var btnUpgrade  = document.getElementById("btnUpgradePlan");
 
   if (planNombre) planNombre.textContent = info.plan === "premium" ? "⭐ Premium" : "🔹 Básico";
 
@@ -1846,6 +1897,11 @@ function renderPlanCard(info) {
   if (prodsMax)    prodsMax.textContent    = info.max_productos > 0
     ? " / " + info.max_productos
     : " (ilimitados)";
+
+  // Mostrar botón de upgrade solo si es admin y está en plan básico
+  if (btnUpgrade) {
+    btnUpgrade.style.display = (esAdmin && info.plan === "basico") ? "flex" : "none";
+  }
 }
 
 /* ============================================================
@@ -2000,4 +2056,17 @@ async function activarUsuario(usuarioId, nombre) {
   } catch (e) {
     showToast("❌ " + (e.message || "No se pudo activar"));
   }
+}
+
+/* ============================================================
+   MODAL — Upgrade de plan
+   Analogia: la vitrina que muestra los beneficios del plan
+   superior para que el admin decida si quiere subir
+   ============================================================ */
+function abrirModalUpgrade() {
+  document.getElementById("modalUpgrade").classList.add("open");
+}
+
+function cerrarModalUpgrade() {
+  document.getElementById("modalUpgrade").classList.remove("open");
 }
