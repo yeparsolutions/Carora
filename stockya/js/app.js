@@ -1291,6 +1291,7 @@ async function showScreen(name) {
   if (name === "salidas")     await cargarSalidas();
   if (name === "reportes")    await cargarReportes();
   if (name === "equipo")      await cargarEquipo();
+  if (name === "fiados")      await cargarFiados();
   if (name === "settings")    await cargarConfiguracion();
 }
 
@@ -1865,6 +1866,115 @@ let esAdmin     = false; // Si el usuario actual es admin
 /* ============================================================
    CARGAR EQUIPO — se llama cuando se abre la pantalla
    ============================================================ */
+// ============================================================
+// PANTALLA FIADOS — deudores / cuentas por cobrar
+// Analogia: el cuaderno de fiados del almacén hecho digital
+// ============================================================
+var _fiadosTodos    = [];   // todos los fiados cargados
+var _fiadoFiltroEstado = ""; // filtro activo
+
+async function cargarFiados() {
+  try {
+    var [lista, resumen] = await Promise.all([
+      api("/fiados/"),
+      api("/fiados/resumen")
+    ]);
+    _fiadosTodos = lista;
+
+    // Actualizar resumen
+    document.getElementById("fiadosTotalDeuda").textContent =
+      "$" + (resumen.total_deuda_pendiente || 0).toLocaleString("es-CL");
+    document.getElementById("fiadosTotalClientes").textContent =
+      resumen.total_clientes_con_deuda || 0;
+    document.getElementById("fiadosSubtitulo").textContent =
+      resumen.total_clientes_con_deuda + " clientes con deuda abierta";
+
+    // Badge en sidebar
+    var badge = document.getElementById("fiadosBadge");
+    if (badge) {
+      badge.style.display = resumen.total_clientes_con_deuda > 0 ? "inline" : "none";
+      badge.textContent   = resumen.total_clientes_con_deuda;
+    }
+
+    renderFiados();
+  } catch(e) {
+    document.getElementById("fiadosLista").innerHTML =
+      "<div style='padding:30px;text-align:center;color:var(--muted)'>Error al cargar deudores</div>";
+  }
+}
+
+function filtrarFiados() {
+  renderFiados();
+}
+
+function setFiltroFiado(btn, estado) {
+  _fiadoFiltroEstado = estado;
+  document.querySelectorAll(".fiado-filtro").forEach(function(b){ b.classList.remove("active"); });
+  btn.classList.add("active");
+  renderFiados();
+}
+
+function renderFiados() {
+  var buscar = (document.getElementById("fiadosBuscar")?.value || "").toLowerCase();
+  var lista  = _fiadosTodos.filter(function(f) {
+    var okEstado = !_fiadoFiltroEstado || f.estado === _fiadoFiltroEstado;
+    var okBuscar = !buscar || f.cliente_nombre.toLowerCase().includes(buscar);
+    return okEstado && okBuscar;
+  });
+
+  var cont = document.getElementById("fiadosLista");
+  if (!lista.length) {
+    cont.innerHTML = "<div style='padding:40px;text-align:center;color:var(--muted);font-size:13px'>No hay deudores con ese filtro</div>";
+    return;
+  }
+
+  var rows = lista.map(function(f) {
+    var estadoColor = f.estado === "pagado" ? "var(--verde)" : f.estado === "pagado_parcial" ? "var(--azul)" : "#f59e0b";
+    var estadoLabel = f.estado === "pagado" ? "✅ Pagado" : f.estado === "pagado_parcial" ? "🔄 Parcial" : "⏳ Pendiente";
+    var pendiente   = f.monto_total - f.monto_pagado;
+    var fecha       = f.created_at ? new Date(f.created_at).toLocaleDateString("es-CL") : "—";
+
+    return `<tr>
+      <td style="padding:12px 16px;font-weight:600">${f.cliente_nombre}</td>
+      <td style="padding:12px 8px;text-align:right">$${f.monto_total.toLocaleString("es-CL")}</td>
+      <td style="padding:12px 8px;text-align:right;color:var(--verde)">$${f.monto_pagado.toLocaleString("es-CL")}</td>
+      <td style="padding:12px 8px;text-align:right;color:#f59e0b;font-weight:700">$${pendiente.toLocaleString("es-CL")}</td>
+      <td style="padding:12px 8px;text-align:center"><span style="color:${estadoColor};font-size:12px;font-weight:700">${estadoLabel}</span></td>
+      <td style="padding:12px 8px;color:var(--muted);font-size:12px">${fecha}</td>
+      <td style="padding:12px 8px;text-align:center">
+        ${f.estado !== "pagado" ? `<button onclick="abrirAbonoFiado(${f.id},'${f.cliente_nombre}',${pendiente})" style="background:var(--verde);border:none;border-radius:8px;padding:5px 12px;color:#000;font-size:12px;font-weight:700;cursor:pointer">💰 Abonar</button>` : "<span style='color:var(--muted);font-size:12px'>—</span>"}
+      </td>
+    </tr>`;
+  }).join("");
+
+  cont.innerHTML = `<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase">
+      <th style="padding:10px 16px;text-align:left">Cliente</th>
+      <th style="padding:10px 8px;text-align:right">Total</th>
+      <th style="padding:10px 8px;text-align:right">Pagado</th>
+      <th style="padding:10px 8px;text-align:right">Pendiente</th>
+      <th style="padding:10px 8px;text-align:center">Estado</th>
+      <th style="padding:10px 8px;text-align:center">Fecha</th>
+      <th style="padding:10px 8px;text-align:center">Acción</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function abrirAbonoFiado(id, cliente, pendiente) {
+  var monto = prompt("¿Cuánto abona " + cliente + "?\nDeuda pendiente: $" + pendiente.toLocaleString("es-CL"));
+  if (!monto || isNaN(parseFloat(monto))) return;
+  var montoNum = parseFloat(monto);
+  if (montoNum <= 0) { showToast("El monto debe ser mayor a 0"); return; }
+
+  api("/fiados/" + id + "/abonar?monto=" + montoNum, "PATCH")
+    .then(function() {
+      showToast("✅ Abono de $" + montoNum.toLocaleString("es-CL") + " registrado para " + cliente);
+      cargarFiados();
+    })
+    .catch(function(e) { showToast("Error: " + e.message); });
+}
+
 async function cargarEquipo() {
   try {
     // Llamar ambos endpoints en paralelo

@@ -179,6 +179,7 @@
     <span class="nav-label">Análisis</span>
     <button class="nav-item" id="nav-alertas"  onclick="showScreen('alertas')">  <span class="nav-icon">🔔</span> Alertas <span class="nav-badge" id="alertBadge" style="display:none">0</span></button>
     <button class="nav-item" id="nav-reportes" onclick="showScreen('reportes')"> <span class="nav-icon">📊</span> Reportes</button>
+    <button class="nav-item" id="nav-fiados"   onclick="showScreen('fiados')">   <span class="nav-icon">📒</span> Deudores <span class="nav-badge" id="fiadosBadge" style="display:none;background:var(--amarillo);color:#000">0</span></button>
 
     <span class="nav-label">Sistema</span>
     <button class="nav-item" id="nav-equipo"   onclick="showScreen('equipo')">   <span class="nav-icon">👥</span> Mi Equipo <span id="equipoBadge" style="display:none;background:var(--verde);color:#000;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:4px">Admin</span></button>
@@ -473,6 +474,7 @@
       <div class="page-header">
         <div><div class="page-title">📊 Reportes</div><div class="page-subtitle">Ventas, inventario y análisis del negocio</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn-secondary" onclick="showScreen('fiados')" style="font-size:13px">📒 Deudores</button>
           <select class="filter-select" id="reportePeriodo" onchange="cargarReportes()">
             <option value="hoy">Hoy</option>
             <option value="semana">Últimos 7 días</option>
@@ -560,6 +562,44 @@
             <div id="reporteCategorias" style="display:flex;flex-direction:column;gap:10px;padding:8px 0"></div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- FIADOS / DEUDORES -->
+    <div class="screen" id="screen-fiados">
+      <div class="page-header">
+        <div>
+          <div class="page-title">📒 Deudores</div>
+          <div class="page-subtitle" id="fiadosSubtitulo">Clientes con deuda pendiente</div>
+        </div>
+        <input class="search-input" id="fiadosBuscar" placeholder="🔍 Buscar cliente..." oninput="filtrarFiados()" style="max-width:260px">
+      </div>
+
+      <!-- Resumen de deuda -->
+      <div class="stats-grid" style="margin-bottom:20px;grid-template-columns:repeat(2,1fr)">
+        <div class="stat-card amarillo">
+          <div class="stat-label">DEUDA TOTAL PENDIENTE</div>
+          <div class="stat-value" id="fiadosTotalDeuda">—</div>
+          <div class="stat-trend">Por cobrar</div>
+        </div>
+        <div class="stat-card rojo">
+          <div class="stat-label">CLIENTES CON DEUDA</div>
+          <div class="stat-value" id="fiadosTotalClientes">—</div>
+          <div class="stat-trend">Cuentas abiertas</div>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn-secondary fiado-filtro active" data-estado="" onclick="setFiltroFiado(this,'')">Todos</button>
+        <button class="btn-secondary fiado-filtro" data-estado="pendiente" onclick="setFiltroFiado(this,'pendiente')">⏳ Pendiente</button>
+        <button class="btn-secondary fiado-filtro" data-estado="pagado_parcial" onclick="setFiltroFiado(this,'pagado_parcial')">🔄 Parcial</button>
+        <button class="btn-secondary fiado-filtro" data-estado="pagado" onclick="setFiltroFiado(this,'pagado')">✅ Pagado</button>
+      </div>
+
+      <!-- Lista de deudores -->
+      <div id="fiadosLista" class="card" style="padding:0;overflow:hidden">
+        <div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Cargando deudores...</div>
       </div>
     </div>
 
@@ -819,12 +859,12 @@
 
 <!-- MODAL: Carrito de ventas -->
 <div class="modal-overlay" id="modalSalida">
-  <div class="modal-box" style="max-width:620px">
+  <div class="modal-box" style="max-width:620px;display:flex;flex-direction:column;max-height:90vh">
     <div class="modal-header">
       <div class="modal-title">🛒 Nueva venta</div>
       <button class="modal-close" onclick="cerrarModalSalida()">✕</button>
     </div>
-    <div style="padding:16px 24px 0">
+    <div style="padding:16px 24px 0;overflow-y:auto;flex:1">
       <div id="scanBox" style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📷 Agregar producto al carrito</div>
         <div style="display:flex;gap:8px;align-items:center">
@@ -860,7 +900,7 @@
       </div>
       <div id="carritoWrap" style="display:none;margin-bottom:12px">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">🧾 Productos en esta venta</div>
-        <div id="carritoLista" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto"></div>
+        <div id="carritoLista" style="display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto"></div>
       </div>
       <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
         <div>
@@ -893,7 +933,7 @@
         <div class="form-group"><label class="form-label">Nota</label><input id="salidaMotivo" class="form-input" type="text" placeholder="Observación opcional"></div>
       </div>
     </div>
-    <div class="form-actions">
+    <div class="form-actions" style="flex-shrink:0;border-top:1px solid var(--border);padding:16px 24px">
       <button type="button" class="btn-secondary" onclick="cerrarModalSalida()">Cancelar</button>
       <button type="button" class="btn-primary" id="btnConfirmarVenta" onclick="guardarSalida()" disabled style="opacity:0.5">✔ Confirmar venta</button>
     </div>
