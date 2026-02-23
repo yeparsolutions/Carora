@@ -232,8 +232,10 @@ async function cargarDashboard() {
     setEl("dashSubtitulo", hoy.charAt(0).toUpperCase() + hoy.slice(1) + " · " + (config.nombre_negocio || "Mi Negocio"));
 
     const totalProductos  = productos.length;
+    const totalUnidades   = productos.reduce(function(acc,p){ return acc + (p.stock_actual || 0); }, 0);
     const valorInventario = productos.reduce(function(acc,p){ return acc + (p.stock_actual * (p.precio_venta||0)); }, 0);
     setEl("statTotal",    totalProductos);
+    setEl("statUnidades", totalUnidades.toLocaleString("es-CL"));
     setEl("statCriticos", alertas.total_criticos || 0);
     setEl("statAlertas",  alertas.total_alertas  || 0);
     setEl("statTotalTrend", totalProductos === 0 ? "Agrega tu primer producto" : totalProductos + " productos registrados");
@@ -441,12 +443,13 @@ function abrirMovimientoRapido(id, nombre) {
 /* ============================================================
    MOVIMIENTOS
    ============================================================ */
-async function cargarMovimientos(tipo, buscar, categoria, desde, hasta) {
+async function cargarMovimientos(tipo, buscar, categoria, desde, hasta, codigo) {
   tipo      = tipo      || "";
   buscar    = buscar    || "";
   categoria = categoria || "";
   desde     = desde     || "";
   hasta     = hasta     || "";
+  codigo    = codigo    || "";
   try {
     var url = "/movimientos/?limit=500";
     if (tipo)      url += "&tipo="      + encodeURIComponent(tipo);
@@ -455,7 +458,16 @@ async function cargarMovimientos(tipo, buscar, categoria, desde, hasta) {
     if (desde)     url += "&desde="    + encodeURIComponent(desde);
     if (hasta)     url += "&hasta="    + encodeURIComponent(hasta);
 
-    const movimientos = await api(url);
+    var movimientos = await api(url);
+
+    // Filtro por código en frontend (busca en codigo_barra_scan del movimiento)
+    if (codigo) {
+      var codigoLower = codigo.toLowerCase();
+      movimientos = movimientos.filter(function(m) {
+        return (m.codigo_barra_scan && m.codigo_barra_scan.toLowerCase().includes(codigoLower))
+            || (m.producto_codigo   && m.producto_codigo.toLowerCase().includes(codigoLower));
+      });
+    }
     const tbody       = document.getElementById("movTableBody");
     const subtitulo   = document.getElementById("movSubtitulo");
 
@@ -584,7 +596,8 @@ function filtrarMovimientos() {
     document.getElementById("movBuscar")?.value          || "",
     document.getElementById("movFiltroCategoria")?.value || "",
     document.getElementById("movFiltroDesde")?.value     || "",
-    document.getElementById("movFiltroHasta")?.value     || ""
+    document.getElementById("movFiltroHasta")?.value     || "",
+    document.getElementById("movBuscarCodigo")?.value    || ""
   );
 }
 

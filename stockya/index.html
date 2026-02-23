@@ -220,6 +220,11 @@
           <div class="stat-value" id="statTotal">—</div>
           <div class="stat-trend" id="statTotalTrend">Sin productos aún</div>
         </div>
+        <div class="stat-card verde" style="background:rgba(0,199,123,0.06)">
+          <div class="stat-label">TOTAL UNIDADES 📦</div>
+          <div class="stat-value" id="statUnidades">—</div>
+          <div class="stat-trend">Unidades físicas en bodega</div>
+        </div>
         <div class="stat-card rojo">
           <div class="stat-label">BAJO STOCK 🔴</div>
           <div class="stat-value" id="statCriticos">—</div>
@@ -338,7 +343,8 @@
         <button class="btn-primary" onclick="openModalMovimiento()">+ Registrar movimiento</button>
       </div>
       <div class="search-row" style="flex-wrap:wrap;gap:8px">
-        <input id="movBuscar" class="search-input" placeholder="🔍  Buscar por producto..." oninput="filtrarMovimientos()" style="min-width:180px;flex:1">
+        <input id="movBuscar"      class="search-input" placeholder="🔍  Buscar por nombre..." oninput="filtrarMovimientos()" style="min-width:160px;flex:1">
+        <input id="movBuscarCodigo" class="search-input" placeholder="📦  Código de producto..."  oninput="filtrarMovimientos()" style="min-width:160px;flex:1">
         <select id="movFiltroTipo" class="filter-select" onchange="filtrarMovimientos()">
           <option value="">Entradas y salidas</option><option value="entrada">↑ Solo entradas</option><option value="salida">↓ Solo salidas</option>
         </select>
@@ -474,7 +480,6 @@
       <div class="page-header">
         <div><div class="page-title">📊 Reportes</div><div class="page-subtitle">Ventas, inventario y análisis del negocio</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn-secondary" onclick="showScreen('fiados')" style="font-size:13px">📒 Deudores</button>
           <select class="filter-select" id="reportePeriodo" onchange="cargarReportes()">
             <option value="hoy">Hoy</option>
             <option value="semana">Últimos 7 días</option>
