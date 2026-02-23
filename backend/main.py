@@ -15,8 +15,7 @@ import models
 # ✅ auth ahora incluye los endpoints de onboarding:
 #    GET  /auth/onboarding-status
 #    POST /auth/completar-onboarding
-from routers import auth, productos, movimientos, alertas, config, salidas, reportes, empresas
-
+from routers import auth, productos, movimientos, alertas, config, salidas, empresas, reportes, fiados
 
 # --- Crear las tablas en PostgreSQL si no existen ---
 # Analogia: es como crear las hojas de Excel vacias la primera vez
@@ -33,10 +32,15 @@ app = FastAPI(
 # REGLA: allow_origins=["*"] + allow_credentials=True NO se pueden combinar.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+        "http://localhost:8000",
+        "null",
+    ],
+    allow_credentials = True,
+    allow_methods     = ["*"],
+    allow_headers     = ["*"],
 )
 
 # --- Registrar todos los routers ---
@@ -46,8 +50,9 @@ app.include_router(movimientos.router)
 app.include_router(alertas.router)
 app.include_router(config.router)
 app.include_router(salidas.router)
-app.include_router(reportes.router)
 app.include_router(empresas.router)
+app.include_router(reportes.router)
+app.include_router(fiados.router)
 
 
 # --- Endpoint raiz ---

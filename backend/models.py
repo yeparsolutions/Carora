@@ -37,8 +37,17 @@ class PlanEmpresa(str, enum.Enum):
 
 class RolUsuario(str, enum.Enum):
     # Analogia: el admin es el dueño del negocio, el operador es el empleado
-    admin    = "admin"     # puede configurar, agregar usuarios y ver todo
-    operador = "operador"  # puede registrar ventas y movimientos
+    admin    = "admin"
+    operador = "operador"
+
+class MetodoPago(str, enum.Enum):
+    # Analogia: la caja registradora sabe cómo se pagó cada venta
+    efectivo     = "efectivo"
+    debito       = "debito"
+    credito      = "credito"
+    transferencia = "transferencia"
+    cheque       = "cheque"
+    fiado        = "fiado"    # el cliente debe — se registra en tabla fiados
 
 
 # ============================================================
@@ -65,9 +74,9 @@ class Empresa(Base):
     stripe_customer_id = Column(String(100), nullable=True)   # ID en Stripe
 
     # Límites según plan
-    # Analogia: básico = estacionamiento de 200 espacios, pro = 1.500 espacios
-    max_usuarios       = Column(Integer, default=1)           # 1 básico, 3 pro
-    max_productos      = Column(Integer, default=200)         # 200 básico, 1500 pro
+    # Analogia: el plan básico es como un estacionamiento de 500 espacios
+    max_usuarios       = Column(Integer, default=1)           # 1 básico, 3 premium
+    max_productos      = Column(Integer, default=500)         # 500 básico, 0=ilimitado premium
 
     onboarding_completo = Column(Boolean, default=False)
     created_at         = Column(DateTime(timezone=True), server_default=func.now())
@@ -202,6 +211,9 @@ class Salida(Base):
     precio_unitario       = Column(Float, default=0.0)
     valor_total           = Column(Float, default=0.0)
 
+    # Método de pago — efectivo, débito, crédito, transferencia, cheque o fiado
+    metodo_pago           = Column(String(30), default="efectivo")
+
     estado                = Column(
                                 Enum(EstadoSalida, name="estado_salida_enum"),
                                 default=EstadoSalida.activo,
@@ -219,6 +231,30 @@ class Salida(Base):
     producto           = relationship("Producto", back_populates="salidas", foreign_keys=[producto_id])
     usuario            = relationship("Usuario", back_populates="salidas", foreign_keys=[usuario_id])
     resolucion_usuario = relationship("Usuario", foreign_keys=[resolucion_usuario_id])
+
+
+# ============================================================
+# TABLA: fiados
+# Deudas de clientes que compraron sin pagar al contado
+# Analogia: el cuaderno de fiados del almacén — pero digital
+# ============================================================
+class Fiado(Base):
+    __tablename__ = "fiados"
+
+    id             = Column(Integer, primary_key=True, index=True)
+    empresa_id     = Column(Integer, ForeignKey("empresas.id"), nullable=False, index=True)
+    salida_id      = Column(Integer, ForeignKey("salidas.id"), nullable=True)
+    cliente_nombre = Column(String(150), nullable=False)
+    monto_total    = Column(Float, nullable=False, default=0.0)
+    monto_pagado   = Column(Float, nullable=False, default=0.0)
+
+    # Estado: pendiente → pagado_parcial → pagado
+    estado         = Column(String(20), nullable=False, default="pendiente")
+    nota           = Column(String(255), nullable=True)
+    created_at     = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at     = Column(DateTime(timezone=True), onupdate=func.now())
+
+    empresa = relationship("Empresa")
 
 
 # ============================================================

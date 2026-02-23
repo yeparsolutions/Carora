@@ -775,6 +775,7 @@ function filtrarSalidas() {
    ============================================================ */
 
 var _carrito        = [];   // [{id, nombre, qty, precio, subtotal}]
+var _metodoPagoActual = "efectivo";  // método de pago seleccionado en el modal de ventas
 var _productoActual = null; // Producto encontrado, pendiente de agregar
 var _streamSalida   = null; // Stream de camara activo
 
@@ -919,6 +920,13 @@ async function abrirModalSalida() {
 function cerrarModalSalida() {
   document.getElementById("modalSalida").classList.remove("open");
   cerrarEscanerSalida();
+  // Resetear método de pago a efectivo
+  _metodoPagoActual = "efectivo";
+  document.querySelectorAll(".metodo-pago-btn").forEach(function(b){ b.classList.remove("active"); });
+  var btnEfectivo = document.querySelector("[data-metodo='efectivo']");
+  if (btnEfectivo) btnEfectivo.classList.add("active");
+  var aviso = document.getElementById("fiadoAviso");
+  if (aviso) aviso.style.display = "none";
 }
 
 /* Cuando el usuario selecciona un producto del dropdown */
@@ -1008,6 +1016,28 @@ function calcularTotalVenta() {
 }
 
 /* Prellenar cliente generico con un clic */
+function seleccionarMetodoPago(metodo) {
+  // Analogia: elegir cómo se paga en la caja — solo una opción activa a la vez
+  _metodoPagoActual = metodo;
+  document.querySelectorAll(".metodo-pago-btn").forEach(function(b){
+    b.classList.remove("active");
+  });
+  var btn = document.querySelector("[data-metodo='" + metodo + "']");
+  if (btn) btn.classList.add("active");
+
+  // Mostrar u ocultar aviso de fiado
+  var aviso = document.getElementById("fiadoAviso");
+  if (aviso) aviso.style.display = metodo === "fiado" ? "block" : "none";
+}
+
+function onClienteInput() {
+  // Si es fiado y se escribe el cliente, quitar borde rojo si lo había
+  var input = document.getElementById("salidaCliente");
+  if (input && input.style.borderColor === "var(--rojo)") {
+    input.style.borderColor = "";
+  }
+}
+
 function usarClienteGenerico() {
   var input = document.getElementById("salidaCliente");
   if (!input) return;
@@ -1054,11 +1084,18 @@ function cerrarEscanerSalida() {
 async function guardarSalida() {
   if (_carrito.length === 0) { showToast("El carrito está vacío"); return; }
 
-  var cliente   = document.getElementById("salidaCliente")?.value.trim()   || "";
-  var documento = document.getElementById("salidaDocumento")?.value.trim() || "";
-  var motivo    = document.getElementById("salidaMotivo")?.value.trim()    || "";
+  var cliente      = document.getElementById("salidaCliente")?.value.trim()    || "";
+  var documento    = document.getElementById("salidaDocumento")?.value.trim()  || "";
+  var motivo       = document.getElementById("salidaMotivo")?.value.trim()     || "";
+  var metodoPago   = _metodoPagoActual || "efectivo";
 
-  // Armar nota base con el cliente
+  // Validar: si es fiado el cliente es obligatorio
+  if (metodoPago === "fiado" && !cliente) {
+    showToast("⚠️ Para venta fiada debes indicar el nombre del cliente");
+    document.getElementById("salidaCliente").focus();
+    return;
+  }
+
   var notaBase = "";
   if (cliente)  notaBase = "Cliente: " + cliente;
   if (motivo)   notaBase = notaBase ? notaBase + " — " + motivo : motivo;
@@ -1069,8 +1106,6 @@ async function guardarSalida() {
   cerrarEscanerSalida();
 
   try {
-    // Enviar cada item del carrito como una salida individual
-    // (el backend los registra como movimientos separados vinculados al mismo numero de doc)
     for (var item of _carrito) {
       await api("/salidas/", "POST", {
         producto_id:      item.id,
@@ -1079,14 +1114,17 @@ async function guardarSalida() {
         precio_unitario:  item.precio,
         motivo:           notaBase || null,
         numero_documento: documento || null,
+        metodo_pago:      metodoPago,
+        cliente_nombre:   cliente || null,
       });
     }
 
     var totalPesos = _carrito.reduce(function(a,i){ return a + i.subtotal; }, 0);
     var totalItems = _carrito.reduce(function(a,i){ return a + i.qty; }, 0);
+    var msgPago    = metodoPago === "fiado" ? " · Fiado a " + cliente : "";
 
     cerrarModalSalida();
-    showToast("Venta confirmada — " + totalItems + " unidades por $" + totalPesos.toLocaleString("es-CL"));
+    showToast("✅ Venta confirmada — " + totalItems + " unidades · $" + totalPesos.toLocaleString("es-CL") + msgPago);
     await cargarSalidas();
     await cargarStock();
     await cargarDashboard();
