@@ -60,6 +60,7 @@
           <input id="loginPassword" class="form-input" type="password" placeholder="••••••••">
         </div>
         <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="enterApp()">Entrar al negocio →</button>
+        <p style="text-align:right;margin:8px 0 4px"><span onclick="mostrarOlvidePass()" style="font-size:12px;color:var(--azul);cursor:pointer;text-decoration:underline">¿Olvidaste tu contraseña?</span></p>
         <p class="divider-text">¿Primera vez?</p>
         <button class="btn-secondary" style="width:100%;justify-content:center" onclick="mostrarRegistro()">Crear cuenta gratis — 30 días</button>
         <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:20px">Sin tarjeta de crédito · Cancela cuando quieras</p>
@@ -85,6 +86,70 @@
         <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="registrarUsuario()">Crear cuenta →</button>
         <p class="divider-text">¿Ya tienes cuenta?</p>
         <button class="btn-secondary" style="width:100%;justify-content:center" onclick="mostrarLogin()">← Volver al login</button>
+      </div>
+
+      <!-- PANEL: verificación de email -->
+      <div id="panelVerificacion" style="display:none">
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:40px">📧</div>
+          <p style="font-weight:700;font-size:16px;margin:8px 0 4px">Revisa tu email</p>
+          <p style="color:var(--muted);font-size:13px;margin:0">Enviamos un código de 6 dígitos a<br><strong id="verifiEmailMostrar"></strong></p>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:20px" id="codigoInputs">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,0)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,1)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,2)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,3)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,4)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,5)">
+        </div>
+        <div id="verifiError" style="display:none;color:var(--rojo);font-size:13px;text-align:center;margin-bottom:12px"></div>
+        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="confirmarVerificacion()">✅ Verificar cuenta</button>
+        <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:16px">
+          ¿No llegó? <span onclick="reenviarCodigo()" style="color:var(--azul);cursor:pointer;text-decoration:underline">Reenviar código</span>
+        </p>
+      </div>
+
+      <!-- PANEL: olvidé mi contraseña - paso 1 email -->
+      <div id="panelOlvideEmail" style="display:none">
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:40px">🔐</div>
+          <p style="font-weight:700;font-size:16px;margin:8px 0 4px">Recuperar contraseña</p>
+          <p style="color:var(--muted);font-size:13px;margin:0">Ingresa tu email y te enviamos un código</p>
+        </div>
+        <div class="form-group" style="margin-bottom:20px">
+          <label class="form-label">Correo electrónico</label>
+          <input id="resetEmail" class="form-input" type="email" placeholder="tu@negocio.com">
+        </div>
+        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="solicitarReset()">Enviar código →</button>
+        <p class="divider-text"></p>
+        <button class="btn-secondary" style="width:100%;justify-content:center" onclick="mostrarLogin()">← Volver al login</button>
+      </div>
+
+      <!-- PANEL: olvidé mi contraseña - paso 2 código + nueva pass -->
+      <div id="panelOlvideCodigo" style="display:none">
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:40px">📧</div>
+          <p style="font-weight:700;font-size:16px;margin:8px 0 4px">Código enviado</p>
+          <p style="color:var(--muted);font-size:13px;margin:0">Revisa tu email e ingresa el código</p>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px" id="resetCodigoInputs">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,0)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,1)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,2)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,3)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,4)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,5)">
+        </div>
+        <div class="form-group" style="margin-bottom:20px">
+          <label class="form-label">Nueva contraseña</label>
+          <input id="resetNuevaPass" class="form-input" type="password" placeholder="Mínimo 6 caracteres">
+        </div>
+        <div id="resetError" style="display:none;color:var(--rojo);font-size:13px;text-align:center;margin-bottom:12px"></div>
+        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="confirmarReset()">🔐 Cambiar contraseña</button>
+        <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:16px">
+          ¿No llegó? <span onclick="solicitarReset()" style="color:var(--azul);cursor:pointer;text-decoration:underline">Reenviar código</span>
+        </p>
       </div>
     </div>
   </div>
@@ -151,6 +216,20 @@
       ✓ Entrar a mi negocio
     </button>
     <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:12px">Tus datos son privados y solo tú los ves</div>
+  </div>
+</div>
+
+<!-- PANTALLA DE BLOQUEO — suscripción vencida -->
+<div id="pantallaBloqueo" style="display:none;position:fixed;inset:0;background:var(--bg1);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:40px;width:100%;max-width:440px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,0.4)">
+    <div style="font-size:52px;margin-bottom:16px">🔒</div>
+    <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:8px">Acceso bloqueado</div>
+    <p style="color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:28px">
+      Tu suscripción fue cancelada y el periodo de gracia ha terminado.<br>
+      Reactiva tu plan para volver a acceder a tu inventario.
+    </p>
+    <button onclick="reactivarSuscripcion()" class="btn-primary" style="width:100%;justify-content:center;padding:13px;margin-bottom:12px">🔄 Reactivar suscripción</button>
+    <button onclick="cerrarSesion()" class="btn-secondary" style="width:100%;justify-content:center">Cerrar sesión</button>
   </div>
 </div>
 
@@ -653,7 +732,11 @@
                 <div style="font-family:var(--font-head);font-size:22px;font-weight:800"><span id="equipoProdsActual">—</span><span id="equipoProdsMax" style="color:var(--muted);font-size:14px"></span></div>
               </div>
             </div>
-            <button id="btnUpgradePlan" onclick="abrirModalUpgrade()" style="display:none;background:linear-gradient(135deg,#5b8eff,#3b6fff);border:none;border-radius:10px;padding:8px 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">🔄 Cambiar Plan</button>
+            <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+              <button id="btnUpgradePlan" onclick="abrirModalUpgrade()" style="display:none;background:linear-gradient(135deg,#5b8eff,#3b6fff);border:none;border-radius:10px;padding:8px 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">🔄 Cambiar Plan</button>
+              <button id="btnCancelarSuscripcion" style="background:transparent;border:1px solid var(--rojo);border-radius:10px;padding:7px 16px;color:var(--rojo);font-size:12px;font-weight:600;cursor:pointer" onclick="cancelarSuscripcion()">❌ Cancelar suscripción</button>
+              <div id="avisoCancelacion" style="display:none;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:8px 12px;font-size:12px;color:#f59e0b;max-width:280px"></div>
+            </div>
           </div>
         </div>
       </div>

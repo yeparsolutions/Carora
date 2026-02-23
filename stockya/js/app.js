@@ -152,6 +152,21 @@ async function enterApp() {
     document.getElementById("loginPage").style.display = "none";
     document.getElementById("appMain").style.display   = "flex";
     actualizarUIUsuario();
+
+    // Verificar estado de suscripción
+    try {
+      var infoEmp = await api("/empresa/info");
+      if (infoEmp.bloqueado) {
+        // Acceso completamente bloqueado — mostrar pantalla de bloqueo
+        mostrarPantallaBloqueo(infoEmp);
+        return;
+      }
+      if (infoEmp.en_gracia) {
+        // Solo lectura — mostrar aviso pero dejar entrar
+        mostrarAvisoCancelacion(infoEmp);
+      }
+    } catch(e) {}
+
     await cargarDashboard();
     showToast("Bienvenido, " + usuarioActual.nombre.split(" ")[0]);
   } catch (error) {
@@ -159,34 +174,168 @@ async function enterApp() {
   }
 }
 
+// Email temporal guardado entre pantallas
+var _emailPendiente = "";
+
 async function registrarUsuario() {
   const nombre   = document.getElementById("regNombre").value.trim();
   const email    = document.getElementById("regEmail").value.trim();
   const password = document.getElementById("regPassword").value.trim();
   if (!nombre || !email || !password) { showToast("Completa todos los campos"); return; }
   try {
-    // ✅ Registro exitoso → el backend retorna token, entrar al onboarding directamente
     const data = await api("/auth/registro", "POST", { nombre, email, password });
+    _emailPendiente = email;
+    // El backend ya no retorna token — muestra pantalla de verificación
+    _mostrarPanel("panelVerificacion");
+    document.getElementById("verifiEmailMostrar").textContent = email;
+    document.getElementById("codigoInputs").querySelectorAll("input")[0].focus();
+  } catch (error) { showToast("Error: " + error.message); }
+}
+
+function _mostrarPanel(id) {
+  // Oculta todos los paneles y muestra el solicitado
+  ["panelLogin","panelRegistro","panelVerificacion","panelOlvideEmail","panelOlvideCodigo"]
+    .forEach(function(p) {
+      var el = document.getElementById(p);
+      if (el) el.style.display = "none";
+    });
+  var target = document.getElementById(id);
+  if (target) target.style.display = "block";
+}
+
+// ── Inputs de código: avanzar al siguiente automáticamente ─
+function avanzarCodigo(input, idx) {
+  input.value = input.value.replace(/\D/g,""); // solo números
+  if (input.value && idx < 5) {
+    document.getElementById("codigoInputs").querySelectorAll("input")[idx+1].focus();
+  }
+}
+function avanzarCodigoReset(input, idx) {
+  input.value = input.value.replace(/\D/g,"");
+  if (input.value && idx < 5) {
+    document.getElementById("resetCodigoInputs").querySelectorAll("input")[idx+1].focus();
+  }
+}
+
+function _leerCodigo(containerId) {
+  return Array.from(document.getElementById(containerId).querySelectorAll("input"))
+    .map(function(i){ return i.value; }).join("");
+}
+
+async function confirmarVerificacion() {
+  var codigo = _leerCodigo("codigoInputs");
+  if (codigo.length < 6) { showToast("Ingresa los 6 dígitos"); return; }
+  var errEl = document.getElementById("verifiError");
+  errEl.style.display = "none";
+  try {
+    var data = await api("/auth/verificar-email?email=" + encodeURIComponent(_emailPendiente) + "&codigo=" + codigo, "POST");
+    // Cuenta verificada — entrar
     authToken     = data.access_token;
     usuarioActual = data.usuario;
     localStorage.setItem("stockya_token",   authToken);
     localStorage.setItem("stockya_usuario", JSON.stringify(usuarioActual));
     document.getElementById("loginPage").style.display = "none";
     mostrarOnboarding();
-  } catch (error) { showToast("Error: " + error.message); }
+  } catch(e) {
+    errEl.style.display = "block";
+    errEl.textContent   = e.message || "Código incorrecto";
+  }
 }
 
-function mostrarRegistro() {
-  document.getElementById("panelLogin").style.display    = "none";
-  document.getElementById("panelRegistro").style.display = "block";
+async function reenviarCodigo() {
+  try {
+    await api("/auth/reenviar-codigo?email=" + encodeURIComponent(_emailPendiente), "POST");
+    showToast("✅ Código reenviado a " + _emailPendiente);
+  } catch(e) { showToast("Error: " + e.message); }
 }
 
-function mostrarLogin() {
-  document.getElementById("panelLogin").style.display    = "block";
-  document.getElementById("panelRegistro").style.display = "none";
+// ── Olvidé mi contraseña ─────────────────────────────────
+function mostrarOlvidePass() {
+  _mostrarPanel("panelOlvideEmail");
 }
 
-function toggleAuthMode() { mostrarRegistro(); }
+async function solicitarReset() {
+  var email = document.getElementById("resetEmail")?.value.trim() || _emailPendiente;
+  if (!email) { showToast("Ingresa tu email"); return; }
+  _emailPendiente = email;
+  try {
+    await api("/auth/solicitar-reset?email=" + encodeURIComponent(email), "POST");
+    _mostrarPanel("panelOlvideCodigo");
+    showToast("📧 Código enviado a " + email);
+    document.getElementById("resetCodigoInputs").querySelectorAll("input")[0].focus();
+  } catch(e) { showToast("Error: " + e.message); }
+}
+
+async function confirmarReset() {
+  var codigo  = _leerCodigo("resetCodigoInputs");
+  var nuevaPass = document.getElementById("resetNuevaPass").value.trim();
+  var errEl   = document.getElementById("resetError");
+  errEl.style.display = "none";
+
+  if (codigo.length < 6) { showToast("Ingresa los 6 dígitos"); return; }
+  if (nuevaPass.length < 6) { showToast("La contraseña debe tener al menos 6 caracteres"); return; }
+
+  try {
+    await api(
+      "/auth/confirmar-reset?email=" + encodeURIComponent(_emailPendiente)
+      + "&codigo=" + codigo
+      + "&nueva_password=" + encodeURIComponent(nuevaPass),
+      "POST"
+    );
+    showToast("✅ Contraseña cambiada. Ya puedes iniciar sesión.");
+    _mostrarPanel("panelLogin");
+  } catch(e) {
+    errEl.style.display = "block";
+    errEl.textContent   = e.message || "Código incorrecto o expirado";
+  }
+}
+
+function mostrarRegistro() { _mostrarPanel("panelRegistro"); }
+function mostrarLogin()     { _mostrarPanel("panelLogin"); }
+function toggleAuthMode()   { mostrarRegistro(); }
+
+function mostrarPantallaBloqueo(info) {
+  // Ocultar la app y mostrar pantalla de bloqueo
+  document.getElementById("appMain").style.display = "none";
+  var bloq = document.getElementById("pantallaBloqueo");
+  if (bloq) bloq.style.display = "flex";
+}
+
+function mostrarAvisoCancelacion(info) {
+  var fecha = info.gracia_hasta
+    ? new Date(info.gracia_hasta).toLocaleDateString("es-CL", {day:"2-digit",month:"2-digit",year:"numeric"})
+    : "pronto";
+  showToast("⚠️ Suscripción cancelada — acceso de solo lectura hasta el " + fecha, 6000);
+}
+
+async function cancelarSuscripcion() {
+  var confirmado = confirm(
+    "¿Confirmas que deseas cancelar la suscripción?\n\n" +
+    "• Seguirás con acceso completo hasta el fin del periodo pagado\n" +
+    "• Luego tendrás 7 días de acceso solo a reportes y dashboard\n" +
+    "• Después el acceso quedará bloqueado\n\n" +
+    "Puedes reactivar en cualquier momento."
+  );
+  if (!confirmado) return;
+
+  try {
+    var r = await api("/empresa/cancelar-suscripcion", "POST");
+    showToast("✅ " + r.mensaje);
+    await cargarEquipo(); // recargar para actualizar la UI del plan
+  } catch(e) {
+    showToast("Error: " + e.message);
+  }
+}
+
+async function reactivarSuscripcion() {
+  try {
+    await api("/empresa/reactivar", "POST");
+    showToast("✅ Suscripción reactivada correctamente");
+    await cargarEquipo();
+  } catch(e) {
+    showToast("Error: " + e.message);
+  }
+}
 
 function cerrarSesion() {
   authToken     = null;
@@ -2197,6 +2346,35 @@ function renderPlanCard(info) {
       btnUpgrade.textContent   = info.plan === "pro" ? "🔄 Cambiar Plan" : "⬆️ Mejorar a Pro";
     } else {
       btnUpgrade.style.display = "none";
+    }
+  }
+
+  // Botón cancelar / reactivar suscripción
+  var btnCancelar = document.getElementById("btnCancelarSuscripcion");
+  if (btnCancelar) {
+    if (info.esta_cancelado) {
+      btnCancelar.textContent         = "🔄 Reactivar suscripción";
+      btnCancelar.style.background    = "var(--verde)";
+      btnCancelar.style.color         = "#000";
+      btnCancelar.onclick             = reactivarSuscripcion;
+      // Mostrar aviso de estado cancelado
+      var avisoCancel = document.getElementById("avisoCancelacion");
+      if (avisoCancel) {
+        var fecha = info.gracia_hasta
+          ? new Date(info.gracia_hasta).toLocaleDateString("es-CL")
+          : "—";
+        avisoCancel.style.display = "block";
+        avisoCancel.innerHTML = info.en_gracia
+          ? "⚠️ Suscripción cancelada · Acceso de solo lectura hasta el <strong>" + fecha + "</strong>"
+          : "🔴 Suscripción cancelada · Acceso bloqueado el <strong>" + fecha + "</strong>";
+      }
+    } else {
+      btnCancelar.textContent      = "❌ Cancelar suscripción";
+      btnCancelar.style.background = "transparent";
+      btnCancelar.style.color      = "var(--rojo)";
+      btnCancelar.onclick          = cancelarSuscripcion;
+      var avisoCancel = document.getElementById("avisoCancelacion");
+      if (avisoCancel) avisoCancel.style.display = "none";
     }
   }
 }
