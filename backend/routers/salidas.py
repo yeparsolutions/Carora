@@ -135,11 +135,11 @@ def registrar_salida(
     if datos.tipo_salida not in TIPOS_VALIDOS:
         raise HTTPException(status_code=400, detail=f"Tipo inválido. Debe ser: {', '.join(TIPOS_VALIDOS)}")
 
-    # ✅ Solo puede registrar salidas de sus propios productos
+    # ✅ Busca productos de la empresa (cualquier usuario de la empresa puede vender)
     producto = db.query(models.Producto).filter(
         models.Producto.id         == datos.producto_id,
         models.Producto.activo     == True,
-        models.Producto.usuario_id == usuario_actual.id
+        models.Producto.empresa_id == usuario_actual.empresa_id
     ).first()
 
     if not producto:

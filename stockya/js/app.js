@@ -1942,7 +1942,7 @@ function renderFiados() {
       <td style="padding:12px 8px;text-align:center"><span style="color:${estadoColor};font-size:12px;font-weight:700">${estadoLabel}</span></td>
       <td style="padding:12px 8px;color:var(--muted);font-size:12px">${fecha}</td>
       <td style="padding:12px 8px;text-align:center">
-        ${f.estado !== "pagado" ? `<button onclick="abrirAbonoFiado(${f.id},'${f.cliente_nombre}',${pendiente})" style="background:var(--verde);border:none;border-radius:8px;padding:5px 12px;color:#000;font-size:12px;font-weight:700;cursor:pointer">💰 Abonar</button>` : "<span style='color:var(--muted);font-size:12px'>—</span>"}
+        ${f.estado !== "pagado" ? `<button onclick="abrirAbonoFiado('${f.cliente_nombre.replace(/'/g,"\\'")}',${f.monto_pendiente})" style="background:var(--verde);border:none;border-radius:8px;padding:5px 12px;color:#000;font-size:12px;font-weight:700;cursor:pointer">💰 Abonar</button>` : "<span style='color:var(--muted);font-size:12px'>—</span>"}
       </td>
     </tr>`;
   }).join("");
@@ -1961,15 +1961,15 @@ function renderFiados() {
   </table>`;
 }
 
-function abrirAbonoFiado(id, cliente, pendiente) {
-  var monto = prompt("¿Cuánto abona " + cliente + "?\nDeuda pendiente: $" + pendiente.toLocaleString("es-CL"));
+function abrirAbonoFiado(clienteNombre, pendiente) {
+  var monto = prompt("¿Cuánto abona " + clienteNombre + "?\nDeuda pendiente: $" + pendiente.toLocaleString("es-CL"));
   if (!monto || isNaN(parseFloat(monto))) return;
   var montoNum = parseFloat(monto);
   if (montoNum <= 0) { showToast("El monto debe ser mayor a 0"); return; }
 
-  api("/fiados/" + id + "/abonar?monto=" + montoNum, "PATCH")
+  api("/fiados/abonar-cliente?cliente_nombre=" + encodeURIComponent(clienteNombre) + "&monto=" + montoNum, "PATCH")
     .then(function() {
-      showToast("✅ Abono de $" + montoNum.toLocaleString("es-CL") + " registrado para " + cliente);
+      showToast("✅ Abono de $" + montoNum.toLocaleString("es-CL") + " registrado para " + clienteNombre);
       cargarFiados();
     })
     .catch(function(e) { showToast("Error: " + e.message); });
