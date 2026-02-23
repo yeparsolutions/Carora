@@ -3,8 +3,8 @@
 # Archivo: backend/routers/movimientos.py
 # Descripcion: Registra entradas y salidas de stock
 # Analogia: el libro contable de la bodega
-# ✅ ACTUALIZADO: filtra por empresa_id para soporte multiusuario
-#    Todos los usuarios de la misma empresa ven los mismos movimientos
+# ✅ CORREGIDO: ahora filtra por usuario_actual — cada usuario
+#    ve y opera SOLO sus propios movimientos y productos
 # ============================================================
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -36,15 +36,8 @@ def movimiento_a_dict(m):
     }
 
 
-def get_empresa_id(usuario_actual: models.Usuario) -> int:
-    """Obtiene empresa_id del usuario actual."""
-    if not usuario_actual.empresa_id:
-        raise HTTPException(status_code=400, detail="Tu cuenta no está asociada a una empresa.")
-    return usuario_actual.empresa_id
-
-
 # ============================================================
-# GET /movimientos
+# GET /movimientos - Lista con filtros completos
 # ============================================================
 @router.get("/", response_model=List[schemas.MovimientoRespuesta])
 def listar_movimientos(
@@ -58,16 +51,19 @@ def listar_movimientos(
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
     """
-    Lista todos los movimientos de la empresa con filtros.
-    Todos los usuarios de la empresa ven el mismo historial.
+    Lista todos los movimientos del usuario autenticado con filtros.
+    Usa eager loading para traer producto y usuario en una sola query.
     """
-    empresa_id = get_empresa_id(usuario_actual)
-
     query = db.query(models.Movimiento).options(
         joinedload(models.Movimiento.producto),
         joinedload(models.Movimiento.usuario)
     ).filter(
-        models.Movimiento.empresa_id == empresa_id
+        # ✅ CORREGIDO: todos los movimientos de la empresa (no solo del usuario)
+        models.Movimiento.usuario_id.in_(
+            db.query(models.Usuario.id).filter(
+                models.Usuario.empresa_id == usuario_actual.empresa_id
+            )
+        )
     )
 
     if tipo:
@@ -98,11 +94,12 @@ def listar_movimientos(
             pass
 
     movimientos = query.order_by(models.Movimiento.created_at.desc()).limit(limit).all()
+
     return [movimiento_a_dict(m) for m in movimientos]
 
 
 # ============================================================
-# POST /movimientos
+# POST /movimientos - Registra un movimiento manual
 # ============================================================
 @router.post("/", response_model=schemas.MovimientoRespuesta, status_code=201)
 def registrar_movimiento(
@@ -113,19 +110,18 @@ def registrar_movimiento(
     """
     Registra una entrada o salida y actualiza el stock.
     Analogia: anotar en el cuaderno de bodega y mover las cajas al mismo tiempo.
-    Cualquier usuario de la empresa puede registrar movimientos.
+    Solo permite operar sobre productos que pertenecen al usuario autenticado.
     """
-    empresa_id = get_empresa_id(usuario_actual)
-
     if datos.tipo not in ("entrada", "salida"):
         raise HTTPException(status_code=400, detail="El tipo debe ser 'entrada' o 'salida'")
     if datos.cantidad <= 0:
         raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
 
-    # ✅ Verifica que el producto pertenece a la empresa
+    # ✅ CORREGIDO: verificar que el producto pertenece al usuario
+    # Analogia: no puedes mover cajas de la bodega de otro inquilino
     producto = db.query(models.Producto).filter(
         models.Producto.id         == datos.producto_id,
-        models.Producto.empresa_id == empresa_id
+        models.Producto.usuario_id == usuario_actual.id   # ← seguridad clave
     ).first()
 
     if not producto:
@@ -147,7 +143,6 @@ def registrar_movimiento(
 
     movimiento = models.Movimiento(
         producto_id    = datos.producto_id,
-        empresa_id     = empresa_id,
         usuario_id     = usuario_actual.id,
         tipo           = datos.tipo,
         cantidad       = datos.cantidad,

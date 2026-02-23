@@ -1932,15 +1932,16 @@ function renderFiados() {
     var estadoColor = f.estado === "pagado" ? "var(--verde)" : f.estado === "pagado_parcial" ? "var(--azul)" : "#f59e0b";
     var estadoLabel = f.estado === "pagado" ? "✅ Pagado" : f.estado === "pagado_parcial" ? "🔄 Parcial" : "⏳ Pendiente";
     var pendiente   = f.monto_total - f.monto_pagado;
-    var fecha       = f.created_at ? new Date(f.created_at).toLocaleDateString("es-CL") : "—";
+    var fechaRaw    = f.ultima_compra || f.created_at;
+    var fecha       = fechaRaw ? new Date(fechaRaw).toLocaleDateString("es-CL", {day:"2-digit",month:"2-digit",year:"numeric"}) : "—";
 
     return `<tr>
-      <td style="padding:12px 16px;font-weight:600">${f.cliente_nombre}</td>
+      <td style="padding:12px 16px;font-weight:600">${f.cliente_nombre}<br><span style="font-size:11px;color:var(--muted);font-weight:400">${f.cantidad_fiados} compra${f.cantidad_fiados!==1?'s':''}</span></td>
       <td style="padding:12px 8px;text-align:right">$${f.monto_total.toLocaleString("es-CL")}</td>
       <td style="padding:12px 8px;text-align:right;color:var(--verde)">$${f.monto_pagado.toLocaleString("es-CL")}</td>
-      <td style="padding:12px 8px;text-align:right;color:#f59e0b;font-weight:700">$${pendiente.toLocaleString("es-CL")}</td>
+      <td style="padding:12px 8px;text-align:right;color:#f59e0b;font-weight:700">$${f.monto_pendiente.toLocaleString("es-CL")}</td>
       <td style="padding:12px 8px;text-align:center"><span style="color:${estadoColor};font-size:12px;font-weight:700">${estadoLabel}</span></td>
-      <td style="padding:12px 8px;color:var(--muted);font-size:12px">${fecha}</td>
+      <td style="padding:12px 8px;color:var(--muted);font-size:12px;text-align:center">${fecha}</td>
       <td style="padding:12px 8px;text-align:center">
         ${f.estado !== "pagado" ? `<button onclick="abrirAbonoFiado('${f.cliente_nombre.replace(/'/g,"\\'")}',${f.monto_pendiente})" style="background:var(--verde);border:none;border-radius:8px;padding:5px 12px;color:#000;font-size:12px;font-weight:700;cursor:pointer">💰 Abonar</button>` : "<span style='color:var(--muted);font-size:12px'>—</span>"}
       </td>
