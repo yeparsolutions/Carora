@@ -1191,10 +1191,15 @@ async function guardarResolucion() {
    ============================================================ */
 async function cargarReportes() {
   try {
-    const [productos, movimientos, resumen] = await Promise.all([
+    const periodo = document.getElementById("reportePeriodo")?.value || "mes";
+
+    const [productos, movimientos, resumen, salidas, fiadosResumen, fiadosLista] = await Promise.all([
       api("/productos/"),
       api("/movimientos/?limit=500"),
       api("/salidas/resumen"),
+      api("/salidas/?tipo_salida=venta&limit=1000"),
+      api("/fiados/resumen"),
+      api("/fiados/"),
     ]);
 
     // Valor bodega
@@ -1266,7 +1271,96 @@ async function cargarReportes() {
           }).join("");
     }
 
+    // ── Ventas por método de pago ─────────────────────────────
+    // Analogia: saber cuánto entró en efectivo, tarjeta o quedó fiado
+    var metodosMap  = {};
+    var iconMetodo  = { efectivo:"💵", debito:"💳", credito:"💳", transferencia:"📱", cheque:"📝", fiado:"📒" };
+    var labelMetodo = { efectivo:"Efectivo", debito:"Débito", credito:"Crédito", transferencia:"Transferencia", cheque:"Cheque", fiado:"Fiado" };
+    salidas.forEach(function(s) {
+      var m = s.metodo_pago || "efectivo";
+      if (!metodosMap[m]) metodosMap[m] = { monto: 0, cant: 0 };
+      metodosMap[m].monto += s.valor_total || 0;
+      metodosMap[m].cant  += s.cantidad    || 0;
+    });
+    var metodosArr = Object.entries(metodosMap).sort(function(a,b){ return b[1].monto - a[1].monto; });
+    var maxMetodo  = metodosArr.length > 0 ? metodosArr[0][1].monto : 1;
+    var elMetodo   = document.getElementById("reporteMetodoPago");
+    if (elMetodo) {
+      elMetodo.innerHTML = metodosArr.length === 0
+        ? "<div style='text-align:center;color:var(--muted);padding:20px;font-size:13px'>Sin ventas registradas</div>"
+        : metodosArr.map(function(e) {
+            var pct   = maxMetodo > 0 ? Math.round((e[1].monto / maxMetodo) * 100) : 0;
+            var monto = e[1].monto >= 1000000 ? "$"+(e[1].monto/1000000).toFixed(1)+"M"
+                      : e[1].monto >= 1000    ? "$"+Math.round(e[1].monto/1000)+"K"
+                      : "$"+Math.round(e[1].monto).toLocaleString("es-CL");
+            var color = e[0] === "fiado" ? "#f59e0b" : "var(--verde)";
+            return "<div style='margin-bottom:10px'>"
+              + "<div style='display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px'>"
+              +   "<span style='font-weight:600'>" + (iconMetodo[e[0]]||"💰") + " " + (labelMetodo[e[0]]||e[0]) + "</span>"
+              +   "<span style='color:var(--muted)'>" + e[1].cant + " vtas · <strong style='color:var(--text)'>" + monto + "</strong></span>"
+              + "</div>"
+              + "<div style='background:var(--bg3);border-radius:6px;height:8px'>"
+              +   "<div style='background:"+color+";height:8px;border-radius:6px;width:"+pct+"%'></div>"
+              + "</div>"
+              + "</div>";
+          }).join("");
+    }
+
+    // ── Resumen global de deudas ──────────────────────────────
+    // Analogia: el estado de cuenta del cuaderno de fiados
+    var elDeudas = document.getElementById("reporteDeudas");
+    if (elDeudas) {
+      var totalDeuda     = fiadosResumen.total_deuda_pendiente   || 0;
+      var totalClientes  = fiadosResumen.total_clientes_con_deuda || 0;
+      var totalFiados    = fiadosLista.length;
+      var pagados        = fiadosLista.filter(function(f){ return f.estado === "pagado"; }).length;
+      var parciales      = fiadosLista.filter(function(f){ return f.estado === "pagado_parcial"; }).length;
+      var pendientes     = fiadosLista.filter(function(f){ return f.estado === "pendiente"; }).length;
+      var montoTotal     = fiadosLista.reduce(function(a,f){ return a + f.monto_total; }, 0);
+      var montoCobrado   = fiadosLista.reduce(function(a,f){ return a + f.monto_pagado; }, 0);
+      var pctCobrado     = montoTotal > 0 ? Math.round((montoCobrado / montoTotal) * 100) : 0;
+
+      elDeudas.innerHTML = totalFiados === 0
+        ? "<div style='text-align:center;color:var(--muted);padding:20px;font-size:13px'>Sin deudas registradas</div>"
+        : "<div style='display:flex;flex-direction:column;gap:8px'>"
+
+          // Barra de cobro
+          + "<div style='margin-bottom:4px'>"
+          + "<div style='display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px'>"
+          +   "<span style='color:var(--muted)'>Cobrado</span>"
+          +   "<span style='font-weight:700'>"+pctCobrado+"%  ·  $"+montoCobrado.toLocaleString("es-CL")+" / $"+montoTotal.toLocaleString("es-CL")+"</span>"
+          + "</div>"
+          + "<div style='background:var(--bg3);border-radius:6px;height:10px'>"
+          +   "<div style='background:var(--verde);height:10px;border-radius:6px;width:"+pctCobrado+"%'></div>"
+          + "</div></div>"
+
+          // Fila de stats
+          + "<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px'>"
+          +   _dCard("⏳","Pendiente",pendientes,"#f59e0b")
+          +   _dCard("🔄","Parcial",parciales,"var(--azul)")
+          +   _dCard("✅","Pagado",pagados,"var(--verde)")
+          + "</div>"
+
+          // Total pendiente por cobrar
+          + "<div style='background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:12px;margin-top:4px;display:flex;justify-content:space-between;align-items:center'>"
+          +   "<span style='font-size:13px;color:#f59e0b;font-weight:600'>💰 Por cobrar</span>"
+          +   "<span style='font-family:var(--font-head);font-size:20px;font-weight:800;color:#f59e0b'>$"+totalDeuda.toLocaleString("es-CL")+"</span>"
+          + "</div>"
+
+          + "<div style='font-size:12px;color:var(--muted);text-align:right;margin-top:2px'>"+totalClientes+" cliente(s) con deuda abierta · <a onclick=\"showScreen('fiados')\" style='color:var(--azul);cursor:pointer;text-decoration:underline'>Ver deudores →</a></div>"
+          + "</div>";
+    }
+
   } catch(error) { console.error("Error reportes:", error); }
+}
+
+// Helper para mini-cards de deudas
+function _dCard(icon, label, val, color) {
+  return "<div style='background:var(--bg3);border-radius:8px;padding:10px;text-align:center'>"
+    + "<div style='font-size:18px'>"+icon+"</div>"
+    + "<div style='font-family:var(--font-head);font-size:18px;font-weight:800;color:"+color+"'>"+val+"</div>"
+    + "<div style='font-size:11px;color:var(--muted)'>"+label+"</div>"
+    + "</div>";
 }
 
 /* ============================================================
