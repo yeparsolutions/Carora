@@ -884,9 +884,26 @@ function quitarDelCarrito(idx) {
 }
 
 /* Abrir modal, resetear carrito y cargar lista de productos */
-async function abrirModalSalida() {
-  _carrito        = [];
-  _productoActual = null;
+var _tipoSalidaActual = "venta"; // "venta" o "merma"
+
+async function abrirModalSalida(tipo) {
+  _tipoSalidaActual = tipo || "venta";
+  _carrito          = [];
+  _productoActual   = null;
+
+  // Adaptar UI según modo
+  var esMerma = _tipoSalidaActual === "merma";
+  setEl("modalSalidaTitulo", esMerma ? "🗑️ Registrar merma" : "🛒 Nueva venta");
+  var btnConf = document.getElementById("btnConfirmarVenta");
+  if (btnConf) {
+    btnConf.textContent   = esMerma ? "✔ Confirmar merma" : "✔ Confirmar venta";
+    btnConf.style.background = esMerma ? "var(--rojo)" : "";
+  }
+  // Ocultar método de pago y cliente en mermas — no aplica
+  var metodoPagoWrap = document.getElementById("metodoPagoGrid")?.closest(".form-group.form-full");
+  var clienteWrap    = document.getElementById("salidaCliente")?.closest(".form-group.form-full");
+  if (metodoPagoWrap) metodoPagoWrap.style.display = esMerma ? "none" : "";
+  if (clienteWrap)    clienteWrap.style.display    = esMerma ? "none" : "";
 
   try {
     var productos = await api("/productos/");
@@ -1097,32 +1114,33 @@ function cerrarEscanerSalida() {
 async function guardarSalida() {
   if (_carrito.length === 0) { showToast("El carrito está vacío"); return; }
 
-  var cliente      = document.getElementById("salidaCliente")?.value.trim()    || "";
-  var documento    = document.getElementById("salidaDocumento")?.value.trim()  || "";
-  var motivo       = document.getElementById("salidaMotivo")?.value.trim()     || "";
-  var metodoPago   = _metodoPagoActual || "efectivo";
+  var esMerma    = _tipoSalidaActual === "merma";
+  var cliente    = esMerma ? "" : (document.getElementById("salidaCliente")?.value.trim()  || "");
+  var documento  = document.getElementById("salidaDocumento")?.value.trim() || "";
+  var motivo     = document.getElementById("salidaMotivo")?.value.trim()    || "";
+  var metodoPago = esMerma ? null : (_metodoPagoActual || "efectivo");
 
-  // Validar: si es fiado el cliente es obligatorio
-  if (metodoPago === "fiado" && !cliente) {
+  if (!esMerma && metodoPago === "fiado" && !cliente) {
     showToast("⚠️ Para venta fiada debes indicar el nombre del cliente");
     document.getElementById("salidaCliente").focus();
     return;
   }
 
-  var notaBase = "";
-  if (cliente)  notaBase = "Cliente: " + cliente;
-  if (motivo)   notaBase = notaBase ? notaBase + " — " + motivo : motivo;
+  var notaBase = esMerma ? (motivo || "Merma") : "";
+  if (!esMerma) {
+    if (cliente) notaBase = "Cliente: " + cliente;
+    if (motivo)  notaBase = notaBase ? notaBase + " — " + motivo : motivo;
+  }
 
   var btn = document.getElementById("btnConfirmarVenta");
-  if (btn) { btn.disabled = true; btn.textContent = "Guardando " + _carrito.length + " productos..."; }
-
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
   cerrarEscanerSalida();
 
   try {
     for (var item of _carrito) {
       await api("/salidas/", "POST", {
         producto_id:      item.id,
-        tipo_salida:      "venta",
+        tipo_salida:      _tipoSalidaActual,
         cantidad:         item.qty,
         precio_unitario:  item.precio,
         motivo:           notaBase || null,
@@ -1131,22 +1149,25 @@ async function guardarSalida() {
         cliente_nombre:   cliente || null,
       });
     }
-
-    var totalPesos = _carrito.reduce(function(a,i){ return a + i.subtotal; }, 0);
     var totalItems = _carrito.reduce(function(a,i){ return a + i.qty; }, 0);
-    var msgPago    = metodoPago === "fiado" ? " · Fiado a " + cliente : "";
+    var totalPesos = _carrito.reduce(function(a,i){ return a + i.subtotal; }, 0);
+    var msg = esMerma
+      ? "🗑️ Merma registrada — " + totalItems + " unidades"
+      : "✅ Venta confirmada — " + totalItems + " unidades · $" + totalPesos.toLocaleString("es-CL")
+        + (metodoPago === "fiado" ? " · Fiado a " + cliente : "");
 
     cerrarModalSalida();
-    showToast("✅ Venta confirmada — " + totalItems + " unidades · $" + totalPesos.toLocaleString("es-CL") + msgPago);
+    showToast(msg);
     await cargarSalidas();
     await cargarStock();
     await cargarDashboard();
 
   } catch (error) {
-    if (btn) { btn.disabled = false; btn.textContent = "✔ Confirmar venta"; }
-    showToast("Error al guardar: " + error.message);
+    if (btn) { btn.disabled = false; btn.textContent = esMerma ? "✔ Confirmar merma" : "✔ Confirmar venta"; }
+    showToast("Error: " + error.message);
   }
 }
+
 /* ============================================================
    MODAL RESOLUCION DE CUARENTENA
    El supervisor decide el destino del producto en espera
@@ -1214,6 +1235,20 @@ async function cargarReportes() {
       api("/fiados/resumen"),
       api("/fiados/"),
     ]);
+
+    // Ventas del periodo
+    var totalVentas   = salidas.reduce(function(a,s){ return a + (s.valor_total||0); }, 0);
+    var totalUnidades = salidas.reduce(function(a,s){ return a + (s.cantidad||0); }, 0);
+    var vStr = totalVentas >= 1000000 ? "$"+(totalVentas/1000000).toFixed(1)+"M"
+             : totalVentas >= 1000    ? "$"+Math.round(totalVentas/1000)+"K"
+             : "$"+Math.round(totalVentas).toLocaleString("es-CL");
+    setEl("reporteValorVentas", totalVentas > 0 ? vStr : "—");
+    setEl("reporteUnidades",    totalUnidades > 0 ? totalUnidades.toLocaleString("es-CL") : "—");
+
+    // Mermas del periodo
+    var mermas = await api("/salidas/?tipo_salida=merma&limit=1000");
+    var totalMermasUnd = mermas.reduce(function(a,s){ return a + (s.cantidad||0); }, 0);
+    setEl("reporteMermas", totalMermasUnd > 0 ? totalMermasUnd.toLocaleString("es-CL") + " und." : "0");
 
     // Valor bodega
     var valorBodega = productos.reduce(function(a,p){ return a + (p.stock_actual*(p.precio_venta||0)); }, 0);

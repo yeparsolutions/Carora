@@ -211,7 +211,7 @@
           <div class="page-title" id="dashTitulo">Buen día 👋</div>
           <div class="page-subtitle" id="dashSubtitulo">Cargando...</div>
         </div>
-        <button class="btn-primary" onclick="abrirModalSalida()" style="background:var(--azul)">🛒 Nueva venta</button>
+        <button class="btn-primary" onclick="abrirModalSalida('venta')" style="background:var(--azul)">🛒 Nueva venta</button>
         <button class="btn-primary" onclick="openModal()">+ Agregar producto</button>
       </div>
       <div class="stats-grid">
@@ -374,7 +374,10 @@
           <div class="page-title">Salidas 📤</div>
           <div class="page-subtitle" id="salidaSubtitulo">Ventas · Mermas · Cuarentenas · Devoluciones</div>
         </div>
-        <button class="btn-primary" onclick="abrirModalSalida()" style="background:var(--azul)">🛒 Nueva venta</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn-primary" onclick="abrirModalSalida('venta')" style="background:var(--azul)">🛒 Nueva venta</button>
+          <button class="btn-primary" onclick="abrirModalSalida('merma')" style="background:var(--rojo)">🗑️ Registrar merma</button>
+        </div>
       </div>
       <div class="stats-grid" style="margin-bottom:20px">
         <div class="stat-card azul"><div class="stat-label">VENTAS</div><div class="stat-value" id="salidaResVentas">—</div><div class="stat-trend">registros totales</div></div>
@@ -495,7 +498,7 @@
       </div>
 
       <!-- Tarjetas de ventas del periodo -->
-      <div class="stats-grid" style="margin-bottom:20px">
+      <div class="stats-grid" style="margin-bottom:20px;grid-template-columns:repeat(3,1fr)">
         <div class="stat-card verde">
           <div class="stat-label">VENTAS DEL PERIODO</div>
           <div class="stat-value" id="reporteValorVentas">—</div>
@@ -506,20 +509,15 @@
           <div class="stat-value" id="reporteUnidades">—</div>
           <div class="stat-trend">Total de unidades</div>
         </div>
-        <div class="stat-card amarillo">
-          <div class="stat-label">TICKET PROMEDIO</div>
-          <div class="stat-value" id="reporteTicket">—</div>
-          <div class="stat-trend">Por transacción</div>
-        </div>
         <div class="stat-card rojo">
-          <div class="stat-label">MERMAS</div>
+          <div class="stat-label">MERMAS DEL PERIODO</div>
           <div class="stat-value" id="reporteMermas">—</div>
-          <div class="stat-trend">Pérdidas del periodo</div>
+          <div class="stat-trend">Unidades perdidas</div>
         </div>
       </div>
 
-      <!-- Segunda fila de tarjetas -->
-      <div class="stats-grid" style="margin-bottom:24px;grid-template-columns:repeat(2,1fr)">
+      <!-- Tarjetas de inventario -->
+      <div class="stats-grid" style="margin-bottom:20px;grid-template-columns:repeat(2,1fr)">
         <div class="stat-card verde">
           <div class="stat-label">VALOR BODEGA ACTUAL</div>
           <div class="stat-value" id="reporteValorBodega">—</div>
@@ -882,7 +880,7 @@
 <div class="modal-overlay" id="modalSalida">
   <div class="modal-box" style="max-width:620px;display:flex;flex-direction:column;max-height:90vh">
     <div class="modal-header">
-      <div class="modal-title">🛒 Nueva venta</div>
+      <div class="modal-title" id="modalSalidaTitulo">🛒 Nueva venta</div>
       <button class="modal-close" onclick="cerrarModalSalida()">✕</button>
     </div>
     <div style="padding:16px 24px 0;overflow-y:auto;flex:1">
