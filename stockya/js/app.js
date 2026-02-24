@@ -1,11 +1,11 @@
 /* ============================================================
-   STOCKYA — app.js completo con módulo de Salidas
+   YEPARSTOCK — app.js completo con módulo de Salidas
    Backend: http://localhost:8000
    ============================================================ */
 
 const API_URL = "http://localhost:8000";
-let authToken     = localStorage.getItem("stockya_token")   || null;
-let usuarioActual = JSON.parse(localStorage.getItem("stockya_usuario") || "null");
+let authToken     = localStorage.getItem("yeparstock_token")   || null;
+let usuarioActual = JSON.parse(localStorage.getItem("yeparstock_usuario") || "null");
 
 /* ============================================================
    FUNCION CENTRAL DE API
@@ -24,8 +24,8 @@ async function api(path, method = "GET", body = null) {
     // Limpiar sesión silenciosamente — el usuario verá el login sin toast de error
     authToken     = null;
     usuarioActual = null;
-    localStorage.removeItem("stockya_token");
-    localStorage.removeItem("stockya_usuario");
+    localStorage.removeItem("yeparstock_token");
+    localStorage.removeItem("yeparstock_usuario");
     document.getElementById("loginPage").style.display = "block";
     document.getElementById("appMain").style.display   = "none";
     throw new Error("Sesion expirada");
@@ -119,7 +119,7 @@ async function guardarOnboarding() {
     // Actualizar nombre en memoria local
     if (usuarioActual) {
       usuarioActual.nombre = nombreUsuario;
-      localStorage.setItem("stockya_usuario", JSON.stringify(usuarioActual));
+      localStorage.setItem("yeparstock_usuario", JSON.stringify(usuarioActual));
     }
     document.getElementById("onboardingPage").style.display = "none";
     document.getElementById("appMain").style.display        = "flex";
@@ -147,8 +147,8 @@ async function enterApp() {
     const data    = await api("/auth/login", "POST", { email, password });
     authToken     = data.access_token;
     usuarioActual = data.usuario;
-    localStorage.setItem("stockya_token",   authToken);
-    localStorage.setItem("stockya_usuario", JSON.stringify(usuarioActual));
+    localStorage.setItem("yeparstock_token",   authToken);
+    localStorage.setItem("yeparstock_usuario", JSON.stringify(usuarioActual));
 
     // ✅ Verificar si debe mostrar onboarding antes de entrar
     // Analogia: el portero verifica si el inquilino ya paso por recepcion
@@ -241,8 +241,8 @@ async function confirmarVerificacion() {
     // Cuenta verificada — entrar
     authToken     = data.access_token;
     usuarioActual = data.usuario;
-    localStorage.setItem("stockya_token",   authToken);
-    localStorage.setItem("stockya_usuario", JSON.stringify(usuarioActual));
+    localStorage.setItem("yeparstock_token",   authToken);
+    localStorage.setItem("yeparstock_usuario", JSON.stringify(usuarioActual));
     document.getElementById("loginPage").style.display = "none";
     mostrarOnboarding();
   } catch(e) {
@@ -349,8 +349,8 @@ async function reactivarSuscripcion() {
 function cerrarSesion() {
   authToken     = null;
   usuarioActual = null;
-  localStorage.removeItem("stockya_token");
-  localStorage.removeItem("stockya_usuario");
+  localStorage.removeItem("yeparstock_token");
+  localStorage.removeItem("yeparstock_usuario");
   document.getElementById("appMain").style.display        = "none";
   document.getElementById("onboardingPage").style.display = "none";
   document.getElementById("loginPage").style.display      = "block";
@@ -2018,7 +2018,7 @@ async function guardarConfiguracion() {
       if (usuarioActual) {
         if (nombreUser) usuarioActual.nombre = nombreUser;
         if (emailUser)  usuarioActual.email  = emailUser;
-        localStorage.setItem("stockya_usuario", JSON.stringify(usuarioActual));
+        localStorage.setItem("yeparstock_usuario", JSON.stringify(usuarioActual));
         actualizarUIUsuario();
       }
     }
@@ -2143,8 +2143,8 @@ document.addEventListener("DOMContentLoaded", function(){
         // Token expirado o inválido — limpiar y mostrar login sin toast de error
         authToken     = null;
         usuarioActual = null;
-        localStorage.removeItem("stockya_token");
-        localStorage.removeItem("stockya_usuario");
+        localStorage.removeItem("yeparstock_token");
+        localStorage.removeItem("yeparstock_usuario");
         document.getElementById("loginPage").style.display = "block";
         document.getElementById("appMain").style.display   = "none";
       });
