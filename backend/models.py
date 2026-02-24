@@ -32,8 +32,8 @@ class EstadoSalida(str, enum.Enum):
 
 class PlanEmpresa(str, enum.Enum):
     # Analogia: como los tipos de membresía de un gimnasio
-    basico   = "basico"    # 1 usuario, hasta 500 productos
-    premium  = "premium"   # hasta 3 usuarios, productos ilimitados
+    basico = "basico"  # 1 usuario, hasta 200 productos
+    pro    = "pro"     # hasta 3 usuarios, hasta 1500 productos
 
 class RolUsuario(str, enum.Enum):
     # Analogia: el admin es el dueño del negocio, el operador es el empleado
