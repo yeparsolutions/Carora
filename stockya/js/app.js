@@ -1385,28 +1385,24 @@ async function cargarReportes() {
   try {
     const periodo = document.getElementById("reportePeriodo")?.value || "mes";
 
-    const [productos, movimientos, resumen, salidas, fiadosResumen, fiadosLista] = await Promise.all([
+    const [productos, movimientos, resumenReportes, fiadosResumen, fiadosLista] = await Promise.all([
       api("/productos/"),
       api("/movimientos/?limit=500"),
-      api("/salidas/resumen"),
-      api("/salidas/?tipo_salida=venta&limit=1000"),
+      api("/reportes/ventas-resumen?periodo=" + periodo),
       api("/fiados/resumen"),
       api("/fiados/"),
     ]);
 
-    // Ventas del periodo
-    var totalVentas   = salidas.reduce(function(a,s){ return a + (s.valor_total||0); }, 0);
-    var totalUnidades = salidas.reduce(function(a,s){ return a + (s.cantidad||0); }, 0);
+    // Ventas del periodo — datos reales del backend
+    var totalVentas   = resumenReportes.total_valor    || 0;
+    var totalUnidades = resumenReportes.total_unidades || 0;
+    var totalMermasUnd = resumenReportes.total_mermas  || 0;
     var vStr = totalVentas >= 1000000 ? "$"+(totalVentas/1000000).toFixed(1)+"M"
              : totalVentas >= 1000    ? "$"+Math.round(totalVentas/1000)+"K"
              : "$"+Math.round(totalVentas).toLocaleString("es-CL");
     setEl("reporteValorVentas", totalVentas > 0 ? vStr : "—");
     setEl("reporteUnidades",    totalUnidades > 0 ? totalUnidades.toLocaleString("es-CL") : "—");
-
-    // Mermas del periodo
-    var mermas = await api("/salidas/?tipo_salida=merma&limit=1000");
-    var totalMermasUnd = mermas.reduce(function(a,s){ return a + (s.cantidad||0); }, 0);
-    setEl("reporteMermas", totalMermasUnd > 0 ? totalMermasUnd.toLocaleString("es-CL") + " und." : "0");
+    setEl("reporteMermas",      totalMermasUnd > 0 ? "$"+Math.round(totalMermasUnd).toLocaleString("es-CL") : "0");
 
     // Valor bodega
     var valorBodega = productos.reduce(function(a,p){ return a + (p.stock_actual*(p.precio_venta||0)); }, 0);
@@ -1478,11 +1474,12 @@ async function cargarReportes() {
     }
 
     // ── Ventas por método de pago ─────────────────────────────
-    // Analogia: saber cuánto entró en efectivo, tarjeta o quedó fiado
+    var topProd = await api("/reportes/top-productos?periodo=" + periodo + "&limite=100");
+    var salidasDetalle = await api("/salidas/?tipo_salida=venta&limit=1000");
     var metodosMap  = {};
     var iconMetodo  = { efectivo:"💵", debito:"💳", credito:"💳", transferencia:"📱", cheque:"📝", fiado:"📒" };
     var labelMetodo = { efectivo:"Efectivo", debito:"Débito", credito:"Crédito", transferencia:"Transferencia", cheque:"Cheque", fiado:"Fiado" };
-    salidas.forEach(function(s) {
+    salidasDetalle.forEach(function(s) {
       var m = s.metodo_pago || "efectivo";
       if (!metodosMap[m]) metodosMap[m] = { monto: 0, cant: 0 };
       metodosMap[m].monto += s.valor_total || 0;
