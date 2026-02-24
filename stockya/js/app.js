@@ -20,7 +20,16 @@ async function api(path, method = "GET", body = null) {
 
   const response = await fetch(API_URL + path, opciones);
 
-  if (response.status === 401) { cerrarSesion(); throw new Error("Sesion expirada"); }
+  if (response.status === 401) {
+    // Limpiar sesión silenciosamente — el usuario verá el login sin toast de error
+    authToken     = null;
+    usuarioActual = null;
+    localStorage.removeItem("stockya_token");
+    localStorage.removeItem("stockya_usuario");
+    document.getElementById("loginPage").style.display = "block";
+    document.getElementById("appMain").style.display   = "none";
+    throw new Error("Sesion expirada");
+  }
   if (response.status === 204) return null;
 
   const data = await response.json();
@@ -2119,8 +2128,7 @@ document.addEventListener("DOMContentLoaded", function(){
     if (el) el.addEventListener("click", function(e){ if(e.target===this) e.target.classList.remove("open"); });
   });
 
-  // ✅ Si ya hay sesion activa, verificar onboarding antes de entrar
-  // Analogia: el portero del edificio verifica si ya pasaste por recepcion
+  // Si ya hay sesión activa, verificar onboarding antes de entrar
   if (authToken && usuarioActual) {
     api("/auth/onboarding-status")
       .then(function(status) {
@@ -2134,12 +2142,14 @@ document.addEventListener("DOMContentLoaded", function(){
           cargarDashboard();
         }
       })
-      .catch(function() {
-        // Si falla el check, entrar normal para no bloquear al usuario
-        document.getElementById("loginPage").style.display = "none";
-        document.getElementById("appMain").style.display   = "flex";
-        actualizarUIUsuario();
-        cargarDashboard();
+      .catch(function(err) {
+        // Token expirado o inválido — limpiar y mostrar login sin toast de error
+        authToken     = null;
+        usuarioActual = null;
+        localStorage.removeItem("stockya_token");
+        localStorage.removeItem("stockya_usuario");
+        document.getElementById("loginPage").style.display = "block";
+        document.getElementById("appMain").style.display   = "none";
       });
   }
 });
@@ -2269,11 +2279,9 @@ function abrirAbonoFiado(clienteNombre, pendiente) {
 
 async function cargarEquipo() {
   try {
-    // Llamar ambos endpoints en paralelo
-    // Analogia: pedir el organigrama y la ficha del negocio al mismo tiempo
     const [infoEmpresa, listaEquipo] = await Promise.all([
       api("/empresa/info"),
-      api("/empresa/equipo"),
+      api("/empresa/usuarios"),
     ]);
 
     empresaInfo = infoEmpresa;
@@ -2281,8 +2289,12 @@ async function cargarEquipo() {
 
     // Determinar si el usuario actual es admin ANTES de renderizar
     // Analogia: verificar el carnet antes de abrir la puerta, no después
+    // Marcar cuál es el usuario actual y detectar si es admin
+    listaEquipo.forEach(function(u) {
+      u.es_yo = usuarioActual && u.id === usuarioActual.id;
+    });
     const yo = listaEquipo.find(function(u){ return u.es_yo; });
-    esAdmin   = !!(yo && yo.rol === "admin");
+    esAdmin  = !!(yo && yo.rol === "admin") || (usuarioActual && usuarioActual.rol === "admin");
 
     renderPlanCard(infoEmpresa);   // usa esAdmin ya seteado
     renderEquipoTabla(listaEquipo);
@@ -2482,7 +2494,7 @@ async function guardarInvitacion() {
 
   try {
     // Analogia: llenar el formulario de contratación y enviarlo a RRHH
-    await api("/empresa/invitar?rol=" + rol, "POST", { nombre, email, password });
+    await api("/empresa/invitar?nombre=" + encodeURIComponent(nombre) + "&email=" + encodeURIComponent(email) + "&rol=" + rol, "POST");
     showToast("✅ " + nombre + " agregado al equipo");
     cerrarModalInvitar();
     await cargarEquipo();
@@ -2503,7 +2515,7 @@ async function cambiarRolUsuario(usuarioId, nuevoRol) {
   if (!confirm("¿Cambiar a " + nombre + " a " + rolLabel + "?")) return;
 
   try {
-    await api("/empresa/equipo/" + usuarioId + "/rol?nuevo_rol=" + nuevoRol, "PATCH");
+    await api("/empresa/usuarios/" + usuarioId + "/rol?rol=" + nuevoRol, "PATCH");
     showToast("✅ Rol de " + nombre + " actualizado a " + rolLabel);
     await cargarEquipo();
   } catch (e) {
@@ -2515,7 +2527,7 @@ async function desactivarUsuario(usuarioId, nombre) {
   if (!confirm("¿Desactivar acceso de " + nombre + "? Podrás reactivarlo después.")) return;
 
   try {
-    await api("/empresa/equipo/" + usuarioId + "/desactivar", "PATCH");
+    await api("/empresa/usuarios/" + usuarioId + "/estado?activo=false", "PATCH");
     showToast("✅ " + nombre + " desactivado");
     await cargarEquipo();
   } catch (e) {
@@ -2525,7 +2537,7 @@ async function desactivarUsuario(usuarioId, nombre) {
 
 async function activarUsuario(usuarioId, nombre) {
   try {
-    await api("/empresa/equipo/" + usuarioId + "/activar", "PATCH");
+    await api("/empresa/usuarios/" + usuarioId + "/estado?activo=true", "PATCH");
     showToast("✅ " + nombre + " reactivado");
     await cargarEquipo();
   } catch (e) {
