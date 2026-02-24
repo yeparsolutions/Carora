@@ -1,5 +1,5 @@
 # ============================================================
-# STOCKYA — Router de Fiados
+# YEPARSTOCK — Router de Fiados
 # Archivo: backend/routers/fiados.py
 # Descripcion: Gestiona las deudas de clientes (ventas fiadas)
 # Analogia: el cuaderno de fiados del almacén hecho digital —

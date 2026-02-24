@@ -1,5 +1,5 @@
 # ============================================================
-# STOCKYA – Router de Alertas
+# YEPARSTOCK – Router de Alertas
 # Archivo: backend/routers/alertas.py
 # Descripcion: Stock bajo + vencimientos proximos
 # ✅ ACTUALIZADO: filtra por empresa_id para soporte multiusuario
