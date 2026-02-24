@@ -203,6 +203,8 @@ class Salida(Base):
 
     precio_unitario       = Column(Float, default=0.0)
     valor_total           = Column(Float, default=0.0)
+    metodo_pago           = Column(String(50), default="efectivo")   # efectivo, debito, credito, transferencia, cheque, fiado
+    cliente_nombre        = Column(String(150), nullable=True)        # nombre del cliente (opcional)
 
     estado                = Column(
                                 Enum(EstadoSalida, name="estado_salida_enum"),
@@ -242,3 +244,26 @@ class Configuracion(Base):
     updated_at          = Column(DateTime(timezone=True), onupdate=func.now())
 
     usuario = relationship("Usuario")
+
+
+# ============================================================
+# TABLA: fiados
+# Analogia: el cuaderno de deudas del almacén hecho digital —
+# cada fila es una venta que quedó pendiente de cobro
+# ============================================================
+class Fiado(Base):
+    __tablename__ = "fiados"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    empresa_id      = Column(Integer, ForeignKey("empresas.id"), nullable=False, index=True)
+    salida_id       = Column(Integer, ForeignKey("salidas.id", ondelete="SET NULL"), nullable=True)
+    cliente_nombre  = Column(String(150), nullable=False)
+    monto_total     = Column(Float, default=0.0)
+    monto_pagado    = Column(Float, default=0.0)
+    estado          = Column(String(20), default="pendiente")  # pendiente, pagado_parcial, pagado
+    nota            = Column(String(255), nullable=True)
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at      = Column(DateTime(timezone=True), onupdate=func.now())
+
+    empresa = relationship("Empresa")
+    salida  = relationship("Salida", foreign_keys=[salida_id])
