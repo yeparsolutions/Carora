@@ -1,5 +1,5 @@
 # ============================================================
-# STOCKYA - Router de Movimientos
+# YEPARSTOCK - Router de Movimientos
 # Archivo: backend/routers/movimientos.py
 # Descripcion: Registra entradas y salidas de stock
 # Analogia: el libro contable de la bodega

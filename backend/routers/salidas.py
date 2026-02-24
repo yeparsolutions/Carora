@@ -1,5 +1,5 @@
 # ============================================================
-# STOCKYA - Router de Salidas
+# YEPARSTOCK - Router de Salidas
 # Archivo: backend/routers/salidas.py
 # Descripción: Gestiona ventas, mermas, cuarentenas y
 #              devoluciones a proveedor con escaneo de codigo

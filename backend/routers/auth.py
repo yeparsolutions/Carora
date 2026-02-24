@@ -1,5 +1,5 @@
 # ============================================================
-# STOCKYA – Router de Autenticación
+# YEPARSTOCK – Router de Autenticación
 # Archivo: backend/routers/auth.py
 # Descripción: Endpoints para login, registro, onboarding y perfil
 # ============================================================

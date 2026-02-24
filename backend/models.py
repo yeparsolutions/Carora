@@ -1,5 +1,5 @@
 # ============================================================
-# STOCKYA - Modelos de base de datos
+# YEPARSTOCK - Modelos de base de datos
 # Archivo: backend/models.py
 # Descripcion: Define las tablas de PostgreSQL usando SQLAlchemy
 # Analogia: cada clase es como el diseño de una hoja de Excel —

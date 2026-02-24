@@ -1,5 +1,5 @@
 # ============================================================
-# STOCKYA – Router de Productos
+# YEPARSTOCK – Router de Productos
 # Archivo: backend/routers/productos.py
 # Descripción: CRUD completo + búsqueda por código de barras
 # ✅ ACTUALIZADO: filtra por empresa_id para soporte multiusuario

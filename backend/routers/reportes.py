@@ -1,5 +1,5 @@
 # ============================================================
-# STOCKYA - Router de Reportes
+# YEPARSTOCK - Router de Reportes
 # Archivo: backend/routers/reportes.py
 # Descripcion: Endpoints para graficos y valorado de ventas
 # ✅ ACTUALIZADO: filtra por empresa_id para soporte multiusuario

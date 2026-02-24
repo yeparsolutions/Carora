@@ -1,5 +1,5 @@
 # ============================================================
-# STOCKYA — Router de Empresas
+# YEPARSTOCK — Router de Empresas
 # Archivo: backend/routers/empresas.py
 # Descripcion: Gestiona plan, usuarios y suscripción de la empresa
 # ============================================================

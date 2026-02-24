@@ -1,91 +1,216 @@
 # ============================================================
-# STOCKYA — Utilidades de autenticación
-# Archivo: backend/auth.py  ← OJO: este va en la RAÍZ del backend
-#                              NO en la carpeta routers/
-# Descripción: Maneja encriptación de contraseñas y tokens JWT
-# Analogía: es el "guardia de seguridad" que verifica
-#           que cada usuario sea quien dice ser
+# YEPARSTOCK – Router de Autenticación
+# Archivo: backend/routers/auth.py
+# Descripción: Endpoints para login, registro, onboarding y perfil
 # ============================================================
-import os
-from dotenv import load_dotenv
-from datetime import datetime, timedelta
-from typing import Optional
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
-import models
+from auth import encriptar_password, verificar_password, crear_token, get_usuario_actual
+import models, schemas
 
-load_dotenv()
-
-SECRET_KEY   = os.getenv("SECRET_KEY", "clave-local-de-desarrollo-cambiar-en-produccion")
-ALGORITHM    = os.getenv("ALGORITHM", "HS256")
-TOKEN_EXPIRY = int(os.getenv("TOKEN_EXPIRY", "1440"))
-
-pwd_context   = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+router = APIRouter(prefix="/auth", tags=["Autenticación"])
 
 
-def encriptar_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-
-def verificar_password(password_plano: str, password_hash: str) -> bool:
-    return pwd_context.verify(password_plano, password_hash)
-
-
-def crear_token(data: dict, expiry_minutos: Optional[int] = None) -> str:
-    payload = data.copy()
-    expira  = datetime.utcnow() + timedelta(minutes=expiry_minutos or TOKEN_EXPIRY)
-    payload.update({"exp": expira})
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-
-
-def verificar_token(token: str) -> Optional[dict]:
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except JWTError:
-        return None
-
-
-def get_usuario_actual(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-) -> models.Usuario:
+# ============================================================
+# POST /auth/registro
+# ============================================================
+@router.post("/registro", response_model=schemas.TokenRespuesta, status_code=201)
+def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)):
     """
-    Dependencia de FastAPI que extrae el usuario del token JWT.
-    Analogía: el torniquete que valida tu credencial antes de dejarte pasar.
+    Registra un usuario nuevo.
+    Analogia: abrir una cuenta bancaria — el banco crea tu
+    expediente vacío y te da la tarjeta para entrar.
     """
-    credenciales_error = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="No autenticado o token inválido",
-        headers={"WWW-Authenticate": "Bearer"},
+    existe = db.query(models.Usuario).filter(models.Usuario.email == datos.email).first()
+    if existe:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este correo ya está registrado"
+        )
+
+    nuevo_usuario = models.Usuario(
+        nombre        = datos.nombre,
+        email         = datos.email,
+        password_hash = encriptar_password(datos.password)
     )
-    payload = verificar_token(token)
-    if payload is None:
-        raise credenciales_error
-    email: str = payload.get("sub")
-    if email is None:
-        raise credenciales_error
-    usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    if usuario is None or not usuario.activo:
-        raise credenciales_error
-    return usuario
+    db.add(nuevo_usuario)
+    db.commit()
+    db.refresh(nuevo_usuario)
+
+    # ✅ Configuración inicial con onboarding pendiente
+    # Analogia: el apartamento está listo pero sin muebles —
+    # el inquilino debe pasar por bienvenida antes de instalarse
+    config_inicial = models.Configuracion(
+        usuario_id          = nuevo_usuario.id,
+        nombre_negocio      = "Mi Negocio",
+        moneda              = "CLP",
+        color_principal     = "#00C77B",
+        onboarding_completo = False
+    )
+    db.add(config_inicial)
+    db.commit()
+
+    token = crear_token({"sub": nuevo_usuario.email})
+
+    return {
+        "access_token": token,
+        "token_type":   "bearer",
+        "usuario":      nuevo_usuario
+    }
 
 
-def solo_admin(usuario: models.Usuario) -> models.Usuario:
+# ============================================================
+# POST /auth/login
+# ============================================================
+@router.post("/login", response_model=schemas.TokenRespuesta)
+def login(datos: schemas.LoginRequest, db: Session = Depends(get_db)):
     """
-    Verifica que el usuario tenga rol de admin.
-    Analogía: el guardia que solo deja pasar al gerente a ciertas áreas.
-    Lanza 403 si no es admin.
+    Inicia sesión con email y contraseña.
+    Analogia: la recepcionista que verifica tu carnet y te da el pase.
     """
-    rol = usuario.rol.value if hasattr(usuario.rol, "value") else usuario.rol
-    if rol != "admin":
+    usuario = db.query(models.Usuario).filter(models.Usuario.email == datos.email).first()
+
+    if not usuario or not verificar_password(datos.password, usuario.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Correo o contraseña incorrectos"
+        )
+
+    if not usuario.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo los administradores pueden realizar esta acción"
+            detail="Esta cuenta está desactivada"
         )
-    return usuario
+
+    token = crear_token({"sub": usuario.email})
+
+    return {
+        "access_token": token,
+        "token_type":   "bearer",
+        "usuario":      usuario
+    }
+
+
+# ============================================================
+# GET /auth/onboarding-status
+# ============================================================
+@router.get("/onboarding-status")
+def onboarding_status(
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
+    """
+    Retorna si el usuario ya completó el onboarding.
+    El frontend llama esto al iniciar sesión para decidir
+    si muestra la app o la pantalla de bienvenida.
+    """
+    config = db.query(models.Configuracion).filter(
+        models.Configuracion.usuario_id == usuario_actual.id
+    ).first()
+
+    completo = config.onboarding_completo if config else False
+
+    return {"onboarding_completo": completo}
+
+
+# ============================================================
+# POST /auth/completar-onboarding
+# ============================================================
+@router.post("/completar-onboarding")
+def completar_onboarding(
+    datos: schemas.OnboardingDatos,
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
+    """
+    Guarda nombre de empresa, rubro, moneda, logo y nombre de usuario.
+    Marca onboarding_completo = True para no volver a mostrarlo.
+    Analogia: el inquilino amobló su apartamento — ya puede vivir en él.
+    """
+    # Actualizar nombre del usuario en la tabla usuarios
+    if datos.nombre_usuario:
+        usuario_actual.nombre = datos.nombre_usuario
+        db.add(usuario_actual)
+
+    # Buscar o crear configuración
+    config = db.query(models.Configuracion).filter(
+        models.Configuracion.usuario_id == usuario_actual.id
+    ).first()
+
+    if not config:
+        config = models.Configuracion(usuario_id=usuario_actual.id)
+        db.add(config)
+
+    # Guardar los datos del onboarding
+    if datos.nombre_negocio: config.nombre_negocio = datos.nombre_negocio
+    if datos.rubro:          config.rubro          = datos.rubro
+    if datos.moneda:         config.moneda         = datos.moneda
+    if datos.logo_base64:    config.logo_base64    = datos.logo_base64
+    if datos.nombre_usuario: config.nombre_usuario = datos.nombre_usuario
+
+    # ✅ Marcar como completo — no volverá a aparecer
+    config.onboarding_completo = True
+
+    db.commit()
+    db.refresh(config)
+
+    return {"ok": True, "mensaje": "Onboarding completado"}
+
+
+# ============================================================
+# PUT /auth/perfil
+# ✅ NUEVO: actualiza nombre, email y contraseña del usuario
+#    Lo llama guardarConfiguracion() en el frontend
+# ============================================================
+@router.put("/perfil", response_model=schemas.UsuarioRespuesta)
+def actualizar_perfil(
+    datos: schemas.PerfilActualizar,
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
+    """
+    Actualiza los datos personales del usuario autenticado.
+    Analogia: ir a la ventanilla del banco a cambiar tus datos.
+    """
+    # Actualizar nombre si fue enviado
+    if datos.nombre:
+        usuario_actual.nombre = datos.nombre
+
+    # Actualizar email si fue enviado y no está en uso
+    if datos.email and datos.email != usuario_actual.email:
+        en_uso = db.query(models.Usuario).filter(
+            models.Usuario.email == datos.email,
+            models.Usuario.id    != usuario_actual.id
+        ).first()
+        if en_uso:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ese correo ya está registrado por otro usuario"
+            )
+        usuario_actual.email = datos.email
+
+    # Cambiar contraseña si fue enviada
+    if datos.password_nuevo and datos.password_actual:
+        if not verificar_password(datos.password_actual, usuario_actual.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La contraseña actual es incorrecta"
+            )
+        usuario_actual.password_hash = encriptar_password(datos.password_nuevo)
+
+    db.add(usuario_actual)
+    db.commit()
+    db.refresh(usuario_actual)
+
+    return usuario_actual
+
+
+# ============================================================
+# GET /auth/yo
+# ============================================================
+@router.get("/yo", response_model=schemas.UsuarioRespuesta)
+def obtener_yo(usuario_actual: models.Usuario = Depends(get_usuario_actual)):
+    """Retorna los datos del usuario autenticado a partir del token JWT."""
+    return usuario_actual

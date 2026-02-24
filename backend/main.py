@@ -1,5 +1,5 @@
 # ============================================================
-# STOCKYA - Servidor principal FastAPI
+# YEPARSTOCK - Servidor principal FastAPI
 # Archivo: backend/main.py
 # Descripcion: Punto de entrada del backend. Registra todos
 #              los routers y configura CORS para el frontend.
@@ -15,7 +15,7 @@ import models
 # ✅ auth ahora incluye los endpoints de onboarding:
 #    GET  /auth/onboarding-status
 #    POST /auth/completar-onboarding
-from routers import auth, productos, movimientos, alertas, config, salidas, empresas, reportes, fiados
+from routers import auth, productos, movimientos, alertas, config, salidas
 
 # --- Crear las tablas en PostgreSQL si no existen ---
 # Analogia: es como crear las hojas de Excel vacias la primera vez
@@ -23,8 +23,8 @@ Base.metadata.create_all(bind=engine)
 
 # --- Crear la aplicacion FastAPI ---
 app = FastAPI(
-    title       = "Stockya API",
-    description = "Backend para el sistema de control de inventario Stockya",
+    title       = "YeparStock API",
+    description = "Backend para el sistema de control de inventario YeparStock",
     version     = "1.2.0"
 )
 
@@ -50,16 +50,13 @@ app.include_router(movimientos.router)
 app.include_router(alertas.router)
 app.include_router(config.router)
 app.include_router(salidas.router)
-app.include_router(empresas.router)
-app.include_router(reportes.router)
-app.include_router(fiados.router)
 
 
 # --- Endpoint raiz ---
 @app.get("/")
 def raiz():
     return {
-        "mensaje": "Stockya API funcionando",
+        "mensaje": "YeparStock API funcionando",
         "version": "1.2.0",
         "docs":    "http://localhost:8000/docs"
     }
