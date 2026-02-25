@@ -89,7 +89,7 @@ class Usuario(Base):
     __tablename__ = "usuarios"
 
     id            = Column(Integer, primary_key=True, index=True)
-    empresa_id    = Column(Integer, ForeignKey("empresas.id"), nullable=True, index=True)
+    empresa_id    = Column(Integer, ForeignKey("empresas.id"), nullable=False, index=True)  # 🔧 CORREGIDO
     nombre        = Column(String(100), nullable=False)
     email         = Column(String(150), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
@@ -120,7 +120,7 @@ class Producto(Base):
     id                  = Column(Integer, primary_key=True, index=True)
 
     # Pertenece a la empresa (antes era usuario_id)
-    empresa_id          = Column(Integer, ForeignKey("empresas.id"), nullable=True, index=True)
+    empresa_id          = Column(Integer, ForeignKey("empresas.id"), nullable=False, index=True)  # 🔧 CORREGIDO
 
     # Mantener usuario_id para compatibilidad (quien lo creó)
     usuario_id          = Column(Integer, ForeignKey("usuarios.id"), nullable=True, index=True)
@@ -166,7 +166,7 @@ class Movimiento(Base):
     __tablename__ = "movimientos"
 
     id             = Column(Integer, primary_key=True, index=True)
-    empresa_id     = Column(Integer, ForeignKey("empresas.id"), nullable=True, index=True)
+    empresa_id     = Column(Integer, ForeignKey("empresas.id"), nullable=False, index=True)  # 🔧 CORREGIDO
     producto_id    = Column(Integer, ForeignKey("productos.id", ondelete="SET NULL"), nullable=True)
     usuario_id     = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     tipo           = Column(String(10), nullable=False)
@@ -189,7 +189,7 @@ class Salida(Base):
     __tablename__ = "salidas"
 
     id                    = Column(Integer, primary_key=True, index=True)
-    empresa_id            = Column(Integer, ForeignKey("empresas.id"), nullable=True, index=True)
+    empresa_id            = Column(Integer, ForeignKey("empresas.id"), nullable=False, index=True)  # 🔧 CORREGIDO
     producto_id           = Column(Integer, ForeignKey("productos.id", ondelete="SET NULL"), nullable=True)
     usuario_id            = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     resolucion_usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
@@ -268,5 +268,4 @@ class Fiado(Base):
     updated_at      = Column(DateTime(timezone=True), onupdate=func.now())
 
     empresa = relationship("Empresa")
-    salida  = relationship("Salida", foreign_keys=[salida_id])
     salida  = relationship("Salida", foreign_keys=[salida_id])

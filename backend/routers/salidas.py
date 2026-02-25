@@ -65,11 +65,12 @@ def registrar_salida_por_scan(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    # ✅ Solo busca productos del usuario actual
+    # ✅ Busca productos de la empresa — cualquier operador puede escanear
+    # productos de la empresa, no solo los que él mismo creó
     producto = db.query(models.Producto).filter(
         models.Producto.codigo_barra == datos.codigo_barra,
         models.Producto.activo       == True,
-        models.Producto.usuario_id   == usuario_actual.id
+        models.Producto.empresa_id   == usuario_actual.empresa_id  # 🔧 CORREGIDO
     ).first()
 
     if not producto:
@@ -90,6 +91,7 @@ def registrar_salida_por_scan(
     producto.stock_actual = stock_nuevo
 
     salida = models.Salida(
+        empresa_id        = usuario_actual.empresa_id,  # 🔧 CORREGIDO — asocia la salida a la empresa
         producto_id       = producto.id,
         usuario_id        = usuario_actual.id,
         cantidad          = datos.cantidad,
@@ -108,6 +110,7 @@ def registrar_salida_por_scan(
     db.add(salida)
 
     movimiento = models.Movimiento(
+        empresa_id     = usuario_actual.empresa_id,  # 🔧 CORREGIDO — movimiento ligado a la empresa
         producto_id    = producto.id,
         usuario_id     = usuario_actual.id,
         tipo           = "salida",
@@ -349,14 +352,17 @@ def actualizar_estado_salida(
     salida.resolucion_usuario_id = usuario_actual.id
 
     if datos.nuevo_estado == "reingresado" and salida.producto_id:
+        # ✅ Busca el producto dentro de la empresa — cualquier admin/operador
+        # puede reingresar cuarentenas aunque no las haya creado él
         producto = db.query(models.Producto).filter(
             models.Producto.id         == salida.producto_id,
-            models.Producto.usuario_id == usuario_actual.id
+            models.Producto.empresa_id == usuario_actual.empresa_id  # 🔧 CORREGIDO
         ).first()
         if producto:
             stock_antes            = producto.stock_actual
             producto.stock_actual += salida.cantidad
             db.add(models.Movimiento(
+                empresa_id     = usuario_actual.empresa_id,  # 🔧 CORREGIDO
                 producto_id    = producto.id,
                 usuario_id     = usuario_actual.id,
                 tipo           = "entrada",
