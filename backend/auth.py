@@ -16,14 +16,19 @@ from datetime import datetime, timedelta, timezone
 from database import get_db
 import models
 import os
+from dotenv import load_dotenv
+
+# Carga las variables del archivo .env (debe estar en la raíz del backend)
+# Analogia: abrir el manual de configuración antes de arrancar la máquina
+load_dotenv()
 
 # ============================================================
 # Configuración de seguridad
 # ============================================================
 
 SECRET_KEY        = os.getenv("SECRET_KEY", "yeparstock_secret_key_cambiar_en_produccion")
-ALGORITHM         = "HS256"
-TOKEN_EXPIRY_DAYS = 30  # Los tokens duran 30 días
+ALGORITHM         = os.getenv("ALGORITHM", "HS256")
+TOKEN_EXPIRY_DAYS = int(os.getenv("TOKEN_EXPIRY_DAYS", "30"))  # días que dura el token
 
 # Contexto bcrypt para hashear contraseñas
 # Analogia: la máquina que convierte contraseñas en texto ilegible
