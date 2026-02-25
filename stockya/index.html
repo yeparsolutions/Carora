@@ -14,10 +14,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
 <style>
-#modalAgregar .form-input[type="text"],
-#modalEditar  .form-input[type="text"] { text-transform: uppercase; }
-#modalAgregar .form-input[type="text"]::placeholder,
-#modalEditar  .form-input[type="text"]::placeholder { text-transform: none; }
+/* Mayúsculas en todos los inputs de texto — salvo contraseñas y email */
+.form-input[type="text"],
+input[type="text"]:not(.no-upper) { text-transform: uppercase; }
+.form-input[type="text"]::placeholder,
+input[type="text"]::placeholder { text-transform: none; }
 
 /* Botones método de pago */
 .metodo-pago-btn {
@@ -37,7 +38,7 @@
 .metodo-pago-btn.fiado.active { border-color: #f59e0b; background: rgba(245,158,11,0.15); color: #f59e0b; }
 </style>
 </head>
-<body>
+<body class="tema-claro">
 
 <!-- LOGIN -->
 <div id="loginPage">
@@ -1088,7 +1089,7 @@
         <!-- Plan Básico -->
         <div id="cardPlanBasico" style="border:2px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;transition:border 0.2s" onclick="seleccionarPlan('basico')">
           <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">🟢 Básico</div>
-          <div style="font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:8px">$14.990<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
+          <div style="font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:8px">$14.990<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span><div style="font-size:10px;color:var(--muted);margin-top:2px">+ IVA</div></div>
           <div style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:5px">
             <div>✓ Hasta 200 productos</div>
             <div>✓ 1 usuario</div>
@@ -1103,7 +1104,7 @@
         <!-- Plan Pro -->
         <div id="cardPlanPro" style="border:2px solid var(--azul);border-radius:14px;padding:16px;cursor:pointer;transition:border 0.2s;background:rgba(91,142,255,0.04)" onclick="seleccionarPlan('pro')">
           <div style="font-size:11px;color:var(--azul);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">🔵 Pro</div>
-          <div style="font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:8px">$29.990<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
+          <div style="font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:8px">$29.990<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span><div style="font-size:10px;color:var(--muted);margin-top:2px">+ IVA</div></div>
           <div style="font-size:12px;display:flex;flex-direction:column;gap:5px">
             <div style="color:var(--verde)">✓ Hasta 1.500 productos</div>
             <div style="color:var(--verde)">✓ Hasta 3 usuarios</div>
@@ -1129,6 +1130,13 @@
         Selecciona un plan para continuar
       </button>
       <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:10px">El cambio es inmediato · Sin compromiso</p>
+
+      <!-- Cancelar / Reactivar suscripción -->
+      <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;display:flex;justify-content:center">
+        <button id="btnCancelarSuscripcionModal" style="background:transparent;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline" onclick="cerrarModalUpgrade(); cancelarSuscripcion()">
+          ❌ Cancelar suscripción
+        </button>
+      </div>
     </div>
   </div>
 </div>
