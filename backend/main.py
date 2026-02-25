@@ -15,7 +15,7 @@ import models
 # ✅ auth ahora incluye los endpoints de onboarding:
 #    GET  /auth/onboarding-status
 #    POST /auth/completar-onboarding
-from routers import auth, productos, movimientos, alertas, config, salidas
+from routers import auth, productos, movimientos, alertas, config, salidas, empresas, reportes, fiados
 
 # --- Crear las tablas en PostgreSQL si no existen ---
 # Analogia: es como crear las hojas de Excel vacias la primera vez
@@ -50,6 +50,9 @@ app.include_router(movimientos.router)
 app.include_router(alertas.router)
 app.include_router(config.router)
 app.include_router(salidas.router)
+app.include_router(empresas.router)    # plan, usuarios, suscripción
+app.include_router(reportes.router)    # reportes y estadísticas
+app.include_router(fiados.router)      # deudores / cuentas por cobrar
 
 
 # --- Endpoint raiz ---

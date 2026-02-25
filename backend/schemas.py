@@ -1,5 +1,5 @@
 # ============================================================
-# YEPARSTOCK - Schemas de validación
+# STOCKYA - Schemas de validación
 # Archivo: backend/schemas.py
 # Descripcion: Define la estructura de datos que entra y sale
 # Analogia: el formulario que el cliente debe llenar —
@@ -201,6 +201,8 @@ class SalidaCrear(BaseModel):
     codigo_barra_scan:Optional[str]      = None
     lote:             Optional[str]      = None
     fecha_vencimiento:Optional[datetime] = None
+    metodo_pago:      Optional[str]      = "efectivo"
+    cliente_nombre:   Optional[str]      = None
 
 class SalidaPorScan(BaseModel):
     codigo_barra:     str
