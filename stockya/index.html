@@ -14,6 +14,26 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
 <style>
+/* ── SCROLL EN SIDEBAR ──────────────────────────────────────────
+   El sidebar tenía overflow oculto — el contenido del footer
+   (tema, usuario) quedaba cortado en pantallas pequeñas.
+   Con overflow-y: auto aparece la barra de scroll solo cuando
+   se necesita, y flex-direction: column + justify-content permiten
+   que el footer quede al fondo pero sea alcanzable con scroll.
+─────────────────────────────────────────────────────────────── */
+.sidebar {
+  overflow-y: auto;        /* scroll vertical cuando el contenido supera la altura */
+  overflow-x: hidden;      /* evita scroll horizontal innecesario */
+  display: flex;
+  flex-direction: column;  /* apila logo → items → footer verticalmente */
+}
+
+/* El footer del sidebar se empuja al fondo pero no se oculta */
+.sidebar-footer {
+  margin-top: auto;        /* empuja el footer hacia abajo */
+  padding-bottom: 12px;    /* respira un poco al final */
+}
+
 /* Mayúsculas en todos los inputs de texto — salvo contraseñas y email */
 .form-input[type="text"],
 input[type="text"]:not(.no-upper) { text-transform: uppercase; }
