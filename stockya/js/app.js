@@ -98,10 +98,10 @@ function onboardingPreviewLogo(event) {
 }
 
 async function guardarOnboarding() {
-  var nombreNegocio = document.getElementById("onboardingNombreNegocio")?.value.trim();
+  var nombreNegocio = document.getElementById("onboardingNombreNegocio")?.value.trim().toUpperCase();
   var rubro         = document.getElementById("onboardingRubro")?.value;
   var moneda        = document.getElementById("onboardingMoneda")?.value || "CLP";
-  var nombreUsuario = document.getElementById("onboardingNombreUsuario")?.value.trim();
+  var nombreUsuario = document.getElementById("onboardingNombreUsuario")?.value.trim().toUpperCase();
 
   if (!nombreNegocio) { showToast("Escribe el nombre de tu negocio"); return; }
   if (!rubro)         { showToast("Selecciona el rubro de tu negocio"); return; }
@@ -187,7 +187,7 @@ async function enterApp() {
 var _emailPendiente = "";
 
 async function registrarUsuario() {
-  const nombre   = document.getElementById("regNombre").value.trim();
+  const nombre   = document.getElementById("regNombre").value.trim().toUpperCase();
   const email    = document.getElementById("regEmail").value.trim();
   const password = document.getElementById("regPassword").value.trim();
   if (!nombre || !email || !password) { showToast("Completa todos los campos"); return; }
@@ -1273,9 +1273,9 @@ async function guardarSalida() {
   if (_carrito.length === 0) { showToast("El carrito está vacío"); return; }
 
   var esMerma    = _tipoSalidaActual === "merma";
-  var cliente    = esMerma ? "" : (document.getElementById("salidaCliente")?.value.trim()  || "");
-  var documento  = document.getElementById("salidaDocumento")?.value.trim() || "";
-  var motivo     = document.getElementById("salidaMotivo")?.value.trim()    || "";
+  var cliente    = esMerma ? "" : (document.getElementById("salidaCliente")?.value.trim().toUpperCase()  || "");
+  var documento  = document.getElementById("salidaDocumento")?.value.trim().toUpperCase() || "";
+  var motivo     = document.getElementById("salidaMotivo")?.value.trim().toUpperCase()    || "";
   var metodoPago = esMerma ? null : (_metodoPagoActual || "efectivo");
 
   if (!esMerma && metodoPago === "fiado" && !cliente) {
@@ -1347,7 +1347,7 @@ function cerrarModalResolucion() {
 async function guardarResolucion() {
   if (!_salidaResolverId) return;
   var nuevoEstado = document.getElementById("resolucionEstado")?.value     || "";
-  var nota        = document.getElementById("resolucionNota")?.value.trim() || "";
+  var nota        = document.getElementById("resolucionNota")?.value.trim().toUpperCase() || "";
 
   if (!nuevoEstado) { showToast("Selecciona una resolucion"); return; }
 
@@ -1698,7 +1698,7 @@ async function saveProduct() {
   var precioComp   = document.getElementById("inputPrecioCompra").value;
   var precioVent   = document.getElementById("inputPrecioVenta").value;
   var porcentaje   = document.getElementById("inputPorcentaje").value;
-  var lote         = document.getElementById("inputLote").value.trim();
+  var lote         = document.getElementById("inputLote").value.trim().toUpperCase();
   var fechaVenc    = document.getElementById("inputFechaVenc").value;
   var diasAlerta   = document.getElementById("inputDiasAlerta").value;
 
@@ -1811,7 +1811,7 @@ async function guardarEdicion() {
   var precioComp  = document.getElementById("editPrecioCompra").value;
   var precioVent  = document.getElementById("editPrecioVenta").value;
   var porcentaje  = document.getElementById("editPorcentaje").value;
-  var lote        = document.getElementById("editLote").value.trim();
+  var lote        = document.getElementById("editLote").value.trim().toUpperCase();
   var fechaVenc   = document.getElementById("editFechaVenc").value;
   var diasAlerta  = document.getElementById("editDiasAlerta").value;
 
@@ -1896,8 +1896,8 @@ async function guardarMovimiento() {
   var productoId = document.getElementById("movProductoId").value;
   var tipo       = document.getElementById("movTipo").value;
   var cantidad   = parseInt(document.getElementById("movCantidad").value) || 0;
-  var lote       = document.getElementById("movLote").value.trim();
-  var nota       = document.getElementById("movNota").value.trim();
+  var lote       = document.getElementById("movLote").value.trim().toUpperCase();
+  var nota       = document.getElementById("movNota").value.trim().toUpperCase();
 
   if (!productoId) { showToast("Selecciona un producto"); return; }
   if (cantidad <= 0) { showToast("La cantidad debe ser mayor a 0"); return; }
@@ -1986,9 +1986,9 @@ function togglePass(inputId, btn) {
 }
 
 async function guardarConfiguracion() {
-  var negocio     = document.getElementById("inputNegocio").value.trim();
+  var negocio     = document.getElementById("inputNegocio").value.trim().toUpperCase();
   var moneda      = document.getElementById("inputMoneda").value;
-  var nombreUser  = document.getElementById("inputNombreUsuario")?.value.trim() || "";
+  var nombreUser  = document.getElementById("inputNombreUsuario")?.value.trim().toUpperCase() || "";
   var emailUser   = document.getElementById("inputEmail")?.value.trim()         || "";
   var passActual  = document.getElementById("inputPassActual")?.value           || "";
   var passN       = document.getElementById("inputPassNueva")?.value            || "";
@@ -2478,7 +2478,7 @@ function cerrarModalInvitar() {
 }
 
 async function guardarInvitacion() {
-  var nombre   = document.getElementById("invitarNombre").value.trim();
+  var nombre   = document.getElementById("invitarNombre").value.trim().toUpperCase();
   var email    = document.getElementById("invitarEmail").value.trim();
   var password = document.getElementById("invitarPassword").value.trim();
   var rol      = document.getElementById("invitarRol").value;
