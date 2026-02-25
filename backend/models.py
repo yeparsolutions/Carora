@@ -269,3 +269,4 @@ class Fiado(Base):
 
     empresa = relationship("Empresa")
     salida  = relationship("Salida", foreign_keys=[salida_id])
+    salida  = relationship("Salida", foreign_keys=[salida_id])
