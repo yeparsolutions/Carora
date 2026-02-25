@@ -2491,7 +2491,7 @@ async function guardarInvitacion() {
 
   try {
     // Analogia: llenar el formulario de contratación y enviarlo a RRHH
-    await api("/empresa/invitar?nombre=" + encodeURIComponent(nombre) + "&email=" + encodeURIComponent(email) + "&rol=" + rol, "POST");
+    await api("/empresa/invitar?nombre=" + encodeURIComponent(nombre) + "&email=" + encodeURIComponent(email) + "&password=" + encodeURIComponent(password) + "&rol=" + rol, "POST");
     showToast("✅ " + nombre + " agregado al equipo");
     cerrarModalInvitar();
     await cargarEquipo();

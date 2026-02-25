@@ -1,5 +1,5 @@
 # ============================================================
-# YEPARSTOCK — Router de Empresas
+# STOCKYA — Router de Empresas
 # Archivo: backend/routers/empresas.py
 # Descripcion: Gestiona plan, usuarios y suscripción de la empresa
 # ============================================================
@@ -238,6 +238,7 @@ def listar_usuarios_empresa(
 def invitar_usuario(
     nombre:   str,
     email:    str,
+    password: str,
     rol:      str = "operador",
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
@@ -264,23 +265,21 @@ def invitar_usuario(
         raise HTTPException(status_code=400, detail="Ese email ya está registrado")
 
     from auth import encriptar_password
-    import secrets
-    password_temporal = secrets.token_urlsafe(8)
 
     nuevo = models.Usuario(
-        empresa_id    = empresa.id,
-        nombre        = nombre,
-        email         = email,
-        password_hash = encriptar_password(password_temporal),
-        rol           = rol,
-        activo        = True,
-        email_verificado = True,  # invitados se consideran verificados
+        empresa_id       = empresa.id,
+        nombre           = nombre,
+        email            = email,
+        password_hash    = encriptar_password(password),
+        rol              = rol,
+        activo           = True,
+        email_verificado = True,  # invitados se consideran verificados por el admin
     )
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)
 
-    return {**_usuario_dict(nuevo), "password_temporal": password_temporal}
+    return _usuario_dict(nuevo)
 
 
 # ============================================================

@@ -94,8 +94,10 @@ class Usuario(Base):
     email         = Column(String(150), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     rol           = Column(Enum(RolUsuario, name="rol_usuario_enum"), default=RolUsuario.admin)
-    activo        = Column(Boolean, default=True)
-    created_at    = Column(DateTime(timezone=True), server_default=func.now())
+    activo              = Column(Boolean, default=True)
+    email_verificado    = Column(Boolean, default=False)   # True cuando confirma el código de 6 dígitos
+    codigo_verificacion = Column(String(10), nullable=True) # código temporal de verificación
+    created_at          = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relaciones
     empresa       = relationship("Empresa", back_populates="usuarios")
