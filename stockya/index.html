@@ -290,6 +290,9 @@ input[type="text"]::placeholder { text-transform: none; }
     <button class="nav-item" id="nav-settings" onclick="showScreen('settings')"> <span class="nav-icon">⚙️</span> Configuración</button>
 
     <div class="sidebar-footer">
+      <!-- RELOJ — se actualiza cada segundo desde iniciarReloj() en app.js -->
+      <div id="sidebarReloj" style="text-align:center;font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--text);letter-spacing:2px;margin-bottom:4px;line-height:1;">--:--:--</div>
+      <div id="sidebarFecha" style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:12px;text-transform:capitalize;">--</div>
       <div class="theme-toggle-row" onclick="toggleTema()">
         <span class="theme-toggle-label" id="themeLabel">🌙 Tema oscuro</span>
         <div class="theme-toggle-switch" id="themeSwitch"><div class="theme-toggle-thumb" id="themeThumb"></div></div>
@@ -803,10 +806,23 @@ input[type="text"]::placeholder { text-transform: none; }
             <div class="settings-logo-info">
               <div class="settings-logo-label">Logo del negocio</div>
               <div class="settings-logo-hint">PNG, JPG o SVG · Máximo 2MB · Recomendado 200×200px</div>
-              <div style="display:flex;gap:10px;margin-top:12px">
+              <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
                 <input type="file" id="inputLogo" accept="image/*" style="display:none" onchange="previewLogo(event)">
                 <button class="btn-secondary" style="font-size:13px;padding:8px 16px" onclick="document.getElementById('inputLogo').click()">📁 Subir logo</button>
+                <button class="btn-secondary" style="font-size:13px;padding:8px 16px" onclick="toggleInputUrlLogo()">🔗 Pegar URL</button>
                 <button class="btn-secondary" style="font-size:13px;padding:8px 16px" onclick="quitarLogo()">🗑️ Quitar</button>
+              </div>
+              <!-- Input de URL — se muestra al hacer clic en "Pegar URL" -->
+              <div id="logoUrlWrap" style="display:none;margin-top:10px">
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input id="inputLogoUrl" class="form-input" type="url"
+                    placeholder="https://ejemplo.com/logo.png"
+                    style="font-size:13px;padding:8px 12px;flex:1"
+                    oninput="previewLogoUrl(this.value)">
+                  <button class="btn-secondary" style="font-size:13px;padding:8px 12px;white-space:nowrap"
+                    onclick="aplicarLogoUrl()">✓ Aplicar</button>
+                </div>
+                <span class="settings-field-hint">PNG, JPG o SVG accesible públicamente</span>
               </div>
             </div>
           </div>

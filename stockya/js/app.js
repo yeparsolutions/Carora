@@ -150,17 +150,22 @@ async function enterApp() {
     localStorage.setItem("yeparstock_token",   authToken);
     localStorage.setItem("yeparstock_usuario", JSON.stringify(usuarioActual));
 
-    // ✅ Verificar si debe mostrar onboarding antes de entrar
-    // Analogia: el portero verifica si el inquilino ya paso por recepcion
-    const status = await api("/auth/onboarding-status");
-    if (!status.onboarding_completo) {
-      mostrarOnboarding();
-      return;
+    // ✅ Verificar onboarding solo para admins
+    // Analogia: solo el dueño del negocio configura el local la primera vez —
+    // los empleados (operadores) entran directo porque la empresa ya existe.
+    const rolUsuario = data.usuario.rol;
+    if (rolUsuario === "admin") {
+      const status = await api("/auth/onboarding-status");
+      if (!status.onboarding_completo) {
+        mostrarOnboarding();
+        return;
+      }
     }
 
     document.getElementById("loginPage").style.display = "none";
     document.getElementById("appMain").style.display   = "flex";
     actualizarUIUsuario();
+    iniciarReloj(); // ← arranca el reloj del sidebar
 
     // Verificar estado de suscripción
     try {
@@ -354,6 +359,36 @@ function cerrarSesion() {
   document.getElementById("appMain").style.display        = "none";
   document.getElementById("onboardingPage").style.display = "none";
   document.getElementById("loginPage").style.display      = "block";
+}
+
+/* ============================================================
+   RELOJ EN SIDEBAR
+   Analogia: el reloj de la pared de la oficina — siempre visible,
+   se actualiza cada segundo para que el operador sepa la hora
+   exacta al registrar una venta o movimiento.
+   ============================================================ */
+function iniciarReloj() {
+  function actualizar() {
+    var ahora = new Date();
+
+    // Hora en formato HH:MM:SS
+    var hh = String(ahora.getHours()).padStart(2, "0");
+    var mm = String(ahora.getMinutes()).padStart(2, "0");
+    var ss = String(ahora.getSeconds()).padStart(2, "0");
+    var horaStr = hh + ":" + mm + ":" + ss;
+
+    // Fecha en formato "lunes 25 feb"
+    var fechaStr = ahora.toLocaleDateString("es-CL", {
+      weekday: "long", day: "numeric", month: "short"
+    });
+
+    var elReloj = document.getElementById("sidebarReloj");
+    var elFecha = document.getElementById("sidebarFecha");
+    if (elReloj) elReloj.textContent = horaStr;
+    if (elFecha) elFecha.textContent = fechaStr.charAt(0).toUpperCase() + fechaStr.slice(1);
+  }
+  actualizar();                    // mostrar inmediatamente
+  setInterval(actualizar, 1000);   // actualizar cada segundo
 }
 
 function actualizarUIUsuario() {
@@ -1935,6 +1970,60 @@ function previewLogo(event) {
   reader.readAsDataURL(archivo);
 }
 
+/* ============================================================
+   LOGO POR URL
+   Analogia: en vez de traer la foto física, pegas el link
+   donde está publicada en internet
+   ============================================================ */
+function toggleInputUrlLogo() {
+  // Solo admin puede cambiar el logo
+  if (!esAdmin) { showToast("Solo el administrador puede cambiar el logo"); return; }
+  var wrap = document.getElementById("logoUrlWrap");
+  if (wrap) wrap.style.display = wrap.style.display === "none" ? "block" : "none";
+}
+
+function previewLogoUrl(url) {
+  // Muestra una previsualización mientras el admin escribe la URL
+  if (!url || !url.startsWith("http")) return;
+  var img = document.getElementById("logoImg");
+  var ini = document.getElementById("logoInitials");
+  img.src = url;
+  img.style.display = "block";
+  ini.style.display = "none";
+}
+
+function aplicarLogoUrl() {
+  // Convierte la URL a base64 para guardarla igual que una imagen subida
+  if (!esAdmin) { showToast("Solo el administrador puede cambiar el logo"); return; }
+  var url = document.getElementById("inputLogoUrl").value.trim();
+  if (!url) { showToast("Ingresa una URL válida"); return; }
+
+  // Cargar imagen desde URL y convertir a base64
+  var img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = function() {
+    var canvas = document.createElement("canvas");
+    canvas.width  = img.width;
+    canvas.height = img.height;
+    canvas.getContext("2d").drawImage(img, 0, 0);
+    try {
+      var base64 = canvas.toDataURL("image/png");
+      configTemporal.logoData = base64;
+      var imgEl = document.getElementById("logoImg");
+      var iniEl = document.getElementById("logoInitials");
+      imgEl.src = base64; imgEl.style.display = "block"; iniEl.style.display = "none";
+      document.getElementById("logoUrlWrap").style.display = "none";
+      showToast("✅ Logo aplicado — recuerda guardar cambios");
+    } catch(e) {
+      // Si hay error CORS, guardar la URL directamente
+      configTemporal.logoData = url;
+      showToast("✅ Logo aplicado — recuerda guardar cambios");
+    }
+  };
+  img.onerror = function() { showToast("❌ No se pudo cargar la imagen. Verifica la URL"); };
+  img.src = url;
+}
+
 function quitarLogo() {
   configTemporal.logoData = null;
   var img = document.getElementById("logoImg"), ini = document.getElementById("logoInitials");
@@ -1994,7 +2083,14 @@ async function guardarConfiguracion() {
   var passN       = document.getElementById("inputPassNueva")?.value            || "";
   var passC       = document.getElementById("inputPassConfirm")?.value          || "";
 
-  if (!negocio) { showToast("El nombre del negocio es obligatorio"); return; }
+  // Solo admin puede cambiar nombre del negocio y logo
+  // Analogia: el empleado puede cambiar su contraseña, pero
+  // solo el dueño puede cambiar el cartel del negocio
+  if (!esAdmin && negocio) {
+    showToast("Solo el administrador puede cambiar el nombre del negocio");
+    return;
+  }
+  if (!negocio && esAdmin) { showToast("El nombre del negocio es obligatorio"); return; }
   if (passN && passN !== passC) { showToast("Las contraseñas no coinciden"); return; }
 
   try {
@@ -2042,6 +2138,35 @@ async function cargarConfiguracion() {
   // Limpiar campos primero para evitar datos del usuario anterior
   var campos = ["inputNegocio","inputNombreUsuario","inputEmail","inputPassActual","inputPassNueva","inputPassConfirm"];
   campos.forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ""; });
+
+  // ✅ Bloquear campos de empresa para operadores
+  // Analogia: el empleado puede ver el cartel del negocio pero no puede cambiarlo
+  var seccionEmpresa = document.querySelector(".settings-section");
+  if (seccionEmpresa) {
+    var inputsEmpresa = seccionEmpresa.querySelectorAll("input, select, button:not(.settings-eye-btn)");
+    inputsEmpresa.forEach(function(el) {
+      if (esAdmin) {
+        el.removeAttribute("disabled");
+        el.style.opacity = "";
+        el.style.cursor  = "";
+      } else {
+        el.setAttribute("disabled", "true");
+        el.style.opacity = "0.5";
+        el.style.cursor  = "not-allowed";
+      }
+    });
+    // Mostrar aviso solo para operadores
+    var avisoAdmin = document.getElementById("avisoSoloAdmin");
+    if (!avisoAdmin) {
+      avisoAdmin = document.createElement("div");
+      avisoAdmin.id = "avisoSoloAdmin";
+      avisoAdmin.style = "font-size:12px;color:var(--muted);margin-top:8px;padding:8px 12px;background:var(--bg3);border-radius:8px;";
+      avisoAdmin.textContent = "🔒 Solo el administrador puede modificar los datos del negocio.";
+      var logoInfo = document.querySelector(".settings-logo-info");
+      if (logoInfo) logoInfo.appendChild(avisoAdmin);
+    }
+    avisoAdmin.style.display = esAdmin ? "none" : "block";
+  }
 
   try {
     var config = await api("/configuracion/");
@@ -2125,9 +2250,15 @@ document.addEventListener("DOMContentLoaded", function(){
     // Modal solo cierra con botón ✕ o Cancelar — nunca al hacer clic en el overlay
   });
 
-  // Si ya hay sesión activa, verificar onboarding antes de entrar
+  // Si ya hay sesión activa, verificar onboarding solo para admins
+  // Los operadores invitados entran directo — la empresa ya fue configurada
   if (authToken && usuarioActual) {
-    api("/auth/onboarding-status")
+    var rolGuardado = usuarioActual.rol;
+    var verificarOnboarding = rolGuardado === "admin"
+      ? api("/auth/onboarding-status")
+      : Promise.resolve({ onboarding_completo: true });
+
+    verificarOnboarding
       .then(function(status) {
         if (!status.onboarding_completo) {
           document.getElementById("loginPage").style.display = "none";
@@ -2136,6 +2267,7 @@ document.addEventListener("DOMContentLoaded", function(){
           document.getElementById("loginPage").style.display = "none";
           document.getElementById("appMain").style.display   = "flex";
           actualizarUIUsuario();
+          iniciarReloj();
           cargarDashboard();
         }
       })
