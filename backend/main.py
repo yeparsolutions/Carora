@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 import models
+import os
 
 # --- Importar todos los routers ---
 # ✅ auth ahora incluye los endpoints de onboarding:
@@ -29,22 +30,25 @@ app = FastAPI(
 )
 
 # --- Configurar CORS ---
-# REGLA: allow_origins=["*"] + allow_credentials=True NO se pueden combinar.
-# ⚠️  IMPORTANTE PARA PRODUCCIÓN:
-#     1. Reemplazar estas URLs por el dominio real del frontend (ej: "https://tuapp.com")
-#     2. Nunca dejar "null" — permite requests desde archivos locales (file://) lo que
-#        es un vector de ataque. Solo sirve en desarrollo con Live Server.
-#     3. Cambiar SECRET_KEY en las variables de entorno — es el punto más crítico.
-#        Analogia: es el molde para fabricar llaves (tokens). Si alguien lo roba,
-#        puede entrar como cualquier usuario, incluso admin.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# ✅ En desarrollo: permite localhost:5500 (Live Server)
+# ✅ En producción: define ALLOWED_ORIGINS en .env con tu dominio real
+#    Ejemplo: ALLOWED_ORIGINS=https://yeparstock.com,https://app.yeparstock.com
+# Analogía: la lista de invitados a la fiesta — si tu nombre no está, no entras.
+_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+if _origins_env:
+    # Producción — leer desde variable de entorno
+    ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",")]
+else:
+    # Desarrollo local — lista fija
+    ALLOWED_ORIGINS = [
         "http://localhost:5500",
         "http://127.0.0.1:5500",
         "http://localhost:8000",
-        # "null",  # 🔧 ELIMINADO — peligroso en producción, solo activar en dev local
-    ],
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins     = ALLOWED_ORIGINS,
     allow_credentials = True,
     allow_methods     = ["*"],
     allow_headers     = ["*"],
