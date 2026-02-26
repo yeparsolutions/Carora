@@ -1,13 +1,27 @@
 # ============================================================
-# STOCKYA — Diagnóstico y reparación de BD
+# YEPARSTOCK — Diagnóstico y reparación de BD
 # Archivo: backend/diagnostico.py
 # Uso: python diagnostico.py
 # ============================================================
+import os
 import psycopg2
+from dotenv import load_dotenv
+from urllib.parse import urlparse
+
+# Cargar variables de entorno desde .env
+# Analogía: leer el manual antes de conectar los cables
+load_dotenv()
+
+# Parsear DATABASE_URL para extraer los parámetros de conexión
+# Analogía: descomponer la dirección completa en calle, ciudad y código postal
+_url = urlparse(os.environ["DATABASE_URL"])
 
 conn = psycopg2.connect(
-    host="localhost", port=5433,
-    dbname="carora", user="postgres", password="Yepar2026"
+    host     = _url.hostname,
+    port     = _url.port or 5432,
+    dbname   = _url.path.lstrip("/"),
+    user     = _url.username,
+    password = _url.password   # ✅ viene del .env, no hardcodeada
 )
 cursor = conn.cursor()
 

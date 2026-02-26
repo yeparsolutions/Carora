@@ -26,9 +26,19 @@ load_dotenv()
 # Configuración de seguridad
 # ============================================================
 
-SECRET_KEY        = os.getenv("SECRET_KEY", "yeparstock_secret_key_cambiar_en_produccion")
-ALGORITHM         = os.getenv("ALGORITHM", "HS256")
-TOKEN_EXPIRY_DAYS = int(os.getenv("TOKEN_EXPIRY_DAYS", "30"))  # días que dura el token
+# ✅ SEGURO: usa os.environ (no os.getenv) — si no existe la variable
+# el servidor falla al arrancar. Intencional: mejor fallar visible
+# que arrancar con una clave débil sin que nadie lo note.
+# Analogía: si el guardia no tiene su credencial, no abre la puerta —
+# no improvisa con una credencial de cartón.
+SECRET_KEY = os.environ["SECRET_KEY"]
+ALGORITHM  = os.getenv("ALGORITHM", "HS256")
+
+# ✅ JWT reducido a 60 minutos (antes: 30 días)
+# Analogía: antes dabas una llave maestra que duraba un mes —
+# ahora la llave expira en 1 hora. Si la roban, el daño es mínimo.
+# Próximo paso: implementar refresh token para renovación silenciosa.
+ACCESS_TOKEN_MINUTES = int(os.getenv("ACCESS_TOKEN_MINUTES", "60"))
 
 # Contexto bcrypt para hashear contraseñas
 # Analogia: la máquina que convierte contraseñas en texto ilegible
@@ -56,11 +66,12 @@ def verificar_password(password_plano: str, password_hash: str) -> bool:
 
 def crear_token(datos: dict) -> str:
     """
-    Genera un token JWT firmado.
-    Analogia: el portero emite un pase con fecha de vencimiento.
+    Genera un token JWT firmado con expiración de 60 minutos.
+    Analogia: el portero emite un pase con fecha de vencimiento corta —
+    si alguien lo pierde, deja de funcionar pronto solo.
     """
     payload = datos.copy()
-    expira  = datetime.now(timezone.utc) + timedelta(days=TOKEN_EXPIRY_DAYS)
+    expira  = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_MINUTES)
     payload.update({"exp": expira})
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
