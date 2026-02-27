@@ -1591,6 +1591,13 @@ async function cargarReportes() {
           + "</div>";
     }
 
+    // Mostrar contenido y ocultar mensaje vacío
+    var tienedatos = totalVentas > 0 || productos.length > 0;
+    var contenido  = document.getElementById("reportesContenido");
+    var vacioMsg   = document.getElementById("reportesVacioMsg");
+    if (contenido) contenido.style.display = tienedatos ? "block" : "none";
+    if (vacioMsg)  vacioMsg.style.display  = tienedata ? "none"  : "block";
+
   } catch(error) { console.error("Error reportes:", error); }
 
   // Cargar sección Pro en paralelo (maneja su propio 403)
