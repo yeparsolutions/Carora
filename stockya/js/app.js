@@ -1509,7 +1509,9 @@ async function cargarReportes() {
     }
 
     // ── Ventas por método de pago ─────────────────────────────
-    var topProd = await api("/reportes/top-productos?periodo=" + periodo + "&limite=100");
+    // Top productos ahora viene del endpoint Pro — si falla con 403 se maneja abajo
+    var topProd = [];
+    try { topProd = await api("/reportes/top-productos?periodo=" + periodo + "&limite=100"); } catch(e) { topProd = []; }
     var salidasDetalle = await api("/salidas/?tipo_salida=venta&limit=1000");
     var metodosMap  = {};
     var iconMetodo  = { efectivo:"💵", debito:"💳", credito:"💳", transferencia:"📱", cheque:"📝", fiado:"📒" };
@@ -1590,6 +1592,9 @@ async function cargarReportes() {
     }
 
   } catch(error) { console.error("Error reportes:", error); }
+
+  // Cargar sección Pro en paralelo (maneja su propio 403)
+  cargarReportesPro();
 }
 
 // Helper para mini-cards de deudas
@@ -1598,6 +1603,155 @@ function _dCard(icon, label, val, color) {
     + "<div style='font-size:18px'>"+icon+"</div>"
     + "<div style='font-family:var(--font-head);font-size:18px;font-weight:800;color:"+color+"'>"+val+"</div>"
     + "<div style='font-size:11px;color:var(--muted)'>"+label+"</div>"
+    + "</div>";
+}
+
+/* ============================================================
+   REPORTES PRO — carga separada, maneja 403 con candado
+   Analogia: vitrina iluminada — el usuario Basico VE los
+   reportes Pro pero no puede interactuar con ellos.
+   ============================================================ */
+async function cargarReportesPro() {
+  const periodo = document.getElementById("reportePeriodo")?.value || "mes";
+
+  // Helper — muestra el overlay de candado en una tarjeta
+  function mostrarCandado(lockId) {
+    var el = document.getElementById(lockId);
+    if (!el) return;
+    el.style.display = "flex";
+    el.innerHTML =
+      "<div class='lock-icon'>🔒</div>"
+      + "<div class='lock-label'>Función Plan Pro</div>"
+      + "<div class='lock-sub'>Análisis de crecimiento estratégico</div>"
+      + "<button class='lock-btn' onclick=\"showScreen('equipo')\">⬆️ Ver planes</button>";
+  }
+
+  // Helper — verifica si el error es un 403 por plan
+  function esPlanRequerido(err) {
+    try {
+      var d = JSON.parse(err.message);
+      return d.tipo === "plan_requerido";
+    } catch(e) { return false; }
+  }
+
+  // Mostrar banner de upgrade si es plan basico
+  var esPro = false;
+
+  // ── Ganancia real ────────────────────────────────────────
+  try {
+    var ganancia = await api("/reportes/ganancia-real?periodo=" + periodo);
+    esPro = true;
+    var elG = document.getElementById("reporteGananciaReal");
+    if (elG) {
+      var mg = ganancia.margen_promedio;
+      var colorMg = mg >= 30 ? "var(--verde)" : mg >= 15 ? "#f59e0b" : "var(--rojo)";
+      elG.innerHTML =
+        "<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:4px 0'>"
+        + _proMetric("💵", "Ingresos", "$" + Math.round(ganancia.total_ingresos).toLocaleString("es-CL"))
+        + _proMetric("📦", "Costo vendido", "$" + Math.round(ganancia.total_costo).toLocaleString("es-CL"))
+        + _proMetric("💰", "Ganancia bruta", "$" + Math.round(ganancia.ganancia_bruta).toLocaleString("es-CL"), "var(--verde)")
+        + _proMetric("📊", "Margen", mg + "%", colorMg)
+        + "</div>";
+    }
+  } catch(err) {
+    if (esPlanRequerido(err)) mostrarCandado("lockGananciaReal");
+  }
+
+  // ── Comparación de periodos ──────────────────────────────
+  try {
+    var comp = await api("/reportes/comparacion-periodos");
+    esPro = true;
+    var elC = document.getElementById("reporteComparacion");
+    if (elC) {
+      var v = comp.variacion;
+      elC.innerHTML =
+        "<div style='display:flex;flex-direction:column;gap:10px;padding:4px 0'>"
+        + _compFila("💵 Ingresos",     comp.periodo_actual.ingresos,     comp.periodo_anterior.ingresos,     v.ingresos)
+        + _compFila("💰 Ganancia",     comp.periodo_actual.ganancia_bruta, comp.periodo_anterior.ganancia_bruta, v.ganancia_bruta)
+        + _compFila("🛒 Ventas",       comp.periodo_actual.ventas,        comp.periodo_anterior.ventas,        v.ventas)
+        + _compFila("📦 Unidades",     comp.periodo_actual.unidades,      comp.periodo_anterior.unidades,      v.unidades)
+        + "</div>"
+        + "<div style='font-size:11px;color:var(--muted);text-align:right;margin-top:4px'>Mes actual vs mes anterior</div>";
+    }
+  } catch(err) {
+    if (esPlanRequerido(err)) mostrarCandado("lockComparacion");
+  }
+
+  // ── Rotación de inventario ───────────────────────────────
+  try {
+    var rotacion = await api("/reportes/rotacion-inventario?periodo=" + periodo);
+    esPro = true;
+    var elR = document.getElementById("reporteRotacionPro");
+    if (elR) {
+      var top5 = rotacion.slice(0, 5);
+      var colores = { alta: "var(--verde)", media: "var(--azul)", baja: "#f59e0b", sin_movimiento: "var(--rojo)" };
+      elR.innerHTML = top5.length === 0
+        ? "<div style='text-align:center;color:var(--muted);padding:20px;font-size:13px'>Sin datos de rotación</div>"
+        : top5.map(function(p) {
+            var color = colores[p.clasificacion] || "var(--muted)";
+            return "<div style='display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)'>"
+              + "<div style='flex:1;font-size:13px;font-weight:500'>" + p.nombre + "</div>"
+              + "<div style='font-size:12px;color:var(--muted);margin:0 12px'>" + p.unidades_vendidas + " und.</div>"
+              + "<div style='font-size:12px;font-weight:700;color:" + color + ";background:rgba(0,0,0,0.1);padding:2px 8px;border-radius:6px'>" + p.clasificacion + "</div>"
+              + "</div>";
+          }).join("");
+    }
+  } catch(err) {
+    if (esPlanRequerido(err)) mostrarCandado("lockRotacion");
+  }
+
+  // ── Productos sin movimiento / Capital dormido ───────────
+  try {
+    var sinMov = await api("/reportes/productos-sin-movimiento?dias=30");
+    esPro = true;
+    var elS = document.getElementById("reporteSinMovimiento");
+    if (elS) {
+      var totalDormido = sinMov.reduce(function(a, p) { return a + p.capital_dormido; }, 0);
+      elS.innerHTML = sinMov.length === 0
+        ? "<div style='text-align:center;color:var(--verde);padding:20px;font-size:13px'>✅ Todos los productos tuvieron movimiento este mes</div>"
+        : "<div style='margin-bottom:12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center'>"
+          + "<span style='font-size:13px;color:var(--rojo);font-weight:600'>💤 Capital dormido (30 días)</span>"
+          + "<span style='font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--rojo)'>$" + Math.round(totalDormido).toLocaleString("es-CL") + "</span>"
+          + "</div>"
+          + sinMov.slice(0, 5).map(function(p) {
+              return "<div style='display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px'>"
+                + "<span style='font-weight:500'>" + p.nombre + "</span>"
+                + "<span style='color:var(--muted)'>" + p.stock_actual + " und · <strong style='color:var(--text)'>$" + Math.round(p.capital_dormido).toLocaleString("es-CL") + "</strong></span>"
+                + "</div>";
+            }).join("")
+          + (sinMov.length > 5 ? "<div style='font-size:12px;color:var(--muted);text-align:center;padding-top:8px'>+" + (sinMov.length - 5) + " productos más sin movimiento</div>" : "");
+    }
+  } catch(err) {
+    if (esPlanRequerido(err)) mostrarCandado("lockSinMovimiento");
+  }
+
+  // Mostrar banner de upgrade si es plan basico
+  var banner = document.getElementById("bannerUpgradePro");
+  if (banner) banner.style.display = esPro ? "none" : "flex";
+}
+
+// Helper — métrica Pro individual
+function _proMetric(icon, label, valor, color) {
+  color = color || "var(--text)";
+  return "<div style='background:var(--bg3);border-radius:10px;padding:12px'>"
+    + "<div style='font-size:11px;color:var(--muted);margin-bottom:4px'>" + icon + " " + label + "</div>"
+    + "<div style='font-family:var(--font-head);font-size:18px;font-weight:800;color:" + color + "'>" + valor + "</div>"
+    + "</div>";
+}
+
+// Helper — fila de comparación de periodos
+function _compFila(label, actual, anterior, variacion) {
+  var flecha = variacion === null ? "—" : variacion > 0 ? "▲ +" + variacion + "%" : variacion < 0 ? "▼ " + variacion + "%" : "= 0%";
+  var colorFlecha = variacion === null ? "var(--muted)" : variacion > 0 ? "var(--verde)" : variacion < 0 ? "var(--rojo)" : "var(--muted)";
+  var fmtNum = function(n) { return typeof n === "number" && n > 100 ? "$" + Math.round(n).toLocaleString("es-CL") : (n || 0).toString(); };
+  return "<div style='display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)'>"
+    + "<div style='font-size:13px;font-weight:600'>" + label + "</div>"
+    + "<div style='display:flex;align-items:center;gap:12px'>"
+    +   "<div style='font-size:12px;color:var(--muted)'>" + fmtNum(anterior) + "</div>"
+    +   "<div style='font-size:12px'>→</div>"
+    +   "<div style='font-size:13px;font-weight:700'>" + fmtNum(actual) + "</div>"
+    +   "<div style='font-size:12px;font-weight:700;color:" + colorFlecha + ";min-width:60px;text-align:right'>" + flecha + "</div>"
+    + "</div>"
     + "</div>";
 }
 

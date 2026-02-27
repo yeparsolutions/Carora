@@ -56,6 +56,49 @@ input[type="text"]::placeholder { text-transform: none; }
 .metodo-pago-btn:hover  { border-color: var(--verde); background: rgba(0,199,123,0.08); }
 .metodo-pago-btn.active { border-color: var(--verde); background: rgba(0,199,123,0.15); color: var(--verde); }
 .metodo-pago-btn.fiado.active { border-color: #f59e0b; background: rgba(245,158,11,0.15); color: #f59e0b; }
+
+/* ============================================================
+   PRO LOCK OVERLAY — cubre tarjetas Pro para usuarios Basico
+   Analogia: vitrina con vidrio — puedes ver pero no tocar
+   ============================================================ */
+.pro-lock-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(3px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  z-index: 10;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pro-lock-overlay:hover { background: rgba(15,23,42,0.88); }
+.pro-lock-overlay .lock-icon { font-size: 32px; }
+.pro-lock-overlay .lock-label {
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+}
+.pro-lock-overlay .lock-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,0.65);
+}
+.pro-lock-overlay .lock-btn {
+  background: linear-gradient(135deg,#1e40af,#7c3aed);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 4px;
+}
 </style>
 </head>
 <body class="tema-claro">
@@ -688,6 +731,63 @@ input[type="text"]::placeholder { text-transform: none; }
             </div>
           </div>
         </div>
+
+        <!-- ============================================================ -->
+        <!-- SECCIÓN PRO — visible pero bloqueada para usuarios Básico    -->
+        <!-- ============================================================ -->
+        <div id="seccionPro" style="margin-top:24px">
+
+          <!-- Banner upgrade -->
+          <div id="bannerUpgradePro" style="display:none;background:linear-gradient(135deg,#1e40af,#7c3aed);border-radius:16px;padding:24px 28px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Plan Pro</div>
+              <div style="font-family:var(--font-head);font-size:20px;font-weight:800;color:#fff;margin-bottom:4px">Inteligencia y Crecimiento 🚀</div>
+              <div style="font-size:13px;color:rgba(255,255,255,0.8)">Ganancia real · Top productos · Comparación de periodos · Rotación de inventario</div>
+            </div>
+            <button onclick="showScreen('equipo')" style="background:#fff;color:#1e40af;border:none;border-radius:10px;padding:12px 24px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">⬆️ Ver planes →</button>
+          </div>
+
+          <div class="report-grid">
+
+            <!-- Ganancia real — PRO -->
+            <div class="card" id="cardGananciaReal" style="position:relative">
+              <div class="card-title">💰 Ganancia Real del Periodo</div>
+              <div id="reporteGananciaReal" style="padding:8px 0">
+                <div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div>
+              </div>
+              <div id="lockGananciaReal" class="pro-lock-overlay" style="display:none"></div>
+            </div>
+
+            <!-- Comparación de periodos — PRO -->
+            <div class="card" id="cardComparacion" style="position:relative">
+              <div class="card-title">📅 Comparación de Periodos</div>
+              <div id="reporteComparacion" style="padding:8px 0">
+                <div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div>
+              </div>
+              <div id="lockComparacion" class="pro-lock-overlay" style="display:none"></div>
+            </div>
+
+            <!-- Rotación inventario — PRO -->
+            <div class="card" id="cardRotacion" style="position:relative">
+              <div class="card-title">🔄 Rotación de Inventario</div>
+              <div id="reporteRotacionPro" style="padding:8px 0">
+                <div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div>
+              </div>
+              <div id="lockRotacion" class="pro-lock-overlay" style="display:none"></div>
+            </div>
+
+            <!-- Productos sin movimiento — PRO -->
+            <div class="card" id="cardSinMovimiento" style="position:relative">
+              <div class="card-title">📦 Capital Dormido</div>
+              <div id="reporteSinMovimiento" style="padding:8px 0">
+                <div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div>
+              </div>
+              <div id="lockSinMovimiento" class="pro-lock-overlay" style="display:none"></div>
+            </div>
+
+          </div>
+        </div>
+
       </div>
     </div>
 
