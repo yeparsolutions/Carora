@@ -420,9 +420,11 @@ async function cargarDashboard() {
     ]);
 
     const nombre = usuarioActual && usuarioActual.nombre ? usuarioActual.nombre.split(" ")[0] : "";
-    const hoy    = new Date().toLocaleDateString("es-CL", { weekday:"long", day:"numeric", month:"long" });
     setEl("dashTitulo",    "Buen dia, " + nombre);
-    setEl("dashSubtitulo", hoy.charAt(0).toUpperCase() + hoy.slice(1) + " · " + (config.nombre_negocio || "Mi Negocio"));
+    setEl("dashSubtitulo", config.nombre_negocio || "Mi Negocio");
+
+    // Badge de plan en sidebar — se actualiza desde empresaInfo (cargado en cargarEquipo)
+    actualizarBadgePlan();
 
     const totalProductos  = productos.length;
     const totalUnidades   = productos.reduce(function(acc,p){ return acc + (p.stock_actual || 0); }, 0);
@@ -1591,13 +1593,6 @@ async function cargarReportes() {
           + "</div>";
     }
 
-    // Mostrar contenido y ocultar mensaje vacío
-    var tienedatos = totalVentas > 0 || productos.length > 0;
-    var contenido  = document.getElementById("reportesContenido");
-    var vacioMsg   = document.getElementById("reportesVacioMsg");
-    if (contenido) contenido.style.display = tienedatos ? "block" : "none";
-    if (vacioMsg)  vacioMsg.style.display  = tienedatos ? "none"  : "block";
-
   } catch(error) { console.error("Error reportes:", error); }
 
   // Cargar sección Pro en paralelo (maneja su propio 403)
@@ -2452,6 +2447,18 @@ document.addEventListener("DOMContentLoaded", function(){
 // Variables del módulo equipo
 let equipoData  = [];    // Lista de usuarios cargados
 let empresaInfo = null;  // Datos del plan y empresa
+
+// Actualiza el badge de plan en el sidebar
+// Analogia: la etiqueta del carnet — te dice si eres visitante o VIP
+function actualizarBadgePlan() {
+  var badge = document.getElementById("sidebarPlanBadge");
+  if (!badge) return;
+  var plan  = empresaInfo ? (empresaInfo.plan || "basico") : "basico";
+  var esPro = plan === "pro";
+  badge.textContent        = esPro ? "⭐ Plan Pro"    : "✦ Plan Básico";
+  badge.style.background   = esPro ? "rgba(124,58,237,0.15)" : "rgba(0,199,123,0.15)";
+  badge.style.color        = esPro ? "#7c3aed"        : "var(--verde)";
+}
 let esAdmin     = false; // Si el usuario actual es admin
 
 /* ============================================================
@@ -2576,6 +2583,7 @@ async function cargarEquipo() {
 
     empresaInfo = infoEmpresa;
     equipoData  = listaEquipo;
+    actualizarBadgePlan();  // Actualizar badge del sidebar con el plan real
 
     // Determinar si el usuario actual es admin ANTES de renderizar
     // Analogia: verificar el carnet antes de abrir la puerta, no después
