@@ -182,7 +182,14 @@ async function enterApp() {
     } catch(e) {}
 
     await cargarDashboard();
+    showScreen("dashboard");  // Siempre inicia en dashboard al hacer login
     showToast("Bienvenido, " + usuarioActual.nombre.split(" ")[0]);
+
+    // Cargar info de empresa en background para badge de plan en sidebar
+    api("/empresa/info").then(function(info) {
+      empresaInfo = info;
+      actualizarBadgePlan();
+    }).catch(function() {});
   } catch (error) {
     showToast("Error: " + error.message);
   }
@@ -1593,6 +1600,13 @@ async function cargarReportes() {
           + "</div>";
     }
 
+    // Mostrar contenido o mensaje vacío según si hay datos
+    var tienedatos = totalVentas > 0 || productos.length > 0;
+    var contenido  = document.getElementById("reportesContenido");
+    var vacioMsg   = document.getElementById("reportesVacioMsg");
+    if (contenido) contenido.style.display = tienedatos ? "block" : "none";
+    if (vacioMsg)  vacioMsg.style.display  = tienedatos ? "none"  : "block";
+
   } catch(error) { console.error("Error reportes:", error); }
 
   // Cargar sección Pro en paralelo (maneja su propio 403)
@@ -1629,11 +1643,12 @@ async function cargarReportesPro() {
   }
 
   // Helper — verifica si el error es un 403 por plan
+  // Analogia: leer la etiqueta del error — si dice "plan_requerido" es el candado, no un error real
   function esPlanRequerido(err) {
-    try {
-      var d = JSON.parse(err.message);
-      return d.tipo === "plan_requerido";
-    } catch(e) { return false; }
+    if (err.detail && err.detail.tipo === "plan_requerido") return true;
+    if (err.status === 403) return true;
+    try { var d = JSON.parse(err.message); return d.tipo === "plan_requerido"; } catch(e) {}
+    return false;
   }
 
   // Mostrar banner de upgrade si es plan basico
