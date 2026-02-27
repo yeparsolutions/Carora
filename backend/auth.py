@@ -151,3 +151,56 @@ def solo_admin(usuario: models.Usuario):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Se requiere rol de administrador para esta acción",
         )
+
+# ============================================================
+# Guard de Plan — bloquea endpoints Pro para usuarios Basico
+# Analogia: el torniquete del estadio — si tu entrada es basica
+#           no puedes pasar a la tribuna VIP aunque lo intentes.
+# ============================================================
+
+def solo_plan_pro(
+    usuario: models.Usuario = Depends(get_usuario_actual),
+    db: Session = Depends(get_db)
+) -> models.Usuario:
+    """
+    Dependency que lanza HTTP 403 si la empresa no tiene Plan Pro activo.
+
+    Uso en cualquier endpoint exclusivo de Pro:
+        @router.get("/ganancia-real")
+        def ganancia_real(usuario = Depends(solo_plan_pro)):
+            ...
+
+    El frontend puede leer detail.tipo == "plan_requerido"
+    para mostrar el modal de upgrade con candado.
+    """
+    empresa = db.query(models.Empresa).filter(
+        models.Empresa.id == usuario.empresa_id
+    ).first()
+
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "tipo":           "plan_requerido",
+                "mensaje":        "No se encontro tu empresa.",
+                "plan_actual":    "desconocido",
+                "plan_requerido": "pro"
+            }
+        )
+
+    # Obtener valor del enum como string
+    plan_actual = empresa.plan.value if hasattr(empresa.plan, "value") else empresa.plan
+
+    # Bloquear si no es Pro o si el plan esta cancelado/inactivo
+    if plan_actual != "pro" or not empresa.plan_activo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "tipo":           "plan_requerido",
+                "mensaje":        "Esta funcion es exclusiva del Plan Pro. Actualiza tu plan para acceder.",
+                "plan_actual":    plan_actual,
+                "plan_requerido": "pro"
+            }
+        )
+
+    return usuario
