@@ -1663,10 +1663,10 @@ async function cargarReportesPro() {
 
   // Si es Basico — mostrar candados directo sin llamar al backend
   if (!esPro) {
-    mostrarCandado("lockGananciaReal");
-    mostrarCandado("lockComparacion");
-    mostrarCandado("lockRotacion");
-    mostrarCandado("lockSinMovimiento");
+    mostrarCandado("lockGananciaReal",  "Ganancia Real del Periodo");
+    mostrarCandado("lockComparacion",    "Comparación de Periodos");
+    mostrarCandado("lockRotacion",       "Rotación de Inventario");
+    mostrarCandado("lockSinMovimiento",  "Capital Dormido");
     var bannerB = document.getElementById("bannerUpgradePro");
     if (bannerB) bannerB.style.display = "flex";
     return;
@@ -1693,7 +1693,7 @@ async function cargarReportesPro() {
         + "</div>";
     }
   } catch(err) {
-    if (esPlanRequerido(err)) mostrarCandado("lockGananciaReal");
+    if (esPlanRequerido(err)) mostrarCandado("lockGananciaReal",  "Ganancia Real del Periodo");
   }
 
   // ── Comparación de periodos ──────────────────────────────
@@ -1713,7 +1713,7 @@ async function cargarReportesPro() {
         + "<div style='font-size:11px;color:var(--muted);text-align:right;margin-top:4px'>Mes actual vs mes anterior</div>";
     }
   } catch(err) {
-    if (esPlanRequerido(err)) mostrarCandado("lockComparacion");
+    if (esPlanRequerido(err)) mostrarCandado("lockComparacion",   "Comparación de Periodos");
   }
 
   // ── Rotación de inventario ───────────────────────────────
@@ -1736,7 +1736,7 @@ async function cargarReportesPro() {
           }).join("");
     }
   } catch(err) {
-    if (esPlanRequerido(err)) mostrarCandado("lockRotacion");
+    if (esPlanRequerido(err)) mostrarCandado("lockRotacion",      "Rotación de Inventario");
   }
 
   // ── Productos sin movimiento / Capital dormido ───────────
@@ -1761,7 +1761,7 @@ async function cargarReportesPro() {
           + (sinMov.length > 5 ? "<div style='font-size:12px;color:var(--muted);text-align:center;padding-top:8px'>+" + (sinMov.length - 5) + " productos más sin movimiento</div>" : "");
     }
   } catch(err) {
-    if (esPlanRequerido(err)) mostrarCandado("lockSinMovimiento");
+    if (esPlanRequerido(err)) mostrarCandado("lockSinMovimiento", "Capital Dormido");
   }
 
   // Mostrar banner de upgrade si es plan basico
@@ -2703,8 +2703,12 @@ let empresaInfo = null;  // Datos del plan y empresa
 function actualizarBadgePlan() {
   var badge = document.getElementById("sidebarPlanBadge");
   if (!badge) return;
-  // Badge oculto por ahora — el plan se muestra en Mi Equipo
-  badge.style.display = "none";
+  var plan  = empresaInfo ? (empresaInfo.plan || "basico") : "basico";
+  var esPro = plan === "pro";
+  badge.style.display  = "inline-block";
+  badge.textContent    = esPro ? "⭐ Plan Pro" : "✦ Plan Básico";
+  badge.style.background = esPro ? "rgba(124,58,237,0.15)" : "rgba(0,199,123,0.15)";
+  badge.style.color      = esPro ? "#7c3aed" : "var(--verde)";
 }
 let esAdmin     = false; // Si el usuario actual es admin
 
