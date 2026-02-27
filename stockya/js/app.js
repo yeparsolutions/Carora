@@ -1631,15 +1631,16 @@ async function cargarReportesPro() {
   const periodo = document.getElementById("reportePeriodo")?.value || "mes";
 
   // Helper — muestra el overlay de candado en una tarjeta
-  function mostrarCandado(lockId) {
+  function mostrarCandado(lockId, nombreVentana) {
     var el = document.getElementById(lockId);
     if (!el) return;
     el.style.display = "flex";
     el.innerHTML =
-      "<div class='lock-icon'>🔒</div>"
-      + "<div class='lock-label'>Función Plan Pro</div>"
-      + "<div class='lock-sub'>Análisis de crecimiento estratégico</div>"
-      + "<button class='lock-btn' onclick=\"showScreen('equipo')\">⬆️ Ver planes</button>";
+      "<div style='text-align:center;padding:8px'>"
+      + "<div style='font-size:14px;font-weight:700;color:rgba(255,255,255,0.9);margin-bottom:6px'>" + (nombreVentana || "") + "</div>"
+      + "<div style='font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px'>Disponible en Plan Pro</div>"
+      + "<button class='lock-btn' onclick=\"showScreen('equipo')\">Ver planes →</button>"
+      + "</div>";
   }
 
   // Helper — verifica si el error es un 403 por plan
@@ -2702,11 +2703,8 @@ let empresaInfo = null;  // Datos del plan y empresa
 function actualizarBadgePlan() {
   var badge = document.getElementById("sidebarPlanBadge");
   if (!badge) return;
-  var plan  = empresaInfo ? (empresaInfo.plan || "basico") : "basico";
-  var esPro = plan === "pro";
-  badge.textContent        = esPro ? "⭐ Plan Pro"    : "✦ Plan Básico";
-  badge.style.background   = esPro ? "rgba(124,58,237,0.15)" : "rgba(0,199,123,0.15)";
-  badge.style.color        = esPro ? "#7c3aed"        : "var(--verde)";
+  // Badge oculto por ahora — el plan se muestra en Mi Equipo
+  badge.style.display = "none";
 }
 let esAdmin     = false; // Si el usuario actual es admin
 
