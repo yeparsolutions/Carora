@@ -1596,7 +1596,7 @@ async function cargarReportes() {
     var contenido  = document.getElementById("reportesContenido");
     var vacioMsg   = document.getElementById("reportesVacioMsg");
     if (contenido) contenido.style.display = tienedatos ? "block" : "none";
-    if (vacioMsg)  vacioMsg.style.display  = tienedata ? "none"  : "block";
+    if (vacioMsg)  vacioMsg.style.display  = tienedatos ? "none"  : "block";
 
   } catch(error) { console.error("Error reportes:", error); }
 
