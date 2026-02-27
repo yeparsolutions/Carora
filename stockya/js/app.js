@@ -1651,8 +1651,29 @@ async function cargarReportesPro() {
     return false;
   }
 
-  // Mostrar banner de upgrade si es plan basico
-  var esPro = false;
+  // Si no tenemos empresaInfo, consultarlo ahora antes de decidir que mostrar
+  // Analogia: antes de abrir la vitrina, verificar si el cliente tiene membresía Pro
+  if (!empresaInfo) {
+    try { empresaInfo = await api("/empresa/info"); } catch(e) {}
+  }
+
+  var planActual = empresaInfo ? (empresaInfo.plan || "basico") : "basico";
+  var esPro      = planActual === "pro" && (empresaInfo && empresaInfo.plan_activo !== false);
+
+  // Si es Basico — mostrar candados directo sin llamar al backend
+  if (!esPro) {
+    mostrarCandado("lockGananciaReal");
+    mostrarCandado("lockComparacion");
+    mostrarCandado("lockRotacion");
+    mostrarCandado("lockSinMovimiento");
+    var bannerB = document.getElementById("bannerUpgradePro");
+    if (bannerB) bannerB.style.display = "flex";
+    return;
+  }
+
+  // Es Pro — ocultar banner y cargar datos reales
+  var bannerP = document.getElementById("bannerUpgradePro");
+  if (bannerP) bannerP.style.display = "none";
 
   // ── Ganancia real ────────────────────────────────────────
   try {
