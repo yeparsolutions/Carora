@@ -1766,6 +1766,219 @@ async function cargarReportesPro() {
   // Mostrar banner de upgrade si es plan basico
   var banner = document.getElementById("bannerUpgradePro");
   if (banner) banner.style.display = esPro ? "none" : "flex";
+
+  // Mostrar botones de exportación solo si es Pro
+  var botonesExport = document.getElementById("botonesExportPro");
+  if (botonesExport) botonesExport.style.display = esPro ? "flex" : "none";
+}
+
+/* ============================================================
+   EXPORTACIONES PRO — Excel y PDF desde los datos ya cargados
+   Analogia: la fotocopiadora del negocio — tomas los datos
+   que ya están en pantalla y los conviertes en un documento
+   para guardar o compartir
+   ============================================================ */
+
+async function exportarExcel() {
+  // Cargar SheetJS dinámicamente si no está disponible
+  if (typeof XLSX === "undefined") {
+    await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js");
+  }
+
+  const periodo  = document.getElementById("reportePeriodo")?.value || "mes";
+  const wb       = XLSX.utils.book_new();
+
+  try {
+    // Hoja 1 — Resumen de ventas
+    var resumen = await api("/reportes/ventas-resumen?periodo=" + periodo);
+    var wsResumen = XLSX.utils.aoa_to_sheet([
+      ["REPORTE YEPARSTOCK — " + periodo.toUpperCase()],
+      [],
+      ["Métrica", "Valor"],
+      ["Ventas del periodo ($)",  resumen.total_valor    || 0],
+      ["Unidades vendidas",       resumen.total_unidades || 0],
+      ["Ticket promedio ($)",     resumen.ticket_promedio || 0],
+      ["Mermas ($)",              resumen.total_mermas   || 0],
+    ]);
+    wsResumen["!cols"] = [{wch:30},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
+
+    // Hoja 2 — Top productos
+    var top = await api("/reportes/top-productos?periodo=" + periodo + "&limite=50");
+    if (top && top.length > 0) {
+      var wsTop = XLSX.utils.json_to_sheet(top.map(function(p, i) {
+        return {
+          "Ranking":          i + 1,
+          "Producto":         p.nombre,
+          "Unidades":         p.unidades,
+          "Valor vendido ($)": p.valor_vendido,
+          "Costo total ($)":  p.costo_total,
+          "Ganancia bruta ($)": p.ganancia_bruta,
+          "Margen (%)":       p.margen_pct,
+        };
+      }));
+      wsTop["!cols"] = [{wch:10},{wch:30},{wch:12},{wch:18},{wch:16},{wch:18},{wch:12}];
+      XLSX.utils.book_append_sheet(wb, wsTop, "Top Productos");
+    }
+
+    // Hoja 3 — Ganancia real
+    var ganancia = await api("/reportes/ganancia-real?periodo=" + periodo);
+    var wsGan = XLSX.utils.aoa_to_sheet([
+      ["GANANCIA REAL — " + periodo.toUpperCase()],
+      [],
+      ["Concepto", "Monto ($)"],
+      ["Ingresos totales",  ganancia.total_ingresos],
+      ["Costo de lo vendido", ganancia.total_costo],
+      ["Ganancia bruta",    ganancia.ganancia_bruta],
+      ["Margen promedio (%)", ganancia.margen_promedio],
+    ]);
+    wsGan["!cols"] = [{wch:30},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, wsGan, "Ganancia Real");
+
+    // Hoja 4 — Rotación inventario
+    var rotacion = await api("/reportes/rotacion-inventario?periodo=" + periodo);
+    if (rotacion && rotacion.length > 0) {
+      var wsRot = XLSX.utils.json_to_sheet(rotacion.map(function(p) {
+        return {
+          "Producto":          p.nombre,
+          "Categoría":         p.categoria || "—",
+          "Stock actual":      p.stock_actual,
+          "Unidades vendidas": p.unidades_vendidas,
+          "Rotación":          p.rotacion,
+          "Clasificación":     p.clasificacion,
+        };
+      }));
+      wsRot["!cols"] = [{wch:30},{wch:20},{wch:14},{wch:18},{wch:12},{wch:16}];
+      XLSX.utils.book_append_sheet(wb, wsRot, "Rotación Inventario");
+    }
+
+    // Hoja 5 — Capital dormido
+    var sinMov = await api("/reportes/productos-sin-movimiento?dias=30");
+    if (sinMov && sinMov.length > 0) {
+      var wsSin = XLSX.utils.json_to_sheet(sinMov.map(function(p) {
+        return {
+          "Producto":          p.nombre,
+          "Categoría":         p.categoria || "—",
+          "Stock actual":      p.stock_actual,
+          "Precio compra ($)": p.precio_compra,
+          "Capital dormido ($)": p.capital_dormido,
+          "Días sin venta":    p.dias_sin_venta,
+        };
+      }));
+      wsSin["!cols"] = [{wch:30},{wch:20},{wch:14},{wch:16},{wch:18},{wch:14}];
+      XLSX.utils.book_append_sheet(wb, wsSin, "Capital Dormido");
+    }
+
+    // Descargar
+    var fecha = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, "reporte-yeparstock-" + fecha + ".xlsx");
+    showToast("✅ Excel descargado correctamente");
+
+  } catch(e) {
+    showToast("Error al exportar: " + e.message);
+    console.error(e);
+  }
+}
+
+async function exportarPDF() {
+  // Cargar jsPDF dinámicamente si no está disponible
+  if (typeof window.jspdf === "undefined") {
+    await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+    await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js");
+  }
+
+  const periodo   = document.getElementById("reportePeriodo")?.value || "mes";
+  const { jsPDF } = window.jspdf;
+  const doc       = new jsPDF();
+  const fecha     = new Date().toLocaleDateString("es-CL", { day:"numeric", month:"long", year:"numeric" });
+  var   y         = 20;  // posición vertical actual
+
+  // Encabezado
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text("Reporte YeparStock", 14, y);
+  y += 8;
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(120);
+  doc.text("Periodo: " + periodo + "   ·   Generado: " + fecha, 14, y);
+  doc.setTextColor(0);
+  y += 12;
+
+  try {
+    // Resumen de ventas
+    var resumen = await api("/reportes/ventas-resumen?periodo=" + periodo);
+    doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.text("Resumen de Ventas", 14, y); y += 6;
+    doc.autoTable({
+      startY: y,
+      head: [["Métrica", "Valor"]],
+      body: [
+        ["Ventas del periodo",  "$" + Math.round(resumen.total_valor || 0).toLocaleString("es-CL")],
+        ["Unidades vendidas",   (resumen.total_unidades || 0).toLocaleString("es-CL")],
+        ["Ticket promedio",     "$" + Math.round(resumen.ticket_promedio || 0).toLocaleString("es-CL")],
+        ["Mermas del periodo",  "$" + Math.round(resumen.total_mermas || 0).toLocaleString("es-CL")],
+      ],
+      theme: "striped", headStyles: { fillColor: [30, 64, 175] },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 12;
+
+    // Ganancia real
+    var ganancia = await api("/reportes/ganancia-real?periodo=" + periodo);
+    doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.text("Ganancia Real", 14, y); y += 6;
+    doc.autoTable({
+      startY: y,
+      head: [["Concepto", "Monto"]],
+      body: [
+        ["Ingresos totales",      "$" + Math.round(ganancia.total_ingresos).toLocaleString("es-CL")],
+        ["Costo de lo vendido",   "$" + Math.round(ganancia.total_costo).toLocaleString("es-CL")],
+        ["Ganancia bruta",        "$" + Math.round(ganancia.ganancia_bruta).toLocaleString("es-CL")],
+        ["Margen promedio",       ganancia.margen_promedio + "%"],
+      ],
+      theme: "striped", headStyles: { fillColor: [5, 150, 105] },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 12;
+
+    // Top 10 productos
+    var top = await api("/reportes/top-productos?periodo=" + periodo + "&limite=10");
+    if (top && top.length > 0) {
+      doc.setFontSize(12); doc.setFont("helvetica", "bold");
+      doc.text("Top 10 Productos por Ganancia", 14, y); y += 6;
+      doc.autoTable({
+        startY: y,
+        head: [["#", "Producto", "Unidades", "Ganancia ($)", "Margen (%)"]],
+        body: top.map(function(p, i) { return [
+          i + 1, p.nombre, p.unidades,
+          "$" + Math.round(p.ganancia_bruta).toLocaleString("es-CL"),
+          p.margen_pct + "%"
+        ]; }),
+        theme: "striped", headStyles: { fillColor: [124, 58, 237] },
+        margin: { left: 14, right: 14 },
+      });
+    }
+
+    // Descargar
+    var fechaArchivo = new Date().toISOString().slice(0,10);
+    doc.save("reporte-yeparstock-" + fechaArchivo + ".pdf");
+    showToast("✅ PDF descargado correctamente");
+
+  } catch(e) {
+    showToast("Error al exportar PDF: " + e.message);
+    console.error(e);
+  }
+}
+
+// Helper — carga un script externo dinámicamente
+function cargarScript(url) {
+  return new Promise(function(resolve, reject) {
+    if (document.querySelector('script[src="' + url + '"]')) { resolve(); return; }
+    var s = document.createElement("script");
+    s.src = url; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
 }
 
 // Helper — métrica Pro individual

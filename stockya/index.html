@@ -344,7 +344,7 @@ input[type="text"]::placeholder { text-transform: none; }
         <div class="avatar">JR</div>
         <div class="user-info">
           <div class="user-name"></div>
-          <div id="sidebarPlanBadge" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:2px;background:rgba(0,199,123,0.15);color:var(--verde)">✦ Plan Activo</div>
+          <div class="user-plan">✦ Plan Activo</div>
         </div>
         <button class="logout-btn" onclick="cerrarSesion()" title="Cerrar sesión">⏻</button>
       </div>
@@ -736,6 +736,16 @@ input[type="text"]::placeholder { text-transform: none; }
         <!-- SECCIÓN PRO — visible pero bloqueada para usuarios Básico    -->
         <!-- ============================================================ -->
         <div id="seccionPro" style="margin-top:24px">
+
+          <!-- Botones de exportación — solo visibles para Plan Pro -->
+          <div id="botonesExportPro" style="display:none;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+            <button onclick="exportarExcel()" style="display:flex;align-items:center;gap:8px;background:rgba(5,150,105,0.12);color:var(--verde);border:1px solid rgba(5,150,105,0.3);border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer">
+              📊 Descargar Excel
+            </button>
+            <button onclick="exportarPDF()" style="display:flex;align-items:center;gap:8px;background:rgba(239,68,68,0.1);color:var(--rojo);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer">
+              📄 Descargar PDF
+            </button>
+          </div>
 
           <!-- Banner upgrade -->
           <div id="bannerUpgradePro" style="display:none;background:linear-gradient(135deg,#1e40af,#7c3aed);border-radius:16px;padding:24px 28px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
