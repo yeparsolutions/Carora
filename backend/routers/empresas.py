@@ -265,6 +265,7 @@ def invitar_usuario(
         raise HTTPException(status_code=400, detail="Ese email ya está registrado")
 
     from auth import encriptar_password
+    from email_service import enviar_email, template_bienvenida_usuario
 
     nuevo = models.Usuario(
         empresa_id       = empresa.id,
@@ -279,7 +280,25 @@ def invitar_usuario(
     db.commit()
     db.refresh(nuevo)
 
-    return _usuario_dict(nuevo)
+    # Enviar correo de bienvenida con credenciales
+    # Analogia: el sobre de bienvenida que le das al empleado nuevo
+    #           con su carnet y las llaves del local
+    html = template_bienvenida_usuario(
+        nombre_usuario   = nombre,
+        email            = email,
+        password_temp    = password,
+        nombre_negocio   = empresa.nombre,
+        nombre_invitador = usuario_actual.nombre,
+    )
+    email_enviado = enviar_email(
+        destinatario = email,
+        asunto       = f"Bienvenido a {empresa.nombre} en YeparStock 🎉",
+        html         = html,
+    )
+
+    resultado = _usuario_dict(nuevo)
+    resultado["email_enviado"] = email_enviado
+    return resultado
 
 
 # ============================================================
