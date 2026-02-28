@@ -7,7 +7,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
-from auth import encriptar_password, verificar_password, crear_token, get_usuario_actual
+import sys, os
+# Importar desde el auth.py de la raíz del backend, no desde este mismo archivo
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import importlib
+_auth = importlib.import_module("auth")
+encriptar_password = _auth.encriptar_password
+verificar_password = _auth.verificar_password
+crear_token        = _auth.crear_token
+get_usuario_actual = _auth.get_usuario_actual
 import models, schemas
 import random
 
@@ -233,34 +241,42 @@ def obtener_yo(usuario_actual: models.Usuario = Depends(get_usuario_actual)):
 
 # ============================================================
 # POST /auth/verificar-email
-# El usuario ingresa el código de 6 dígitos que recibió
+# Recibe email + codigo, no requiere token (usuario aun no verificado)
 # ============================================================
 @router.post("/verificar-email")
 def verificar_email(
+    email:  str,
     codigo: str,
     db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
     """
-    Verifica el código de 6 dígitos enviado por email.
+    Verifica el código de 6 dígitos por email.
     Analogia: ingresar el PIN que el banco te mandó por SMS —
-    confirma que el correo es tuyo y activa la cuenta.
+    sin necesidad de estar logueado todavía.
     """
-    if usuario_actual.email_verificado:
-        return {"ok": True, "mensaje": "El correo ya estaba verificado"}
+    usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    if not usuario_actual.codigo_verificacion:
+    if usuario.email_verificado:
+        # Ya verificado — retornar token para que pueda entrar
+        token = crear_token({"sub": usuario.email})
+        return {"ok": True, "access_token": token, "token_type": "bearer", "usuario": usuario}
+
+    if not usuario.codigo_verificacion:
         raise HTTPException(status_code=400, detail="No hay código pendiente de verificación")
 
-    if usuario_actual.codigo_verificacion != codigo.strip():
+    if usuario.codigo_verificacion.strip() != codigo.strip():
         raise HTTPException(status_code=400, detail="Código incorrecto. Revisa tu correo e intenta de nuevo")
 
     # Marcar como verificado y limpiar el código
-    usuario_actual.email_verificado    = True
-    usuario_actual.codigo_verificacion = None
+    usuario.email_verificado    = True
+    usuario.codigo_verificacion = None
     db.commit()
 
-    return {"ok": True, "mensaje": "Correo verificado correctamente"}
+    # Retornar token igual que el login para que el frontend entre directo
+    token = crear_token({"sub": usuario.email})
+    return {"ok": True, "access_token": token, "token_type": "bearer", "usuario": usuario}
 
 
 # ============================================================
@@ -269,14 +285,18 @@ def verificar_email(
 # ============================================================
 @router.post("/reenviar-codigo")
 def reenviar_codigo(
+    email: str,
     db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
     """
     Genera un nuevo código y lo reenvía por email.
     Analogia: pedir que el banco te mande otro SMS porque el
     primero no llegó.
     """
+    usuario_actual = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not usuario_actual:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
     if usuario_actual.email_verificado:
         raise HTTPException(status_code=400, detail="Tu correo ya está verificado")
 
