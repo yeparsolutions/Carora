@@ -1,206 +1,378 @@
 # ============================================================
-# YEPARSTOCK — Módulo de Autenticación
-# Archivo: backend/auth.py
-# Descripción: Funciones de seguridad: hash, JWT y dependencia
-#              de usuario autenticado. NO es un router.
-# Analogia: es el portero del edificio — verifica identidades
-#           y emite los pases de acceso (tokens JWT).
+# YEPARSTOCK – Router de Autenticación
+# Archivo: backend/routers/auth.py
+# Descripción: Endpoints para login, registro, onboarding y perfil
 # ============================================================
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
-from jose import JWTError, jwt
-from datetime import datetime, timedelta, timezone
 from database import get_db
-import models
-import os
-from dotenv import load_dotenv
+from auth import encriptar_password, verificar_password, crear_token, get_usuario_actual
+import models, schemas
+import random
 
-# Carga las variables del archivo .env (debe estar en la raíz del backend)
-# Analogia: abrir el manual de configuración antes de arrancar la máquina
-load_dotenv()
-
-# ============================================================
-# Configuración de seguridad
-# ============================================================
-
-# ✅ SEGURO: usa os.environ (no os.getenv) — si no existe la variable
-# el servidor falla al arrancar. Intencional: mejor fallar visible
-# que arrancar con una clave débil sin que nadie lo note.
-# Analogía: si el guardia no tiene su credencial, no abre la puerta —
-# no improvisa con una credencial de cartón.
-SECRET_KEY = os.environ["SECRET_KEY"]
-ALGORITHM  = os.getenv("ALGORITHM", "HS256")
-
-# ✅ JWT reducido a 60 minutos (antes: 30 días)
-# Analogía: antes dabas una llave maestra que duraba un mes —
-# ahora la llave expira en 1 hora. Si la roban, el daño es mínimo.
-# Próximo paso: implementar refresh token para renovación silenciosa.
-ACCESS_TOKEN_MINUTES = int(os.getenv("ACCESS_TOKEN_MINUTES", "60"))
-
-# Contexto bcrypt para hashear contraseñas
-# Analogia: la máquina que convierte contraseñas en texto ilegible
-pwd_context   = CryptContext(schemes=["bcrypt"], deprecated="auto")
-bearer_scheme = HTTPBearer(auto_error=False)
+router = APIRouter(prefix="/auth", tags=["Autenticación"])
 
 
 # ============================================================
-# Funciones de contraseña
+# POST /auth/registro
 # ============================================================
-
-def encriptar_password(password: str) -> str:
-    """Convierte una contraseña en su hash bcrypt."""
-    return pwd_context.hash(password)
-
-
-def verificar_password(password_plano: str, password_hash: str) -> bool:
-    """Compara una contraseña con su hash guardado en BD."""
-    return pwd_context.verify(password_plano, password_hash)
-
-
-# ============================================================
-# Funciones JWT
-# ============================================================
-
-def crear_token(datos: dict) -> str:
+@router.post("/registro", response_model=schemas.TokenRespuesta, status_code=201)
+def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)):
     """
-    Genera un token JWT firmado con expiración de 60 minutos.
-    Analogia: el portero emite un pase con fecha de vencimiento corta —
-    si alguien lo pierde, deja de funcionar pronto solo.
+    Registra un usuario nuevo y envía código de verificación por email.
+    Analogia: abrir una cuenta bancaria — el banco crea tu expediente
+    y te envía un SMS con el código para confirmar que eres tú.
     """
-    payload = datos.copy()
-    expira  = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_MINUTES)
-    payload.update({"exp": expira})
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    existe = db.query(models.Usuario).filter(models.Usuario.email == datos.email).first()
+    if existe:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este correo ya está registrado"
+        )
 
+    # Generar código de 6 dígitos
+    codigo = str(random.randint(100000, 999999))
 
-def decodificar_token(token: str) -> dict:
-    """Decodifica y valida un token JWT. Lanza 401 si es inválido."""
+    nuevo_usuario = models.Usuario(
+        nombre              = datos.nombre,
+        email               = datos.email,
+        password_hash       = encriptar_password(datos.password),
+        email_verificado    = False,
+        codigo_verificacion = codigo,
+    )
+    db.add(nuevo_usuario)
+    db.commit()
+    db.refresh(nuevo_usuario)
+
+    # Configuración inicial con onboarding pendiente
+    config_inicial = models.Configuracion(
+        usuario_id          = nuevo_usuario.id,
+        nombre_negocio      = "Mi Negocio",
+        moneda              = "CLP",
+        color_principal     = "#00C77B",
+        onboarding_completo = False
+    )
+    db.add(config_inicial)
+    db.commit()
+
+    # Enviar email con código de verificación
     try:
-        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido o expirado",
-            headers={"WWW-Authenticate": "Bearer"},
+        from email_service import enviar_email
+        html = _template_verificacion(datos.nombre, codigo)
+        enviar_email(
+            destinatario = datos.email,
+            asunto       = "Tu código de verificación YeparStock 🔐",
+            html         = html,
         )
+    except Exception as e:
+        print(f"[REGISTRO] Error enviando email: {e}")
+
+    token = crear_token({"sub": nuevo_usuario.email})
+
+    return {
+        "access_token": token,
+        "token_type":   "bearer",
+        "usuario":      nuevo_usuario
+    }
 
 
 # ============================================================
-# Dependencia: get_usuario_actual
-# Usada en todos los endpoints protegidos con Depends()
+# POST /auth/login
 # ============================================================
-
-def get_usuario_actual(
-    credenciales: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    db: Session = Depends(get_db)
-) -> models.Usuario:
+@router.post("/login", response_model=schemas.TokenRespuesta)
+def login(datos: schemas.LoginRequest, db: Session = Depends(get_db)):
     """
-    Extrae el token del header y retorna el usuario autenticado.
-    Analogia: el portero revisa el pase y busca el registro del visitante.
+    Inicia sesión con email y contraseña.
+    Analogia: la recepcionista que verifica tu carnet y te da el pase.
     """
-    if not credenciales:
+    usuario = db.query(models.Usuario).filter(models.Usuario.email == datos.email).first()
+
+    if not usuario or not verificar_password(datos.password, usuario.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No se proporcionó token de autenticación",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    payload = decodificar_token(credenciales.credentials)
-    email: str = payload.get("sub")
-
-    if not email:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido: sin email",
-        )
-
-    usuario = db.query(models.Usuario).filter(
-        models.Usuario.email == email
-    ).first()
-
-    if not usuario:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario no encontrado",
+            detail="Correo o contraseña incorrectos"
         )
 
     if not usuario.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Esta cuenta está desactivada",
+            detail="Esta cuenta está desactivada"
         )
 
-    return usuario
+    token = crear_token({"sub": usuario.email})
+
+    return {
+        "access_token": token,
+        "token_type":   "bearer",
+        "usuario":      usuario
+    }
 
 
 # ============================================================
-# Helper: solo_admin
+# GET /auth/onboarding-status
 # ============================================================
-
-def solo_admin(usuario: models.Usuario):
+@router.get("/onboarding-status")
+def onboarding_status(
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
     """
-    Lanza 403 si el usuario no es admin.
-    Analogia: la puerta que solo abre con llave de gerente.
+    Retorna si el usuario ya completó el onboarding.
+    El frontend llama esto al iniciar sesión para decidir
+    si muestra la app o la pantalla de bienvenida.
     """
-    rol = usuario.rol.value if hasattr(usuario.rol, "value") else usuario.rol
-    if rol != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Se requiere rol de administrador para esta acción",
-        )
-
-# ============================================================
-# Guard de Plan — bloquea endpoints Pro para usuarios Basico
-# Analogia: el torniquete del estadio — si tu entrada es basica
-#           no puedes pasar a la tribuna VIP aunque lo intentes.
-# ============================================================
-
-def solo_plan_pro(
-    usuario: models.Usuario = Depends(get_usuario_actual),
-    db: Session = Depends(get_db)
-) -> models.Usuario:
-    """
-    Dependency que lanza HTTP 403 si la empresa no tiene Plan Pro activo.
-
-    Uso en cualquier endpoint exclusivo de Pro:
-        @router.get("/ganancia-real")
-        def ganancia_real(usuario = Depends(solo_plan_pro)):
-            ...
-
-    El frontend puede leer detail.tipo == "plan_requerido"
-    para mostrar el modal de upgrade con candado.
-    """
-    empresa = db.query(models.Empresa).filter(
-        models.Empresa.id == usuario.empresa_id
+    config = db.query(models.Configuracion).filter(
+        models.Configuracion.usuario_id == usuario_actual.id
     ).first()
 
-    if not empresa:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "tipo":           "plan_requerido",
-                "mensaje":        "No se encontro tu empresa.",
-                "plan_actual":    "desconocido",
-                "plan_requerido": "pro"
-            }
+    completo = config.onboarding_completo if config else False
+
+    return {"onboarding_completo": completo}
+
+
+# ============================================================
+# POST /auth/completar-onboarding
+# ============================================================
+@router.post("/completar-onboarding")
+def completar_onboarding(
+    datos: schemas.OnboardingDatos,
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
+    """
+    Guarda nombre de empresa, rubro, moneda, logo y nombre de usuario.
+    Marca onboarding_completo = True para no volver a mostrarlo.
+    Analogia: el inquilino amobló su apartamento — ya puede vivir en él.
+    """
+    # Actualizar nombre del usuario en la tabla usuarios
+    if datos.nombre_usuario:
+        usuario_actual.nombre = datos.nombre_usuario
+        db.add(usuario_actual)
+
+    # Buscar o crear configuración
+    config = db.query(models.Configuracion).filter(
+        models.Configuracion.usuario_id == usuario_actual.id
+    ).first()
+
+    if not config:
+        config = models.Configuracion(usuario_id=usuario_actual.id)
+        db.add(config)
+
+    # Guardar los datos del onboarding
+    if datos.nombre_negocio: config.nombre_negocio = datos.nombre_negocio
+    if datos.rubro:          config.rubro          = datos.rubro
+    if datos.moneda:         config.moneda         = datos.moneda
+    if datos.logo_base64:    config.logo_base64    = datos.logo_base64
+    if datos.nombre_usuario: config.nombre_usuario = datos.nombre_usuario
+
+    # ✅ Marcar como completo — no volverá a aparecer
+    config.onboarding_completo = True
+
+    db.commit()
+    db.refresh(config)
+
+    return {"ok": True, "mensaje": "Onboarding completado"}
+
+
+# ============================================================
+# PUT /auth/perfil
+# ✅ NUEVO: actualiza nombre, email y contraseña del usuario
+#    Lo llama guardarConfiguracion() en el frontend
+# ============================================================
+@router.put("/perfil", response_model=schemas.UsuarioRespuesta)
+def actualizar_perfil(
+    datos: schemas.PerfilActualizar,
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
+    """
+    Actualiza los datos personales del usuario autenticado.
+    Analogia: ir a la ventanilla del banco a cambiar tus datos.
+    """
+    # Actualizar nombre si fue enviado
+    if datos.nombre:
+        usuario_actual.nombre = datos.nombre
+
+    # Actualizar email si fue enviado y no está en uso
+    if datos.email and datos.email != usuario_actual.email:
+        en_uso = db.query(models.Usuario).filter(
+            models.Usuario.email == datos.email,
+            models.Usuario.id    != usuario_actual.id
+        ).first()
+        if en_uso:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ese correo ya está registrado por otro usuario"
+            )
+        usuario_actual.email = datos.email
+
+    # Cambiar contraseña si fue enviada
+    if datos.password_nuevo and datos.password_actual:
+        if not verificar_password(datos.password_actual, usuario_actual.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La contraseña actual es incorrecta"
+            )
+        usuario_actual.password_hash = encriptar_password(datos.password_nuevo)
+
+    db.add(usuario_actual)
+    db.commit()
+    db.refresh(usuario_actual)
+
+    return usuario_actual
+
+
+# ============================================================
+# GET /auth/yo
+# ============================================================
+@router.get("/yo", response_model=schemas.UsuarioRespuesta)
+def obtener_yo(usuario_actual: models.Usuario = Depends(get_usuario_actual)):
+    """Retorna los datos del usuario autenticado a partir del token JWT."""
+    return usuario_actual
+
+# ============================================================
+# POST /auth/verificar-email
+# Recibe email + codigo, no requiere token (usuario aun no verificado)
+# ============================================================
+@router.post("/verificar-email")
+def verificar_email(
+    email:  str,
+    codigo: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Verifica el código de 6 dígitos por email.
+    Analogia: ingresar el PIN que el banco te mandó por SMS —
+    sin necesidad de estar logueado todavía.
+    """
+    usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if usuario.email_verificado:
+        # Ya verificado — retornar token para que pueda entrar
+        token = crear_token({"sub": usuario.email})
+        return {"ok": True, "access_token": token, "token_type": "bearer", "usuario": usuario}
+
+    if not usuario.codigo_verificacion:
+        raise HTTPException(status_code=400, detail="No hay código pendiente de verificación")
+
+    if usuario.codigo_verificacion.strip() != codigo.strip():
+        raise HTTPException(status_code=400, detail="Código incorrecto. Revisa tu correo e intenta de nuevo")
+
+    # Marcar como verificado y limpiar el código
+    usuario.email_verificado    = True
+    usuario.codigo_verificacion = None
+    db.commit()
+
+    # Retornar token igual que el login para que el frontend entre directo
+    token = crear_token({"sub": usuario.email})
+    return {"ok": True, "access_token": token, "token_type": "bearer", "usuario": usuario}
+
+
+# ============================================================
+# POST /auth/reenviar-codigo
+# Por si el usuario no recibió el correo
+# ============================================================
+@router.post("/reenviar-codigo")
+def reenviar_codigo(
+    email: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Genera un nuevo código y lo reenvía por email.
+    Analogia: pedir que el banco te mande otro SMS porque el
+    primero no llegó.
+    """
+    usuario_actual = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not usuario_actual:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if usuario_actual.email_verificado:
+        raise HTTPException(status_code=400, detail="Tu correo ya está verificado")
+
+    # Generar nuevo código
+    nuevo_codigo = str(random.randint(100000, 999999))
+    usuario_actual.codigo_verificacion = nuevo_codigo
+    db.commit()
+
+    try:
+        from email_service import enviar_email
+        html = _template_verificacion(usuario_actual.nombre, nuevo_codigo)
+        enviado = enviar_email(
+            destinatario = usuario_actual.email,
+            asunto       = "Tu nuevo código de verificación YeparStock 🔐",
+            html         = html,
         )
+        if not enviado:
+            raise HTTPException(status_code=500, detail="No se pudo enviar el correo. Intenta más tarde.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al enviar correo: {str(e)}")
 
-    # Obtener valor del enum como string
-    plan_actual = empresa.plan.value if hasattr(empresa.plan, "value") else empresa.plan
+    return {"ok": True, "mensaje": "Código reenviado a tu correo"}
 
-    # Bloquear si no es Pro o si el plan esta cancelado/inactivo
-    if plan_actual != "pro" or not empresa.plan_activo:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "tipo":           "plan_requerido",
-                "mensaje":        "Esta funcion es exclusiva del Plan Pro. Actualiza tu plan para acceder.",
-                "plan_actual":    plan_actual,
-                "plan_requerido": "pro"
-            }
-        )
 
-    return usuario
+# ============================================================
+# Template HTML para verificación de email
+# ============================================================
+def _template_verificacion(nombre: str, codigo: str) -> str:
+    return f"""
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#1e40af,#0ea5e9);padding:32px 40px;text-align:center;">
+            <div style="font-size:28px;margin-bottom:6px;">📦</div>
+            <div style="font-family:Georgia,serif;font-size:26px;font-weight:900;color:#fff;letter-spacing:-1px;">YeparStock</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px;">by YeparSolutions</div>
+          </td>
+        </tr>
+
+        <!-- Cuerpo -->
+        <tr>
+          <td style="padding:36px 40px;">
+            <h2 style="margin:0 0 8px;font-size:20px;color:#0f172a;">Hola, {nombre} 👋</h2>
+            <p style="margin:0 0 28px;font-size:14px;color:#475569;line-height:1.6;">
+              Gracias por registrarte en YeparStock. Ingresa el siguiente código para verificar tu correo y activar tu cuenta:
+            </p>
+
+            <!-- Código -->
+            <div style="background:#f0f9ff;border:2px dashed #0ea5e9;border-radius:14px;padding:28px;text-align:center;margin-bottom:28px;">
+              <div style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Tu código de verificación</div>
+              <div style="font-size:44px;font-weight:900;letter-spacing:12px;color:#1e40af;font-family:monospace;">{codigo}</div>
+              <div style="font-size:12px;color:#94a3b8;margin-top:10px;">Este código expira en 24 horas</div>
+            </div>
+
+            <div style="background:#fef3c7;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:24px;">
+              <span style="font-size:13px;color:#92400e;">⚠️ Si no creaste esta cuenta, ignora este correo.</span>
+            </div>
+
+            <p style="margin:0;font-size:13px;color:#94a3b8;">
+              ¿Necesitas ayuda? Escríbenos a
+              <a href="mailto:soporte@yeparsolutions.com" style="color:#1e40af;">soporte@yeparsolutions.com</a>
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f8fafc;padding:18px 40px;text-align:center;border-top:1px solid #e2e8f0;">
+            <p style="margin:0;font-size:11px;color:#94a3b8;">© 2025 YeparSolutions · Este correo fue enviado automáticamente.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+"""
