@@ -210,7 +210,10 @@ async function registrarUsuario() {
     _mostrarPanel("panelVerificacion");
     document.getElementById("verifiEmailMostrar").textContent = email;
     document.getElementById("codigoInputs").querySelectorAll("input")[0].focus();
-  } catch (error) { showToast("Error: " + error.message); }
+  } catch (error) {
+    console.error("ERROR REGISTRO:", error);
+    showToast("Error: " + error.message);
+  }
 }
 
 function _mostrarPanel(id) {
