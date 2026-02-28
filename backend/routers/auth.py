@@ -7,15 +7,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
-import sys, os
-# Importar desde el auth.py de la raíz del backend, no desde este mismo archivo
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import importlib
-_auth = importlib.import_module("auth")
-encriptar_password = _auth.encriptar_password
-verificar_password = _auth.verificar_password
-crear_token        = _auth.crear_token
-get_usuario_actual = _auth.get_usuario_actual
+from auth import encriptar_password, verificar_password, crear_token, get_usuario_actual
 import models, schemas
 import random
 

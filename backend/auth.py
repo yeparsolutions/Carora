@@ -114,3 +114,35 @@ def solo_admin(usuario: models.Usuario) -> models.Usuario:
             detail="Solo los administradores pueden realizar esta acción",
         )
     return usuario
+
+
+# ============================================================
+# solo_plan_pro — permite solo empresas con plan Pro
+# Analogia: la sala VIP del aeropuerto — solo entra quien
+# tiene el ticket de primera clase activo
+# ============================================================
+def solo_plan_pro(
+    usuario: models.Usuario = Depends(get_usuario_actual),
+    db: Session = Depends(get_db),
+) -> models.Usuario:
+    empresa = db.query(models.Empresa).filter(
+        models.Empresa.id == usuario.empresa_id
+    ).first()
+
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+    plan = empresa.plan.value if hasattr(empresa.plan, "value") else empresa.plan
+
+    if plan != "pro":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "tipo":           "plan_requerido",
+                "mensaje":        "Esta función es exclusiva del Plan Pro.",
+                "plan_actual":    plan,
+                "plan_requerido": "pro",
+            }
+        )
+
+    return usuario
