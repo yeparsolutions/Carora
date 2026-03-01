@@ -9,6 +9,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func as sqlfunc
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 from database import get_db
@@ -81,15 +82,17 @@ def listar_movimientos(
 
     if desde:
         try:
-            fd = datetime.strptime(desde, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            query = query.filter(models.Movimiento.created_at >= fd)
+            # Comparar solo la parte de fecha para evitar desfase de timezone
+            # Analogia: buscar movimientos del dia sin importar a qué hora se registraron
+            fd = datetime.strptime(desde, "%Y-%m-%d").date()
+            query = query.filter(sqlfunc.date(models.Movimiento.created_at) >= fd)
         except Exception:
             pass
 
     if hasta:
         try:
-            fh = datetime.strptime(hasta, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
-            query = query.filter(models.Movimiento.created_at < fh)
+            fh = datetime.strptime(hasta, "%Y-%m-%d").date()
+            query = query.filter(sqlfunc.date(models.Movimiento.created_at) <= fh)
         except Exception:
             pass
 
