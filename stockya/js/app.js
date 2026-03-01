@@ -185,11 +185,18 @@ async function enterApp() {
     showScreen("dashboard");  // Siempre inicia en dashboard al hacer login
     showToast("Bienvenido, " + usuarioActual.nombre.split(" ")[0]);
 
-    // Cargar info de empresa en background para badge de plan en sidebar
+    // Ocultar badge hasta tener el plan real del servidor
+    // Analogia: no mostrar el carnet hasta que el guardia lo valide
+    var badgeInicial = document.getElementById("sidebarPlanBadge");
+    if (badgeInicial) badgeInicial.style.display = "none";
+
     api("/empresa/info").then(function(info) {
       empresaInfo = info;
       actualizarBadgePlan();
-    }).catch(function() {});
+    }).catch(function() {
+      // Si falla, mostrar badge con plan del usuario guardado localmente
+      if (badgeInicial) badgeInicial.style.display = "inline-block";
+    });
   } catch (error) {
     showToast("Error: " + error.message);
   }
@@ -289,9 +296,14 @@ async function solicitarReset() {
 
   try {
     await api("/auth/solicitar-reset?email=" + encodeURIComponent(email), "POST");
-    // Mostrar mensaje de éxito — no redirigir para no confundir
+    // Mostrar mensaje de éxito
     var msg = document.getElementById("resetMsg");
-    if (msg) msg.style.display = "block";
+    if (msg) {
+      msg.style.display = "block";
+    } else {
+      // Fallback si el div no existe en el HTML
+      showToast("📧 Contraseña temporal enviada a " + email);
+    }
     if (btn) { btn.style.display = "none"; }
   } catch(e) {
     showToast("Error: " + e.message);

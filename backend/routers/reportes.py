@@ -502,7 +502,6 @@ def enviar_reporte_email(
         models.Movimiento.tipo        == "salida",
         models.Movimiento.fecha       >= inicio,
         models.Movimiento.fecha       <= fin,
-        models.Movimiento.es_venta    == True,
     ).first()
 
     total_valor    = round(float(ventas[0] or 0), 2)
@@ -519,7 +518,6 @@ def enviar_reporte_email(
     ).filter(
         models.Movimiento.empresa_id == empresa_id,
         models.Movimiento.tipo       == "salida",
-        models.Movimiento.es_venta   == True,
         models.Movimiento.fecha      >= inicio,
         models.Movimiento.fecha      <= fin,
     ).group_by(models.Producto.nombre).order_by(desc("unidades")).limit(5).all()
