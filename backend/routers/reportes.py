@@ -37,31 +37,44 @@ def get_empresa_id(usuario_actual: models.Usuario) -> int:
     return usuario_actual.empresa_id
 
 
+# Offset de Chile: UTC-3 (America/Santiago en horario no DST)
+# Analogia: el negocio trabaja en hora chilena, no en hora de Londres
+CHILE_OFFSET = timedelta(hours=3)
+
 def get_rango_fechas(periodo: str, desde: str = None, hasta: str = None):
     """
     Convierte periodo o fechas custom en rango datetime.
+    Ajusta al timezone de Chile (UTC-3) para que los filtros de fecha
+    coincidan con lo que el usuario ve en pantalla.
     Analogia: el cajero que sabe si buscar 'ventas de hoy'
     o 'ventas entre dos fechas especificas'.
     """
     ahora = datetime.now(timezone.utc)
+
     if desde and hasta:
         try:
-            fd = datetime.strptime(desde, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            fh = datetime.strptime(hasta, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
+            # Medianoche Chile = 03:00 UTC (UTC-3)
+            # Ultimo segundo del dia Chile = 03:00 UTC del dia siguiente
+            fd = datetime.strptime(desde, "%Y-%m-%d").replace(tzinfo=timezone.utc) + CHILE_OFFSET
+            fh = datetime.strptime(hasta, "%Y-%m-%d").replace(tzinfo=timezone.utc) + CHILE_OFFSET + timedelta(days=1)
             return fd, fh
         except Exception:
             pass
+
     if periodo == "hoy":
-        inicio = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
+        # Inicio del dia en hora Chile
+        inicio = (ahora + CHILE_OFFSET).replace(hour=0, minute=0, second=0, microsecond=0) - CHILE_OFFSET
         fin    = ahora
     elif periodo == "semana":
         inicio = ahora - timedelta(days=7)
         fin    = ahora
     elif periodo == "mes":
-        inicio = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        ahora_chile = ahora + CHILE_OFFSET
+        inicio = (ahora_chile.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - CHILE_OFFSET)
         fin    = ahora
     elif periodo == "año":
-        inicio = ahora.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        ahora_chile = ahora + CHILE_OFFSET
+        inicio = (ahora_chile.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0) - CHILE_OFFSET)
         fin    = ahora
     else:
         inicio = ahora - timedelta(days=30)
