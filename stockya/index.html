@@ -362,7 +362,7 @@ input[type="text"]::placeholder { text-transform: none; }
           <div class="page-subtitle" id="dashSubtitulo">Cargando...</div>
         </div>
         <button class="btn-primary" onclick="abrirModalSalida('venta')" style="background:var(--azul)">🛒 Nueva venta</button>
-        <button class="btn-primary" onclick="openModal()">+ Agregar producto</button>
+        <button class="btn-primary" onclick="openModal()">+ Nuevo Ingreso</button>
       </div>
       <div class="stats-grid">
         <div class="stat-card verde">
@@ -1054,13 +1054,14 @@ input[type="text"]::placeholder { text-transform: none; }
 <!-- MODAL: Registrar movimiento -->
 <div class="modal-overlay" id="modalMovimiento">
   <div class="modal-box" style="max-width:480px">
-    <div class="modal-header"><div class="modal-title">📝 Registrar movimiento</div><button class="modal-close" onclick="closeModalMovimiento()">✕</button></div>
+    <div class="modal-header"><div class="modal-title">📥 Nuevo Ingreso</div><button class="modal-close" onclick="closeModalMovimiento()">✕</button></div>
     <form id="formMovimiento">
       <div class="form-grid">
         <div class="form-group form-full"><label class="form-label">Producto *</label><select id="movProductoId" class="form-input"><option value="">Seleccionar producto...</option></select></div>
         <div class="form-group"><label class="form-label">Tipo *</label><select id="movTipo" class="form-input"><option value="entrada">↑ Entrada (ingreso de stock)</option><option value="salida">↓ Salida (consumo/venta)</option></select></div>
         <div class="form-group"><label class="form-label">Cantidad *</label><input id="movCantidad" class="form-input" type="number" placeholder="0" min="1"></div>
         <div class="form-group"><label class="form-label">Número de lote</label><input id="movLote" class="form-input" type="text" placeholder="Ej: LOTE-2026-001"></div>
+        <div class="form-group"><label class="form-label">N° Documento</label><input id="movNumDocumento" class="form-input" type="text" placeholder="Ej: FACTURA-001, GD-2026-05"></div>
         <div class="form-group form-full"><label class="form-label">Nota u observación</label><input id="movNota" class="form-input" type="text" placeholder="Ej: Compra a proveedor Norte"></div>
       </div>
       <div class="form-actions">
@@ -1180,7 +1181,38 @@ input[type="text"]::placeholder { text-transform: none; }
             <button type="button" class="metodo-pago-btn"        data-metodo="transferencia" onclick="seleccionarMetodoPago('transferencia')">📱 Transferencia</button>
             <button type="button" class="metodo-pago-btn"        data-metodo="cheque"        onclick="seleccionarMetodoPago('cheque')">📝 Cheque</button>
             <button type="button" class="metodo-pago-btn fiado"  data-metodo="fiado"         onclick="seleccionarMetodoPago('fiado')">📒 Fiado</button>
+            <button type="button" class="metodo-pago-btn"        data-metodo="mixto"         onclick="seleccionarMetodoPago('mixto')" style="grid-column:1/-1">🔀 Pago Mixto (varios métodos)</button>
           </div>
+
+          <!-- Panel pago mixto — aparece solo al seleccionar Mixto -->
+          <div id="pagoMixtoPanel" style="display:none;margin-top:12px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px">
+            <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Distribuir el pago</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div>
+                <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💵 Efectivo</label>
+                <input id="mixtoEfectivo" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()">
+              </div>
+              <div>
+                <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💳 Débito</label>
+                <input id="mixtoDebito" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()">
+              </div>
+              <div>
+                <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💳 Crédito</label>
+                <input id="mixtoCredito" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()">
+              </div>
+              <div>
+                <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">📱 Transferencia</label>
+                <input id="mixtoTransferencia" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()">
+              </div>
+            </div>
+            <div id="mixtoResumen" style="margin-top:10px;padding:8px 12px;border-radius:8px;background:var(--bg2);font-size:13px">
+              <span style="color:var(--muted)">Total asignado: </span>
+              <span id="mixtoAsignado" style="font-weight:700;color:var(--verde)">/bin/sh</span>
+              <span style="color:var(--muted)"> / Restante: </span>
+              <span id="mixtoRestante" style="font-weight:700;color:var(--azul)">/bin/sh</span>
+            </div>
+          </div>
+
           <div id="fiadoAviso" style="display:none;margin-top:8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:#f59e0b">
             ⚠️ <strong>Venta fiada</strong> — El cliente lleva el producto y paga después. El nombre del cliente es <strong>obligatorio</strong>.
           </div>
