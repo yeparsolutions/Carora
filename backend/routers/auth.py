@@ -396,3 +396,127 @@ def _template_verificacion(nombre: str, codigo: str) -> str:
 </body>
 </html>
 """
+
+# ============================================================
+# POST /auth/solicitar-reset
+# Genera contraseña temporal y la envía por email
+# Analogia: el banco te entrega una tarjeta provisional cuando
+# pierdes la tuya — válida 24h, luego debes cambiarla
+# ============================================================
+@router.post("/solicitar-reset")
+def solicitar_reset(
+    email: str,
+    db: Session = Depends(get_db),
+):
+    import string
+    from datetime import datetime, timedelta, timezone
+
+    usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    # Respuesta genérica — no revelar si el email existe o no
+    if not usuario:
+        return {"ok": True, "mensaje": "Si el correo está registrado, recibirás las instrucciones"}
+
+    # Generar contraseña temporal legible (sin caracteres confusos)
+    chars    = string.ascii_letters + string.digits
+    chars    = chars.replace("l","").replace("I","").replace("O","").replace("0","")
+    password_temp = "".join(random.choices(chars, k=10))
+
+    # Guardar hash de la contraseña temporal y su expiración
+    usuario.password_hash        = encriptar_password(password_temp)
+    usuario.codigo_verificacion  = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    db.commit()
+
+    # Enviar email con contraseña temporal
+    try:
+        from email_service import enviar_email
+        html = _template_password_temporal(usuario.nombre, email, password_temp)
+        enviar_email(
+            destinatario = email,
+            asunto       = "Tu contraseña temporal YeparStock 🔑",
+            html         = html,
+        )
+    except Exception as e:
+        print(f"[RESET] Error enviando email: {e}")
+
+    return {"ok": True, "mensaje": "Contraseña temporal enviada a tu correo"}
+
+
+# ============================================================
+# Template HTML para contraseña temporal
+# ============================================================
+def _template_password_temporal(nombre: str, email: str, password_temp: str) -> str:
+    return f"""
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#1e40af,#0ea5e9);padding:32px 40px;text-align:center;">
+            <div style="font-size:28px;margin-bottom:6px;">📦</div>
+            <div style="font-family:Georgia,serif;font-size:26px;font-weight:900;color:#fff;letter-spacing:-1px;">YeparStock</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px;">by YeparSolutions</div>
+          </td>
+        </tr>
+
+        <!-- Cuerpo -->
+        <tr>
+          <td style="padding:36px 40px;">
+            <h2 style="margin:0 0 8px;font-size:20px;color:#0f172a;">Hola, {nombre} 👋</h2>
+            <p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.6;">
+              Recibimos una solicitud para restablecer tu contraseña. Usa las siguientes credenciales temporales para ingresar:
+            </p>
+
+            <!-- Credenciales -->
+            <div style="background:#f0f9ff;border:2px dashed #0ea5e9;border-radius:14px;padding:24px;margin-bottom:24px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:1px;text-transform:uppercase;padding-bottom:6px">CORREO</td>
+                  <td style="font-size:14px;color:#0f172a;font-weight:600;text-align:right">{email}</td>
+                </tr>
+                <tr><td colspan="2" style="padding:6px 0"><hr style="border:none;border-top:1px solid #e2e8f0"></td></tr>
+                <tr>
+                  <td style="font-size:12px;font-weight:700;color:#64748b;letter-spacing:1px;text-transform:uppercase;padding-top:6px">CONTRASEÑA TEMPORAL</td>
+                  <td style="text-align:right;padding-top:6px">
+                    <span style="font-size:22px;font-weight:900;letter-spacing:4px;color:#1e40af;font-family:monospace;">{password_temp}</span>
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Aviso expiración -->
+            <div style="background:#fef3c7;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:24px;">
+              <span style="font-size:13px;color:#92400e;">
+                ⏰ <strong>Esta contraseña expira en 24 horas.</strong><br>
+                Una vez que ingreses, ve a <strong>Configuración → Perfil</strong> y cámbiala por una contraseña segura.
+              </span>
+            </div>
+
+            <div style="background:#fee2e2;border-left:4px solid #ef4444;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:24px;">
+              <span style="font-size:13px;color:#991b1b;">⚠️ Si no solicitaste este cambio, ignora este correo. Tu contraseña anterior sigue activa hasta que uses esta.</span>
+            </div>
+
+            <p style="margin:0;font-size:13px;color:#94a3b8;">
+              ¿Necesitas ayuda? Escríbenos a
+              <a href="mailto:soporte@yeparsolutions.com" style="color:#1e40af;">soporte@yeparsolutions.com</a>
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f8fafc;padding:18px 40px;text-align:center;border-top:1px solid #e2e8f0;">
+            <p style="margin:0;font-size:11px;color:#94a3b8;">© 2025 YeparSolutions · Este correo fue enviado automáticamente.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+"""

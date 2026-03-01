@@ -282,12 +282,21 @@ async function solicitarReset() {
   var email = document.getElementById("resetEmail")?.value.trim() || _emailPendiente;
   if (!email) { showToast("Ingresa tu email"); return; }
   _emailPendiente = email;
+
+  // Deshabilitar botón mientras procesa
+  var btn = document.getElementById("btnSolicitarReset");
+  if (btn) { btn.disabled = true; btn.textContent = "Enviando..."; }
+
   try {
     await api("/auth/solicitar-reset?email=" + encodeURIComponent(email), "POST");
-    _mostrarPanel("panelOlvideCodigo");
-    showToast("📧 Código enviado a " + email);
-    document.getElementById("resetCodigoInputs").querySelectorAll("input")[0].focus();
-  } catch(e) { showToast("Error: " + e.message); }
+    // Mostrar mensaje de éxito — no redirigir para no confundir
+    var msg = document.getElementById("resetMsg");
+    if (msg) msg.style.display = "block";
+    if (btn) { btn.style.display = "none"; }
+  } catch(e) {
+    showToast("Error: " + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = "Enviar contraseña temporal →"; }
+  }
 }
 
 async function confirmarReset() {
