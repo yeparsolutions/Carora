@@ -421,9 +421,9 @@ def solicitar_reset(
     chars    = chars.replace("l","").replace("I","").replace("O","").replace("0","")
     password_temp = "".join(random.choices(chars, k=10))
 
-    # Guardar hash de la contraseña temporal y su expiración
-    usuario.password_hash        = encriptar_password(password_temp)
-    usuario.codigo_verificacion  = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    # Guardar solo el hash — la expiración va en el email, no en BD
+    usuario.password_hash       = encriptar_password(password_temp)
+    usuario.codigo_verificacion = None  # limpiar código anterior si existia
     db.commit()
 
     # Enviar email con contraseña temporal
