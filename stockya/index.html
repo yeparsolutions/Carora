@@ -108,10 +108,10 @@ input[type="text"]::placeholder { text-transform: none; }
   <div class="login-screen">
     <div class="login-card">
       <div class="login-logo">
-        <img id="logoImg" src="img/IsotipoStock.png" onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex'" style="width:150px;height:150px;object-fit:contain;margin-bottom:10px">
+        <img id="logoImg" src="img/IsotipoStock.png" onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex'" style="width:90px;height:90px;object-fit:contain;margin-bottom:10px">
         <div style="line-height:1">
-          <div style="font-size:20px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--muted)">YEPAR</div>
-          <div style="font-size:50px;font-weight:1200;color:#0ea5e9;font-style:roboto;margin-top:-4px">Stock</div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--muted)">YEPAR</div>
+          <div style="font-size:32px;font-weight:900;color:#0ea5e9;font-style:italic;margin-top:-2px">Stock</div>
           <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px">by YEPARSOLUTIONS</div>
         </div>
         <div id="logoFallback" style="display:none;width:72px;height:72px;align-items:center;justify-content:center;font-size:52px;margin-bottom:8px">📦</div>
@@ -181,15 +181,19 @@ input[type="text"]::placeholder { text-transform: none; }
       <!-- PANEL: olvidé mi contraseña - paso 1 email -->
       <div id="panelOlvideEmail" style="display:none">
         <div style="text-align:center;margin-bottom:20px">
-          <div style="font-size:40px">🔐</div>
+          <div style="font-size:40px">🔑</div>
           <p style="font-weight:700;font-size:16px;margin:8px 0 4px">Recuperar contraseña</p>
-          <p style="color:var(--muted);font-size:13px;margin:0">Ingresa tu email y te enviamos un código</p>
+          <p style="color:var(--muted);font-size:13px;margin:0">Te enviaremos una contraseña temporal a tu correo</p>
         </div>
         <div class="form-group" style="margin-bottom:20px">
           <label class="form-label">Correo electrónico</label>
           <input id="resetEmail" class="form-input" type="email" placeholder="tu@negocio.com">
         </div>
-        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="solicitarReset()">Enviar código →</button>
+        <div id="resetMsg" style="display:none;background:#d1fae5;border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:#065f46;text-align:center">
+          📧 ¡Listo! Revisa tu correo y usa la contraseña temporal para ingresar.<br>
+          <span style="font-size:12px;color:#047857;margin-top:4px;display:block">Recuerda cambiarla en Configuración → Perfil</span>
+        </div>
+        <button id="btnSolicitarReset" class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="solicitarReset()">Enviar contraseña temporal →</button>
         <p class="divider-text"></p>
         <button class="btn-secondary" style="width:100%;justify-content:center" onclick="mostrarLogin()">← Volver al login</button>
       </div>
@@ -311,11 +315,11 @@ input[type="text"]::placeholder { text-transform: none; }
     <div class="logo-block">
       <img src="img/IsotipoStock.png" 
         onerror="this.style.display='none'" 
-        style="width:80px; height:80px; object-fit:contain"> <!-- Cubo más grande -->
+        style="width:52px; height:52px; object-fit:contain"> <!-- Cubo más grande -->
       <div>
         <div style="line-height:1.1">
-          <div style="font-size:15px;font-weight:1100;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">YEPAR</div>
-          <div style="font-size:20px;font-weight:900;color:#0ea5e9;font-style:roboto;margin-top:-1px">Stock</div>
+          <div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">YEPAR</div>
+          <div style="font-size:18px;font-weight:900;color:#0ea5e9;font-style:italic;margin-top:-1px">Stock</div>
           <div style="font-size:7px;color:var(--muted);letter-spacing:1px;text-transform:uppercase">by YEPARSOLUTIONS</div>
         </div>
       </div>
