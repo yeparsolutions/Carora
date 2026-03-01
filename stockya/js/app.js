@@ -2535,6 +2535,24 @@ function closeModalMovimiento() {
 var _ingresoCarrito  = [];    // [{id, nombre, qty, precio_compra}]
 var _productosCache  = [];    // cache de productos para buscador de ingreso
 
+// ============================================================
+// calcularPrecioVentaIngreso — calcula precio venta al ingresar mercancía
+// Analogia: la calculadora del precio de venta cuando llega la factura
+// ============================================================
+function calcularPrecioVentaIngreso() {
+  var costo = parseFloat(document.getElementById("movPrecioCompraExtra")?.value) || 0;
+  var pct   = parseFloat(document.getElementById("movPorcentaje")?.value)        || 0;
+  var hint  = document.getElementById("movPrecioHint");
+  var elPV  = document.getElementById("movPrecioVenta");
+  if (costo > 0 && pct > 0) {
+    var pv = Math.round(costo * (1 + pct / 100));
+    if (elPV) elPV.value = pv;
+    if (hint) hint.textContent = "Ganancia: $" + (pv - costo).toLocaleString("es-CL") + " por unidad";
+  } else {
+    if (hint) hint.textContent = "";
+  }
+}
+
 function buscarProductoIngreso(val) {
   // Reutiliza la lista de productos ya cargados
   var chip = document.getElementById("ingresoChip");
@@ -2549,7 +2567,17 @@ function buscarProductoIngreso(val) {
     document.getElementById("ingresoChipNombre").textContent = prod.nombre;
     document.getElementById("ingresoChipDetalle").textContent =
       "Stock actual: " + (prod.stock_actual || 0) + " · Precio compra: $" + (prod.precio_compra || 0).toLocaleString("es-CL");
-    document.getElementById("movPrecioCompra").value = prod.precio_compra || "";
+    // Rellenar todos los campos del formulario con datos del producto
+    document.getElementById("movPrecioCompra").value          = prod.precio_compra  || "";
+    document.getElementById("movPrecioCompraExtra") && (document.getElementById("movPrecioCompraExtra").value = prod.precio_compra || "");
+    document.getElementById("movPrecioVenta")       && (document.getElementById("movPrecioVenta").value      = prod.precio_venta   || "");
+    document.getElementById("movMarca")             && (document.getElementById("movMarca").value            = prod.marca          || "");
+    document.getElementById("movCodigoInterno")     && (document.getElementById("movCodigoInterno").value    = prod.codigo_interno || "");
+    document.getElementById("movStockMin")          && (document.getElementById("movStockMin").value         = prod.stock_minimo   || "");
+    document.getElementById("movLote")              && (document.getElementById("movLote").value             = prod.lote           || "");
+    document.getElementById("movFechaVenc")         && (document.getElementById("movFechaVenc").value        = prod.fecha_vencimiento ? prod.fecha_vencimiento.slice(0,10) : "");
+    var catEl = document.getElementById("movCategoria");
+    if (catEl && prod.categoria) catEl.value = prod.categoria;
     chip._productoActual = prod;
     chip.style.display = "flex";
     document.getElementById("movCantidad").value = 1;
@@ -2652,17 +2680,39 @@ function quitarDeIngresoCarrito(idx) {
 async function guardarMovimiento() {
   if (_ingresoCarrito.length === 0) { showToast("Agrega al menos un producto"); return; }
 
-  var lote         = document.getElementById("movLote")?.value.trim()         || null;
-  var nota         = document.getElementById("movNota")?.value.trim()         || null;
-  var numDocumento = document.getElementById("movNumDocumento")?.value.trim() || null;
-  var proveedor    = document.getElementById("movProveedor")?.value.trim()    || null;
+  var lote         = document.getElementById("movLote")?.value.trim()              || null;
+  var nota         = document.getElementById("movNota")?.value.trim()              || null;
+  var numDocumento = document.getElementById("movNumDocumento")?.value.trim()      || null;
+  var proveedor    = document.getElementById("movProveedor")?.value.trim()         || null;
+  var marca        = document.getElementById("movMarca")?.value.trim()             || null;
+  var categoria    = document.getElementById("movCategoria")?.value                || null;
+  var codigoInt    = document.getElementById("movCodigoInterno")?.value.trim()     || null;
+  var stockMin     = parseInt(document.getElementById("movStockMin")?.value)       || null;
+  var precioCompra = parseFloat(document.getElementById("movPrecioCompraExtra")?.value) || null;
+  var precioVenta  = parseFloat(document.getElementById("movPrecioVenta")?.value)  || null;
+  var fechaVenc    = document.getElementById("movFechaVenc")?.value                || null;
+  var diasAlerta   = parseInt(document.getElementById("movDiasAlerta")?.value)     || null;
 
   var btn = document.getElementById("btnConfirmarIngreso");
   if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
 
   try {
-    // Registrar cada producto del carrito como entrada
     for (var item of _ingresoCarrito) {
+      // Actualizar datos del producto si el usuario los modificó
+      var actualizacion = {};
+      if (marca)        actualizacion.marca             = marca;
+      if (categoria)    actualizacion.categoria         = categoria;
+      if (codigoInt)    actualizacion.codigo_interno    = codigoInt;
+      if (stockMin)     actualizacion.stock_minimo      = stockMin;
+      if (precioCompra) actualizacion.precio_compra     = precioCompra;
+      if (precioVenta)  actualizacion.precio_venta      = precioVenta;
+      if (fechaVenc)    actualizacion.fecha_vencimiento = fechaVenc;
+      if (diasAlerta)   actualizacion.dias_alerta       = diasAlerta;
+      if (Object.keys(actualizacion).length > 0) {
+        try { await api("/productos/" + item.id, "PUT", actualizacion); } catch(e) {}
+      }
+
+      // Registrar la entrada en movimientos
       await api("/movimientos/", "POST", {
         producto_id:   item.id,
         tipo:          "entrada",
