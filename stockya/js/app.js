@@ -2681,13 +2681,24 @@ document.addEventListener("DOMContentLoaded", function(){
         }
       })
       .catch(function(err) {
-        // Token expirado o inválido — limpiar y mostrar login sin toast de error
-        authToken     = null;
-        usuarioActual = null;
-        localStorage.removeItem("yeparstock_token");
-        localStorage.removeItem("yeparstock_usuario");
-        document.getElementById("loginPage").style.display = "block";
-        document.getElementById("appMain").style.display   = "none";
+        // Solo cerrar sesion si es error 401 real — no por fallo de red
+        // Analogia: si la puerta del edificio no responde, no te mandan a casa
+        // solo si el guardia confirma que tu carnet es invalido
+        if (err && err.message && err.message.toLowerCase().includes("sesion")) {
+          authToken     = null;
+          usuarioActual = null;
+          localStorage.removeItem("yeparstock_token");
+          localStorage.removeItem("yeparstock_usuario");
+          document.getElementById("loginPage").style.display = "block";
+          document.getElementById("appMain").style.display   = "none";
+        } else {
+          // Error de red o servidor temporal — entrar igual con datos guardados
+          document.getElementById("loginPage").style.display = "none";
+          document.getElementById("appMain").style.display   = "flex";
+          actualizarUIUsuario();
+          iniciarReloj();
+          cargarDashboard();
+        }
       });
   }
 });
