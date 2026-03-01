@@ -1307,8 +1307,6 @@ function seleccionarMetodoPago(metodo) {
     mixtoPanel.style.display = metodo === "mixto" ? "block" : "none";
     if (metodo === "mixto") {
       // Mostrar el total de la venta al abrir el panel
-      var elTotal = document.getElementById("mixtoTotalVenta");
-      if (elTotal) elTotal.textContent = "$" + Math.round(_carritoTotal || 0).toLocaleString("es-CL");
       calcularMixtoRestante();
     }
   }
@@ -1320,7 +1318,8 @@ function seleccionarMetodoPago(metodo) {
 // alerta si el cliente puso de más
 // ============================================================
 function calcularMixtoRestante() {
-  var total = _carritoTotal || 0;
+  // Calcular total real del carrito
+  var total = _carrito.reduce(function(a,i){ return a + i.subtotal; }, 0);
 
   // Mostrar total en el panel
   var elTotal = document.getElementById("mixtoTotalVenta");
@@ -1442,7 +1441,7 @@ async function guardarSalida() {
     var credito       = parseFloat(document.getElementById("mixtoCredito")?.value)        || 0;
     var transferencia = parseFloat(document.getElementById("mixtoTransferencia")?.value)  || 0;
     var totalMixto    = efectivo + debito + credito + transferencia;
-    var totalCarrito  = _carritoTotal || 0;
+    var totalCarrito  = _carrito.reduce(function(a,i){ return a + i.subtotal; }, 0);
 
     if (totalMixto < totalCarrito) {
       showToast("⚠️ El total asignado (" + "$" + Math.round(totalMixto).toLocaleString("es-CL") + ") es menor al total de la venta");
@@ -2489,18 +2488,33 @@ async function confirmarEliminar() {
    MODAL MOVIMIENTO MANUAL
    ============================================================ */
 async function openModalMovimiento() {
+  // Limpiar carrito antes de abrir
+  _ingresoCarrito = [];
+
   try {
-    var productos = await api("/productos/");
-    var sel       = document.getElementById("movProductoId");
-    sel.innerHTML = "<option value=''>Seleccionar producto...</option>";
-    productos.forEach(function(p){
-      var opt       = document.createElement("option");
-      opt.value     = p.id;
-      opt.textContent = p.nombre + (p.codigo_barra ? " (" + p.codigo_barra + ")" : "");
-      sel.appendChild(opt);
-    });
+    // Cargar productos en cache y en el selector
+    var productos   = await api("/productos/");
+    _productosCache = productos;  // cache para el buscador
+
+    var sel = document.getElementById("movProductoId");
+    if (sel) {
+      sel.innerHTML = "<option value=''>— O selecciona de la lista —</option>";
+      productos.forEach(function(p){
+        var opt         = document.createElement("option");
+        opt.value       = p.id;
+        opt.textContent = p.nombre + (p.codigo_barra ? " (" + p.codigo_barra + ")" : "");
+        sel.appendChild(opt);
+      });
+    }
   } catch(e) {}
-  document.getElementById("formMovimiento").reset();
+
+  // Limpiar campos
+  var buscar = document.getElementById("movCodigoBuscar");
+  if (buscar) buscar.value = "";
+  var chip = document.getElementById("ingresoChip");
+  if (chip) { chip.style.display = "none"; chip._productoActual = null; }
+
+  renderizarIngresoCarrito();
   document.getElementById("modalMovimiento").classList.add("open");
 }
 
@@ -2518,7 +2532,8 @@ function closeModalMovimiento() {
 // CARRITO DE INGRESO — igual concepto que el carrito de ventas
 // Analogia: el formulario de recepción de mercancía del almacén
 // ============================================================
-var _ingresoCarrito = [];  // [{id, nombre, qty, precio_compra}]
+var _ingresoCarrito  = [];    // [{id, nombre, qty, precio_compra}]
+var _productosCache  = [];    // cache de productos para buscador de ingreso
 
 function buscarProductoIngreso(val) {
   // Reutiliza la lista de productos ya cargados

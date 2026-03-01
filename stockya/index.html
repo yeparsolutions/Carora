@@ -432,7 +432,7 @@ input[type="text"]::placeholder { text-transform: none; }
     <div class="screen" id="screen-productos">
       <div class="page-header">
         <div><div class="page-title">Mis Productos</div><div class="page-subtitle" id="prodSubtitulo">Cargando...</div></div>
-        <button class="btn-primary" onclick="openModal()">+ Nuevo producto</button>
+        <button class="btn-primary" onclick="openModalMovimiento()">+ Nuevo Ingreso</button>
       </div>
       <div class="search-row">
         <input id="prodBuscar" class="search-input" placeholder="🔍  Buscar por nombre, código o marca..." oninput="filtrarProductos()">
@@ -461,7 +461,7 @@ input[type="text"]::placeholder { text-transform: none; }
     <div class="screen" id="screen-stock">
       <div class="page-header">
         <div><div class="page-title">Stock 📦</div><div class="page-subtitle" id="stockSubtitulo">Cargando...</div></div>
-        <button class="btn-primary" onclick="openModal()">+ Agregar stock</button>
+        <button class="btn-primary" onclick="openModalMovimiento()">+ Nuevo Ingreso</button>
       </div>
       <div class="search-row">
         <input id="stockBuscar" class="search-input" placeholder="🔍  Buscar producto..." oninput="filtrarStock()">
@@ -1014,7 +1014,7 @@ input[type="text"]::placeholder { text-transform: none; }
 <!-- MODAL: Agregar producto -->
 <div class="modal-overlay" id="modalAgregar">
   <div class="modal-box">
-    <div class="modal-header"><div class="modal-title">Agregar nuevo producto</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-header"><div class="modal-title">➕ Nuevo Producto</div><button class="modal-close" onclick="closeModal()">✕</button></div>
     <form id="formProducto">
       <div class="form-grid">
         <div class="form-group form-full">
