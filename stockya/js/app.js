@@ -2504,21 +2504,21 @@ async function guardarConfiguracion() {
   // Solo admin puede cambiar nombre del negocio y logo
   // Analogia: el empleado puede cambiar su contraseña, pero
   // solo el dueño puede cambiar el cartel del negocio
-  if (!esAdmin && negocio) {
-    showToast("Solo el administrador puede cambiar el nombre del negocio");
-    return;
-  }
+  if (!esAdmin) negocio = ""; // operador ignora el campo negocio aunque tenga valor
   if (!negocio && esAdmin) { showToast("El nombre del negocio es obligatorio"); return; }
   if (passN && passN !== passC) { showToast("Las contraseñas no coinciden"); return; }
 
   try {
-    // 1) Guardar configuracion del negocio
-    await api("/configuracion/", "PUT", {
-      nombre_negocio:  negocio,
-      moneda:          moneda,
-      color_principal: configTemporal.color,
-      logo_base64:     configTemporal.logoData || null,
-    });
+    // 1) Guardar configuracion del negocio — solo si es admin
+    // Analogia: el empleado no toca el cartel del negocio, solo su tarjeta personal
+    if (esAdmin) {
+      await api("/configuracion/", "PUT", {
+        nombre_negocio:  negocio,
+        moneda:          moneda,
+        color_principal: configTemporal.color,
+        logo_base64:     configTemporal.logoData || null,
+      });
+    }
 
     // 2) Guardar datos del usuario si cambio algo
     if (nombreUser || emailUser) {
