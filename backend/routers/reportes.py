@@ -492,35 +492,37 @@ def enviar_reporte_email(
     empresa_id      = get_empresa_id(usuario_actual)
     inicio, fin     = get_rango_fechas(periodo, desde, hasta)
 
-    # ── Obtener datos del resumen ─────────────────────────────
-    # Ventas del periodo
-    ventas = db.query(
-        sqlfunc.sum(models.Movimiento.cantidad * models.Movimiento.precio_unitario),
-        sqlfunc.sum(models.Movimiento.cantidad),
-    ).filter(
-        models.Movimiento.empresa_id  == empresa_id,
-        models.Movimiento.tipo        == "salida",
-        models.Movimiento.fecha       >= inicio,
-        models.Movimiento.fecha       <= fin,
-    ).first()
+    # ── Obtener datos del resumen usando modelo Salida ──────
+    # Analogia: leer el libro de caja en lugar del almacen
+    ventas_lista = db.query(models.Salida).filter(
+        models.Salida.empresa_id  == empresa_id,
+        models.Salida.tipo_salida == "venta",
+        models.Salida.created_at  >= inicio,
+        models.Salida.created_at  <  fin,
+    ).all()
 
-    total_valor    = round(float(ventas[0] or 0), 2)
-    total_unidades = int(ventas[1] or 0)
+    total_valor    = round(sum(v.valor_total or 0 for v in ventas_lista), 2)
+    total_unidades = sum(v.cantidad for v in ventas_lista)
 
-    # Top 5 productos
+    # Top 5 productos agrupando por producto
     from sqlalchemy import desc
-    top = db.query(
-        models.Producto.nombre,
-        sqlfunc.sum(models.Movimiento.cantidad).label("unidades"),
-        sqlfunc.sum(models.Movimiento.cantidad * models.Movimiento.precio_unitario).label("valor"),
-    ).join(
-        models.Movimiento, models.Movimiento.producto_id == models.Producto.id
-    ).filter(
-        models.Movimiento.empresa_id == empresa_id,
-        models.Movimiento.tipo       == "salida",
-        models.Movimiento.fecha      >= inicio,
-        models.Movimiento.fecha      <= fin,
-    ).group_by(models.Producto.nombre).order_by(desc("unidades")).limit(5).all()
+    por_producto = {}
+    for v in ventas_lista:
+        pid    = v.producto_id
+        nombre = v.producto.nombre if v.producto else f"Producto #{pid}"
+        if pid not in por_producto:
+            por_producto[pid] = {"nombre": nombre, "unidades": 0, "valor": 0.0}
+        por_producto[pid]["unidades"] += v.cantidad
+        por_producto[pid]["valor"]    += v.valor_total or 0
+
+    # Convertir a lista tipo namedtuple para compatibilidad con el template
+    from collections import namedtuple
+    TopRow = namedtuple("TopRow", ["nombre", "unidades", "valor"])
+    top = sorted(
+        [TopRow(d["nombre"], d["unidades"], round(d["valor"], 2))
+         for d in por_producto.values()],
+        key=lambda x: x.unidades, reverse=True
+    )[:5]
 
     # Configuración del negocio
     config = db.query(models.Configuracion).filter(
