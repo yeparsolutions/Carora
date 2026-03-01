@@ -246,14 +246,16 @@ def listar_salidas(
         ).filter(models.Producto.nombre.ilike(f"%{buscar}%"))
     if desde:
         try:
-            fd = datetime.strptime(desde, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            query = query.filter(models.Salida.created_at >= fd)
+            # Comparar solo la parte de fecha (sin timezone) para evitar desfase horario
+            # Analogia: buscar ventas del dia sin importar a qué hora se hicieron
+            fd = datetime.strptime(desde, "%Y-%m-%d").date()
+            query = query.filter(sqlfunc.date(models.Salida.created_at) >= fd)
         except Exception:
             pass
     if hasta:
         try:
-            fh = datetime.strptime(hasta, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
-            query = query.filter(models.Salida.created_at < fh)
+            fh = datetime.strptime(hasta, "%Y-%m-%d").date()
+            query = query.filter(sqlfunc.date(models.Salida.created_at) <= fh)
         except Exception:
             pass
 
@@ -285,21 +287,42 @@ def listar_cuarentenas_pendientes(
 # ============================================================
 @router.get("/resumen", response_model=schemas.ResumenSalidas)
 def resumen_salidas(
-    db: Session = Depends(get_db),
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    db:    Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
+    # Analogia: el cajero cierra caja — puede ver el total del dia o del periodo
     empresa_id = usuario_actual.empresa_id
 
-    total_ventas       = db.query(models.Salida).filter(models.Salida.tipo_salida == "venta",                models.Salida.empresa_id == empresa_id).count()
-    total_mermas       = db.query(models.Salida).filter(models.Salida.tipo_salida == "merma",                models.Salida.empresa_id == empresa_id).count()
-    total_cuarentenas  = db.query(models.Salida).filter(models.Salida.tipo_salida == "cuarentena",           models.Salida.empresa_id == empresa_id).count()
-    total_devoluciones = db.query(models.Salida).filter(models.Salida.tipo_salida == "devolucion_proveedor", models.Salida.empresa_id == empresa_id).count()
-    cuarentenas_pend   = db.query(models.Salida).filter(models.Salida.estado      == "en_revision",          models.Salida.empresa_id == empresa_id).count()
+    def base_query():
+        q = db.query(models.Salida).filter(models.Salida.empresa_id == empresa_id)
+        if desde:
+            try:
+                fd = datetime.strptime(desde, "%Y-%m-%d").date()
+                q  = q.filter(sqlfunc.date(models.Salida.created_at) >= fd)
+            except Exception:
+                pass
+        if hasta:
+            try:
+                fh = datetime.strptime(hasta, "%Y-%m-%d").date()
+                q  = q.filter(sqlfunc.date(models.Salida.created_at) <= fh)
+            except Exception:
+                pass
+        return q
+
+    total_ventas       = base_query().filter(models.Salida.tipo_salida == "venta").count()
+    total_mermas       = base_query().filter(models.Salida.tipo_salida == "merma").count()
+    total_cuarentenas  = base_query().filter(models.Salida.tipo_salida == "cuarentena").count()
+    total_devoluciones = base_query().filter(models.Salida.tipo_salida == "devolucion_proveedor").count()
+    cuarentenas_pend   = db.query(models.Salida).filter(
+        models.Salida.estado     == "en_revision",
+        models.Salida.empresa_id == empresa_id
+    ).count()
 
     def suma_valor(tipo):
-        r = db.query(sqlfunc.sum(models.Salida.valor_total)).filter(
-            models.Salida.tipo_salida == tipo,
-            models.Salida.empresa_id == empresa_id
+        r = base_query().with_entities(sqlfunc.sum(models.Salida.valor_total)).filter(
+            models.Salida.tipo_salida == tipo
         ).scalar()
         return r or 0.0
 

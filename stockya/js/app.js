@@ -945,7 +945,15 @@ async function cargarSalidas(tipo, estado, buscar, desde, hasta) {
     if (hasta)  url += "&hasta="       + encodeURIComponent(hasta);
 
     const salidas   = await api(url);
-    const resumen   = await api("/salidas/resumen");
+    // Pasar los mismos filtros de fecha al resumen
+    var resumenUrl = "/salidas/resumen";
+    if (desde || hasta) {
+      var qs = [];
+      if (desde) qs.push("desde=" + encodeURIComponent(desde));
+      if (hasta) qs.push("hasta=" + encodeURIComponent(hasta));
+      resumenUrl += "?" + qs.join("&");
+    }
+    const resumen   = await api(resumenUrl);
     const tbody     = document.getElementById("salidaTableBody");
     const subtitulo = document.getElementById("salidaSubtitulo");
 
