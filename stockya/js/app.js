@@ -1984,6 +1984,29 @@ async function exportarPDF() {
   }
 }
 
+// ============================================================
+// enviarReportePorEmail — genera PDF y lo envía por email al usuario
+// Analogia: el contador que te manda el resumen mensual a tu correo
+// ============================================================
+async function enviarReportePorEmail() {
+  var email = usuarioActual ? usuarioActual.email : null;
+  if (!email) { showToast("No se encontró tu email"); return; }
+
+  var confirmado = confirm("¿Enviar el reporte al correo: " + email + "?");
+  if (!confirmado) return;
+
+  showToast("📧 Generando y enviando reporte...");
+
+  try {
+    var periodo = document.getElementById("reportePeriodo")?.value || "mes";
+    var res = await api("/reportes/enviar-email?periodo=" + periodo, "POST");
+    showToast("✅ Reporte enviado a " + email);
+  } catch(e) {
+    showToast("Error al enviar: " + e.message);
+  }
+}
+
+
 // Helper — carga un script externo dinámicamente
 function cargarScript(url) {
   return new Promise(function(resolve, reject) {
@@ -2504,21 +2527,21 @@ async function guardarConfiguracion() {
   // Solo admin puede cambiar nombre del negocio y logo
   // Analogia: el empleado puede cambiar su contraseña, pero
   // solo el dueño puede cambiar el cartel del negocio
-  if (!esAdmin) negocio = ""; // operador ignora el campo negocio aunque tenga valor
+  if (!esAdmin && negocio) {
+    showToast("Solo el administrador puede cambiar el nombre del negocio");
+    return;
+  }
   if (!negocio && esAdmin) { showToast("El nombre del negocio es obligatorio"); return; }
   if (passN && passN !== passC) { showToast("Las contraseñas no coinciden"); return; }
 
   try {
-    // 1) Guardar configuracion del negocio — solo si es admin
-    // Analogia: el empleado no toca el cartel del negocio, solo su tarjeta personal
-    if (esAdmin) {
-      await api("/configuracion/", "PUT", {
-        nombre_negocio:  negocio,
-        moneda:          moneda,
-        color_principal: configTemporal.color,
-        logo_base64:     configTemporal.logoData || null,
-      });
-    }
+    // 1) Guardar configuracion del negocio
+    await api("/configuracion/", "PUT", {
+      nombre_negocio:  negocio,
+      moneda:          moneda,
+      color_principal: configTemporal.color,
+      logo_base64:     configTemporal.logoData || null,
+    });
 
     // 2) Guardar datos del usuario si cambio algo
     if (nombreUser || emailUser) {
