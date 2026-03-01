@@ -640,9 +640,10 @@ input[type="text"]::placeholder { text-transform: none; }
             <option value="año">Este año</option>
             <option value="custom">Rango personalizado</option>
           </select>
-          <div id="reporteRangoCustom" style="display:none;display:flex;gap:6px">
-            <input type="date" id="reporteDesde" class="filter-select" onchange="cargarReportes()">
-            <input type="date" id="reporteHasta" class="filter-select" onchange="cargarReportes()">
+          <div id="reporteRangoCustom" style="display:none;gap:6px">
+            <input type="date" id="reporteDesde" class="filter-select">
+            <input type="date" id="reporteHasta" class="filter-select">
+            <button onclick="cargarReportes()" style="background:var(--azul);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">Filtrar →</button>
           </div>
         </div>
         <!-- Botones exportación Pro -->

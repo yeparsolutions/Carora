@@ -1457,14 +1457,41 @@ async function guardarResolucion() {
 /* ============================================================
    REPORTES — dinamico, calcula desde los datos reales
    ============================================================ */
+
+// ============================================================
+// getReporteFiltros — obtiene periodo y rango para los APIs
+// Analogia: armar el formulario de busqueda antes de enviarlo
+// ============================================================
+function getReporteFiltros() {
+  var periodo = document.getElementById("reportePeriodo")?.value || "mes";
+  var desde   = document.getElementById("reporteDesde")?.value  || "";
+  var hasta   = document.getElementById("reporteHasta")?.value  || "";
+  var params  = "?periodo=" + periodo;
+  if (periodo === "custom" && desde) params += "&desde=" + encodeURIComponent(desde);
+  if (periodo === "custom" && hasta) params += "&hasta=" + encodeURIComponent(hasta);
+  return params;
+}
+
 async function cargarReportes() {
   try {
     const periodo = document.getElementById("reportePeriodo")?.value || "mes";
 
+    // Mostrar u ocultar inputs de rango personalizado
+    // Analogia: mostrar el calendario solo cuando el usuario pide un rango especifico
+    var rangoDiv = document.getElementById("reporteRangoCustom");
+    if (rangoDiv) rangoDiv.style.display = periodo === "custom" ? "flex" : "none";
+
+    // Si es custom pero no hay fechas, esperar a que las pongan
+    if (periodo === "custom") {
+      var desde = document.getElementById("reporteDesde")?.value;
+      var hasta = document.getElementById("reporteHasta")?.value;
+      if (!desde || !hasta) return;
+    }
+
     const [productos, movimientos, resumenReportes, fiadosResumen, fiadosLista] = await Promise.all([
       api("/productos/"),
       api("/movimientos/?limit=500"),
-      api("/reportes/ventas-resumen?periodo=" + periodo),
+      api("/reportes/ventas-resumen" + getReporteFiltros()),
       api("/fiados/resumen"),
       api("/fiados/"),
     ]);
@@ -1552,7 +1579,7 @@ async function cargarReportes() {
     // ── Ventas por método de pago ─────────────────────────────
     // Top productos ahora viene del endpoint Pro — si falla con 403 se maneja abajo
     var topProd = [];
-    try { topProd = await api("/reportes/top-productos?periodo=" + periodo + "&limite=100"); } catch(e) { topProd = []; }
+    try { topProd = await api("/reportes/top-productos" + getReporteFiltros() + "&limite=100"); } catch(e) { topProd = []; }
     var salidasDetalle = await api("/salidas/?tipo_salida=venta&limit=1000");
     var metodosMap  = {};
     var iconMetodo  = { efectivo:"💵", debito:"💳", credito:"💳", transferencia:"📱", cheque:"📝", fiado:"📒" };
@@ -1710,7 +1737,7 @@ async function cargarReportesPro() {
 
   // ── Ganancia real ────────────────────────────────────────
   try {
-    var ganancia = await api("/reportes/ganancia-real?periodo=" + periodo);
+    var ganancia = await api("/reportes/ganancia-real" + getReporteFiltros());
     esPro = true;
     var elG = document.getElementById("reporteGananciaReal");
     if (elG) {
@@ -1750,7 +1777,7 @@ async function cargarReportesPro() {
 
   // ── Rotación de inventario ───────────────────────────────
   try {
-    var rotacion = await api("/reportes/rotacion-inventario?periodo=" + periodo);
+    var rotacion = await api("/reportes/rotacion-inventario" + getReporteFiltros());
     esPro = true;
     var elR = document.getElementById("reporteRotacionPro");
     if (elR) {
@@ -1823,7 +1850,7 @@ async function exportarExcel() {
 
   try {
     // Hoja 1 — Resumen de ventas
-    var resumen = await api("/reportes/ventas-resumen?periodo=" + periodo);
+    var resumen = await api("/reportes/ventas-resumen" + getReporteFiltros());
     var wsResumen = XLSX.utils.aoa_to_sheet([
       ["REPORTE YEPARSTOCK — " + periodo.toUpperCase()],
       [],
@@ -1837,7 +1864,7 @@ async function exportarExcel() {
     XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
 
     // Hoja 2 — Top productos
-    var top = await api("/reportes/top-productos?periodo=" + periodo + "&limite=50");
+    var top = await api("/reportes/top-productos" + getReporteFiltros() + "&limite=50");
     if (top && top.length > 0) {
       var wsTop = XLSX.utils.json_to_sheet(top.map(function(p, i) {
         return {
@@ -1855,7 +1882,7 @@ async function exportarExcel() {
     }
 
     // Hoja 3 — Ganancia real
-    var ganancia = await api("/reportes/ganancia-real?periodo=" + periodo);
+    var ganancia = await api("/reportes/ganancia-real" + getReporteFiltros());
     var wsGan = XLSX.utils.aoa_to_sheet([
       ["GANANCIA REAL — " + periodo.toUpperCase()],
       [],
@@ -1869,7 +1896,7 @@ async function exportarExcel() {
     XLSX.utils.book_append_sheet(wb, wsGan, "Ganancia Real");
 
     // Hoja 4 — Rotación inventario
-    var rotacion = await api("/reportes/rotacion-inventario?periodo=" + periodo);
+    var rotacion = await api("/reportes/rotacion-inventario" + getReporteFiltros());
     if (rotacion && rotacion.length > 0) {
       var wsRot = XLSX.utils.json_to_sheet(rotacion.map(function(p) {
         return {
@@ -1940,7 +1967,7 @@ async function exportarPDF() {
 
   try {
     // Resumen de ventas
-    var resumen = await api("/reportes/ventas-resumen?periodo=" + periodo);
+    var resumen = await api("/reportes/ventas-resumen" + getReporteFiltros());
     doc.setFontSize(12); doc.setFont("helvetica", "bold");
     doc.text("Resumen de Ventas", 14, y); y += 6;
     doc.autoTable({
@@ -1958,7 +1985,7 @@ async function exportarPDF() {
     y = doc.lastAutoTable.finalY + 12;
 
     // Ganancia real
-    var ganancia = await api("/reportes/ganancia-real?periodo=" + periodo);
+    var ganancia = await api("/reportes/ganancia-real" + getReporteFiltros());
     doc.setFontSize(12); doc.setFont("helvetica", "bold");
     doc.text("Ganancia Real", 14, y); y += 6;
     doc.autoTable({
@@ -1976,7 +2003,7 @@ async function exportarPDF() {
     y = doc.lastAutoTable.finalY + 12;
 
     // Top 10 productos
-    var top = await api("/reportes/top-productos?periodo=" + periodo + "&limite=10");
+    var top = await api("/reportes/top-productos" + getReporteFiltros() + "&limite=10");
     if (top && top.length > 0) {
       doc.setFontSize(12); doc.setFont("helvetica", "bold");
       doc.text("Top 10 Productos por Ganancia", 14, y); y += 6;
@@ -2019,7 +2046,7 @@ async function enviarReportePorEmail() {
 
   try {
     var periodo = document.getElementById("reportePeriodo")?.value || "mes";
-    var res = await api("/reportes/enviar-email?periodo=" + periodo, "POST");
+    var res = await api("/reportes/enviar-email" + getReporteFiltros(), "POST");
     showToast("✅ Reporte enviado a " + email);
   } catch(e) {
     showToast("Error al enviar: " + e.message);
