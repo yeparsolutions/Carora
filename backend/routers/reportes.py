@@ -472,3 +472,167 @@ def productos_sin_movimiento(
         }
         for p in sin_movimiento
     ]
+
+# ============================================================
+# POST /reportes/enviar-email
+# Genera un resumen del reporte y lo envía por email al usuario
+# Analogia: el contador que te manda el estado mensual a tu correo
+# sin que tengas que pedirle el archivo — llega solo
+# ============================================================
+@router.post("/enviar-email")
+def enviar_reporte_email(
+    periodo:        str = "mes",
+    desde:          str = None,
+    hasta:          str = None,
+    db:             Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual),
+):
+    from email_service import enviar_email
+
+    empresa_id      = get_empresa_id(usuario_actual)
+    inicio, fin     = get_rango_fechas(periodo, desde, hasta)
+
+    # ── Obtener datos del resumen ─────────────────────────────
+    # Ventas del periodo
+    ventas = db.query(
+        sqlfunc.sum(models.Movimiento.cantidad * models.Movimiento.precio_unitario),
+        sqlfunc.sum(models.Movimiento.cantidad),
+    ).filter(
+        models.Movimiento.empresa_id  == empresa_id,
+        models.Movimiento.tipo        == "salida",
+        models.Movimiento.fecha       >= inicio,
+        models.Movimiento.fecha       <= fin,
+        models.Movimiento.es_venta    == True,
+    ).first()
+
+    total_valor    = round(float(ventas[0] or 0), 2)
+    total_unidades = int(ventas[1] or 0)
+
+    # Top 5 productos
+    from sqlalchemy import desc
+    top = db.query(
+        models.Producto.nombre,
+        sqlfunc.sum(models.Movimiento.cantidad).label("unidades"),
+        sqlfunc.sum(models.Movimiento.cantidad * models.Movimiento.precio_unitario).label("valor"),
+    ).join(
+        models.Movimiento, models.Movimiento.producto_id == models.Producto.id
+    ).filter(
+        models.Movimiento.empresa_id == empresa_id,
+        models.Movimiento.tipo       == "salida",
+        models.Movimiento.es_venta   == True,
+        models.Movimiento.fecha      >= inicio,
+        models.Movimiento.fecha      <= fin,
+    ).group_by(models.Producto.nombre).order_by(desc("unidades")).limit(5).all()
+
+    # Configuración del negocio
+    config = db.query(models.Configuracion).filter(
+        models.Configuracion.usuario_id == usuario_actual.id
+    ).first()
+    nombre_negocio = config.nombre_negocio if config else "Mi Negocio"
+    moneda         = config.moneda         if config else "$"
+
+    # ── Generar HTML del reporte ──────────────────────────────
+    etiqueta_periodo = {
+        "hoy":    "Hoy",
+        "semana": "Últimos 7 días",
+        "mes":    "Este mes",
+        "año":    "Este año",
+    }.get(periodo, periodo)
+
+    filas_top = "".join([
+        f"""<tr>
+          <td style='padding:8px 12px;border-bottom:1px solid #e2e8f0'>{p.nombre}</td>
+          <td style='padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:right'>{int(p.unidades)}</td>
+          <td style='padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:right'>{moneda}{round(float(p.valor),2):,.0f}</td>
+        </tr>"""
+        for p in top
+    ]) or "<tr><td colspan='3' style='padding:12px;text-align:center;color:#94a3b8'>Sin ventas en el periodo</td></tr>"
+
+    html = f"""
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#1e40af,#0ea5e9);padding:28px 40px;">
+            <div style="font-size:22px;font-weight:900;color:#fff;">📦 YeparStock</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.8);margin-top:4px;">Reporte de {etiqueta_periodo} — {nombre_negocio}</div>
+          </td>
+        </tr>
+
+        <!-- Métricas principales -->
+        <tr>
+          <td style="padding:28px 40px 0;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td width="50%" style="padding-right:8px;">
+                  <div style="background:#f0f9ff;border-radius:12px;padding:20px;text-align:center;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:1px;text-transform:uppercase;">VENTAS</div>
+                    <div style="font-size:28px;font-weight:900;color:#0ea5e9;margin-top:6px;">{moneda}{total_valor:,.0f}</div>
+                  </div>
+                </td>
+                <td width="50%" style="padding-left:8px;">
+                  <div style="background:#f0fdf4;border-radius:12px;padding:20px;text-align:center;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:1px;text-transform:uppercase;">UNIDADES</div>
+                    <div style="font-size:28px;font-weight:900;color:#16a34a;margin-top:6px;">{total_unidades}</div>
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Top productos -->
+        <tr>
+          <td style="padding:24px 40px;">
+            <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:12px;">🏆 Top 5 Productos</div>
+            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+              <tr style="background:#f8fafc;">
+                <th style="padding:10px 12px;text-align:left;font-size:12px;color:#64748b;font-weight:600;">PRODUCTO</th>
+                <th style="padding:10px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;">UNIDADES</th>
+                <th style="padding:10px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;">VALOR</th>
+              </tr>
+              {filas_top}
+            </table>
+          </td>
+        </tr>
+
+        <!-- CTA -->
+        <tr>
+          <td style="padding:0 40px 28px;text-align:center;">
+            <div style="background:#fef3c7;border-radius:10px;padding:14px;font-size:13px;color:#92400e;">
+              Para ver el reporte completo con gráficas, descarga Excel o PDF desde la sección <strong>Reportes</strong> en YeparStock.
+            </div>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f8fafc;padding:16px 40px;text-align:center;border-top:1px solid #e2e8f0;">
+            <p style="margin:0;font-size:11px;color:#94a3b8;">© 2025 YeparSolutions · Reporte generado automáticamente</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+"""
+
+    # ── Enviar email ──────────────────────────────────────────
+    ok = enviar_email(
+        destinatario = usuario_actual.email,
+        asunto       = f"📊 Reporte {etiqueta_periodo} — {nombre_negocio}",
+        html         = html,
+    )
+
+    if not ok:
+        raise HTTPException(status_code=500, detail="No se pudo enviar el email")
+
+    return {"ok": True, "mensaje": f"Reporte enviado a {usuario_actual.email}"}
