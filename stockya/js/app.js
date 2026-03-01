@@ -454,8 +454,16 @@ async function cargarDashboard() {
     setEl("dashTitulo",    "Buen dia, " + nombre);
     setEl("dashSubtitulo", config.nombre_negocio || "Mi Negocio");
 
-    // Badge de plan en sidebar — se actualiza desde empresaInfo (cargado en cargarEquipo)
-    actualizarBadgePlan();
+    // Badge de plan — cargar empresaInfo si aun no esta disponible
+    // Analogia: el carnet debe mostrar el rango real, no el provisional
+    if (!empresaInfo) {
+      api("/empresa/info").then(function(info) {
+        empresaInfo = info;
+        actualizarBadgePlan();
+      }).catch(function() {});
+    } else {
+      actualizarBadgePlan();
+    }
 
     const totalProductos  = productos.length;
     const totalUnidades   = productos.reduce(function(acc,p){ return acc + (p.stock_actual || 0); }, 0);
