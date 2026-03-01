@@ -177,9 +177,6 @@ def registrar_salida(
         lote              = datos.lote or producto.lote,
         fecha_vencimiento = datos.fecha_vencimiento or producto.fecha_vencimiento,
         metodo_pago       = datos.metodo_pago or "efectivo",
-        # Detalle de pago mixto en JSON — solo cuando metodo_pago es 'mixto'
-        # Analogia: el desglose de la cuenta cuando el cliente paga con varias tarjetas
-        pago_mixto        = datos.pago_mixto if hasattr(datos, 'pago_mixto') else None,
     )
     db.add(salida)
     db.flush()  # para obtener salida.id antes del commit
