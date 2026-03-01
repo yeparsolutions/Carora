@@ -149,7 +149,10 @@ def registrar_movimiento(
         stock_anterior = stock_anterior,
         stock_nuevo    = stock_nuevo,
         nota           = datos.nota,
-        lote           = datos.lote
+        lote           = datos.lote,
+        # Numero de documento para trazabilidad del ingreso
+        # Analogia: el número de la factura que llega con la mercancía
+        num_documento  = getattr(datos, 'num_documento', None),
     )
     db.add(movimiento)
     db.commit()
@@ -166,6 +169,7 @@ def registrar_movimiento(
         "stock_nuevo":     movimiento.stock_nuevo,
         "nota":            movimiento.nota,
         "lote":            movimiento.lote,
+        "num_documento":   movimiento.num_documento if hasattr(movimiento, 'num_documento') else None,
         "created_at":      movimiento.created_at,
         "producto_nombre": producto.nombre,
         "usuario_nombre":  usuario_actual.nombre,

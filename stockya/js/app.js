@@ -1186,6 +1186,13 @@ function cerrarModalSalida() {
   cerrarEscanerSalida();
   // Resetear método de pago a efectivo
   _metodoPagoActual = "efectivo";
+  // Limpiar campos de pago mixto
+  ["mixtoEfectivo","mixtoDebito","mixtoCredito","mixtoTransferencia"].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  var mp = document.getElementById("pagoMixtoPanel");
+  if (mp) mp.style.display = "none";
   document.querySelectorAll(".metodo-pago-btn").forEach(function(b){ b.classList.remove("active"); });
   var btnEfectivo = document.querySelector("[data-metodo='efectivo']");
   if (btnEfectivo) btnEfectivo.classList.add("active");
@@ -1281,7 +1288,8 @@ function calcularTotalVenta() {
 
 /* Prellenar cliente generico con un clic */
 function seleccionarMetodoPago(metodo) {
-  // Analogia: elegir cómo se paga en la caja — solo una opción activa a la vez
+  // Analogia: elegir cómo se paga en la caja
+  // Mixto = el cliente paga con varias billeteras a la vez
   _metodoPagoActual = metodo;
   document.querySelectorAll(".metodo-pago-btn").forEach(function(b){
     b.classList.remove("active");
@@ -1292,6 +1300,41 @@ function seleccionarMetodoPago(metodo) {
   // Mostrar u ocultar aviso de fiado
   var aviso = document.getElementById("fiadoAviso");
   if (aviso) aviso.style.display = metodo === "fiado" ? "block" : "none";
+
+  // Mostrar u ocultar panel de pago mixto
+  var mixtoPanel = document.getElementById("pagoMixtoPanel");
+  if (mixtoPanel) {
+    mixtoPanel.style.display = metodo === "mixto" ? "block" : "none";
+    if (metodo === "mixto") calcularMixtoRestante();
+  }
+}
+
+// ============================================================
+// calcularMixtoRestante — muestra cuánto falta asignar en pago mixto
+// Analogia: la calculadora de la caja — suma lo que ya pusiste
+// y te dice cuánto falta para completar el total
+// ============================================================
+function calcularMixtoRestante() {
+  var total = _carritoTotal || 0;
+  var efectivo      = parseFloat(document.getElementById("mixtoEfectivo")?.value)      || 0;
+  var debito        = parseFloat(document.getElementById("mixtoDebito")?.value)         || 0;
+  var credito       = parseFloat(document.getElementById("mixtoCredito")?.value)        || 0;
+  var transferencia = parseFloat(document.getElementById("mixtoTransferencia")?.value)  || 0;
+
+  var asignado  = efectivo + debito + credito + transferencia;
+  var restante  = Math.max(0, total - asignado);
+  var moneda    = empresaInfo?.moneda || "$";
+
+  var elAsig = document.getElementById("mixtoAsignado");
+  var elRest = document.getElementById("mixtoRestante");
+  if (elAsig) {
+    elAsig.textContent = moneda + Math.round(asignado).toLocaleString("es-CL");
+    elAsig.style.color = asignado >= total ? "var(--verde)" : "#f59e0b";
+  }
+  if (elRest) {
+    elRest.textContent = moneda + Math.round(restante).toLocaleString("es-CL");
+    elRest.style.color = restante === 0 ? "var(--verde)" : "var(--azul)";
+  }
 }
 
 function onClienteInput() {
@@ -1360,6 +1403,25 @@ async function guardarSalida() {
     return;
   }
 
+  // Validar y armar pago mixto
+  // Analogia: verificar que las diferentes billeteras sumen el total
+  var pagoMixtoDetalle = null;
+  if (!esMerma && metodoPago === "mixto") {
+    var efectivo      = parseFloat(document.getElementById("mixtoEfectivo")?.value)      || 0;
+    var debito        = parseFloat(document.getElementById("mixtoDebito")?.value)         || 0;
+    var credito       = parseFloat(document.getElementById("mixtoCredito")?.value)        || 0;
+    var transferencia = parseFloat(document.getElementById("mixtoTransferencia")?.value)  || 0;
+    var totalMixto    = efectivo + debito + credito + transferencia;
+    var totalCarrito  = _carritoTotal || 0;
+
+    if (totalMixto < totalCarrito) {
+      showToast("⚠️ El total asignado (" + "$" + Math.round(totalMixto).toLocaleString("es-CL") + ") es menor al total de la venta");
+      return;
+    }
+    pagoMixtoDetalle = { efectivo, debito, credito, transferencia };
+    metodoPago = "mixto";
+  }
+
   var notaBase = esMerma ? (motivo || "Merma") : "";
   if (!esMerma) {
     if (cliente) notaBase = "Cliente: " + cliente;
@@ -1381,6 +1443,7 @@ async function guardarSalida() {
         numero_documento: documento || null,
         metodo_pago:      metodoPago,
         cliente_nombre:   cliente || null,
+        pago_mixto:       pagoMixtoDetalle || null,
       });
     }
     var totalItems = _carrito.reduce(function(a,i){ return a + i.qty; }, 0);
@@ -2416,11 +2479,12 @@ function closeModalMovimiento() {
 }
 
 async function guardarMovimiento() {
-  var productoId = document.getElementById("movProductoId").value;
-  var tipo       = document.getElementById("movTipo").value;
-  var cantidad   = parseInt(document.getElementById("movCantidad").value) || 0;
-  var lote       = document.getElementById("movLote").value.trim();
-  var nota       = document.getElementById("movNota").value.trim();
+  var productoId   = document.getElementById("movProductoId").value;
+  var tipo         = document.getElementById("movTipo").value;
+  var cantidad     = parseInt(document.getElementById("movCantidad").value) || 0;
+  var lote         = document.getElementById("movLote").value.trim();
+  var nota         = document.getElementById("movNota").value.trim();
+  var numDocumento = document.getElementById("movNumDocumento")?.value.trim() || null;
 
   if (!productoId) { showToast("Selecciona un producto"); return; }
   if (cantidad <= 0) { showToast("La cantidad debe ser mayor a 0"); return; }
@@ -2428,10 +2492,11 @@ async function guardarMovimiento() {
   try {
     await api("/movimientos/", "POST", {
       producto_id: parseInt(productoId), tipo, cantidad,
-      lote: lote||null, nota: nota||null
+      lote: lote||null, nota: nota||null,
+      num_documento: numDocumento||null
     });
     closeModalMovimiento();
-    showToast((tipo==="entrada"?"Entrada":"Salida") + " registrada correctamente");
+    showToast((tipo==="entrada"?"✅ Ingreso":"↓ Salida") + " registrado correctamente");
     await cargarMovimientos();
     await cargarStock();
     await cargarDashboard();
