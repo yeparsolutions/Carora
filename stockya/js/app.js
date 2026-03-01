@@ -1305,36 +1305,66 @@ function seleccionarMetodoPago(metodo) {
   var mixtoPanel = document.getElementById("pagoMixtoPanel");
   if (mixtoPanel) {
     mixtoPanel.style.display = metodo === "mixto" ? "block" : "none";
-    if (metodo === "mixto") calcularMixtoRestante();
+    if (metodo === "mixto") {
+      // Mostrar el total de la venta al abrir el panel
+      var elTotal = document.getElementById("mixtoTotalVenta");
+      if (elTotal) elTotal.textContent = "$" + Math.round(_carritoTotal || 0).toLocaleString("es-CL");
+      calcularMixtoRestante();
+    }
   }
 }
 
 // ============================================================
-// calcularMixtoRestante — muestra cuánto falta asignar en pago mixto
-// Analogia: la calculadora de la caja — suma lo que ya pusiste
-// y te dice cuánto falta para completar el total
+// calcularMixtoRestante — barra de progreso + alerta de exceso
+// Analogia: la balanza de la caja — muestra cuánto falta o
+// alerta si el cliente puso de más
 // ============================================================
 function calcularMixtoRestante() {
   var total = _carritoTotal || 0;
+
+  // Mostrar total en el panel
+  var elTotal = document.getElementById("mixtoTotalVenta");
+  if (elTotal) elTotal.textContent = "$" + Math.round(total).toLocaleString("es-CL");
+
   var efectivo      = parseFloat(document.getElementById("mixtoEfectivo")?.value)      || 0;
   var debito        = parseFloat(document.getElementById("mixtoDebito")?.value)         || 0;
   var credito       = parseFloat(document.getElementById("mixtoCredito")?.value)        || 0;
   var transferencia = parseFloat(document.getElementById("mixtoTransferencia")?.value)  || 0;
 
-  var asignado  = efectivo + debito + credito + transferencia;
-  var restante  = Math.max(0, total - asignado);
-  var moneda    = empresaInfo?.moneda || "$";
+  var asignado = efectivo + debito + credito + transferencia;
+  var restante = total - asignado;
+  var exceso   = asignado > total;
+  var completo = asignado >= total && total > 0;
 
+  // Barra de progreso
+  var barra = document.getElementById("mixtoBarra");
+  if (barra) {
+    var pct = total > 0 ? Math.min(100, Math.round(asignado / total * 100)) : 0;
+    barra.style.width = pct + "%";
+    barra.style.background = exceso ? "var(--rojo)" : completo ? "var(--verde)" : "var(--azul)";
+  }
+
+  // Asignado
   var elAsig = document.getElementById("mixtoAsignado");
-  var elRest = document.getElementById("mixtoRestante");
   if (elAsig) {
-    elAsig.textContent = moneda + Math.round(asignado).toLocaleString("es-CL");
-    elAsig.style.color = asignado >= total ? "var(--verde)" : "#f59e0b";
+    elAsig.textContent = "$" + Math.round(asignado).toLocaleString("es-CL");
+    elAsig.style.color = exceso ? "var(--rojo)" : completo ? "var(--verde)" : "#f59e0b";
   }
-  if (elRest) {
-    elRest.textContent = moneda + Math.round(restante).toLocaleString("es-CL");
-    elRest.style.color = restante === 0 ? "var(--verde)" : "var(--azul)";
+
+  // Restante o exceso
+  var elLabel = document.getElementById("mixtoRestanteLabel");
+  if (elLabel) {
+    if (exceso) {
+      elLabel.innerHTML = "<span style='color:var(--rojo);font-weight:700'>⚠️ Exceso: $" + Math.round(asignado - total).toLocaleString("es-CL") + "</span>";
+    } else {
+      var color = completo ? "var(--verde)" : "var(--azul)";
+      elLabel.innerHTML = "Falta: <span style='color:" + color + ";font-weight:700'>$" + Math.round(Math.max(0, restante)).toLocaleString("es-CL") + "</span>";
+    }
   }
+
+  // Alerta de exceso
+  var alerta = document.getElementById("mixtoAlertaExceso");
+  if (alerta) alerta.style.display = exceso ? "block" : "none";
 }
 
 function onClienteInput() {
@@ -2476,31 +2506,168 @@ async function openModalMovimiento() {
 
 function closeModalMovimiento() {
   document.getElementById("modalMovimiento").classList.remove("open");
+  // Limpiar carrito de ingreso
+  _ingresoCarrito = [];
+  renderizarIngresoCarrito();
+  document.getElementById("movCodigoBuscar") && (document.getElementById("movCodigoBuscar").value = "");
+  var chip = document.getElementById("ingresoChip");
+  if (chip) { chip.style.display = "none"; chip._productoActual = null; }
+}
+
+// ============================================================
+// CARRITO DE INGRESO — igual concepto que el carrito de ventas
+// Analogia: el formulario de recepción de mercancía del almacén
+// ============================================================
+var _ingresoCarrito = [];  // [{id, nombre, qty, precio_compra}]
+
+function buscarProductoIngreso(val) {
+  // Reutiliza la lista de productos ya cargados
+  var chip = document.getElementById("ingresoChip");
+  if (!chip) return;
+  if (!val || val.length < 2) { chip.style.display = "none"; return; }
+  var prod = (_productosCache || []).find(function(p) {
+    return (p.nombre && p.nombre.toLowerCase().includes(val.toLowerCase()))
+        || (p.codigo_barra && p.codigo_barra === val)
+        || (p.codigo_interno && p.codigo_interno === val);
+  });
+  if (prod) {
+    document.getElementById("ingresoChipNombre").textContent = prod.nombre;
+    document.getElementById("ingresoChipDetalle").textContent =
+      "Stock actual: " + (prod.stock_actual || 0) + " · Precio compra: $" + (prod.precio_compra || 0).toLocaleString("es-CL");
+    document.getElementById("movPrecioCompra").value = prod.precio_compra || "";
+    chip._productoActual = prod;
+    chip.style.display = "flex";
+    document.getElementById("movCantidad").value = 1;
+  } else {
+    chip.style.display = "none";
+  }
+}
+
+function onProductoIngresoSeleccionado() {
+  var sel  = document.getElementById("movProductoId");
+  var prod = (_productosCache || []).find(function(p){ return p.id == sel.value; });
+  if (!prod) return;
+  document.getElementById("movCodigoBuscar").value = prod.nombre;
+  buscarProductoIngreso(prod.nombre);
+}
+
+function cambiarQtyIngreso(delta) {
+  var inp = document.getElementById("movCantidad");
+  var v   = Math.max(1, (parseInt(inp.value) || 1) + delta);
+  inp.value = v;
+}
+
+function abrirEscanerIngreso() {
+  // Mismo scanner que ventas pero apunta a buscarProductoIngreso
+  var video = document.getElementById("videoEscanerIngreso");
+  if (!video) return;
+  video.style.display = "block";
+  // Reutiliza la misma lógica de la cámara
+  _iniciarEscaner(video, function(codigo) {
+    document.getElementById("movCodigoBuscar").value = codigo;
+    buscarProductoIngreso(codigo);
+    video.style.display = "none";
+  });
+}
+
+function agregarAlIngresoCarrito() {
+  var chip = document.getElementById("ingresoChip");
+  if (!chip || chip.style.display === "none" || !chip._productoActual) {
+    showToast("Selecciona un producto primero"); return;
+  }
+  var prod    = chip._productoActual;
+  var qty     = parseInt(document.getElementById("movCantidad").value) || 1;
+  var precio  = parseFloat(document.getElementById("movPrecioCompra").value) || 0;
+
+  // Si ya está en el carrito, sumar cantidad
+  var existente = _ingresoCarrito.find(function(i){ return i.id === prod.id; });
+  if (existente) {
+    existente.qty += qty;
+    existente.precio_compra = precio;
+  } else {
+    _ingresoCarrito.push({ id: prod.id, nombre: prod.nombre, qty: qty, precio_compra: precio });
+  }
+
+  // Limpiar buscador
+  document.getElementById("movCodigoBuscar").value = "";
+  chip.style.display = "none";
+  chip._productoActual = null;
+
+  renderizarIngresoCarrito();
+}
+
+function renderizarIngresoCarrito() {
+  var wrap  = document.getElementById("ingresoCarritoWrap");
+  var lista = document.getElementById("ingresoCarritoLista");
+  var btnC  = document.getElementById("btnConfirmarIngreso");
+  if (!wrap || !lista) return;
+
+  if (_ingresoCarrito.length === 0) {
+    wrap.style.display = "none";
+    if (btnC) { btnC.disabled = true; btnC.style.opacity = "0.5"; }
+    document.getElementById("ingresoTotalDetalle").textContent = "0 productos";
+    document.getElementById("ingresoTotalValor").textContent   = "$0";
+    return;
+  }
+
+  wrap.style.display = "block";
+  if (btnC) { btnC.disabled = false; btnC.style.opacity = "1"; }
+
+  lista.innerHTML = _ingresoCarrito.map(function(item, idx) {
+    var subtotal = item.qty * item.precio_compra;
+    return "<div style='display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:10px;padding:8px 12px'>"
+      + "<div style='flex:1;font-size:13px;font-weight:600'>" + item.nombre + "</div>"
+      + "<div style='font-size:12px;color:var(--muted)'>" + item.qty + " ud.</div>"
+      + "<div style='font-size:13px;font-weight:700;color:var(--azul);min-width:70px;text-align:right'>$" + subtotal.toLocaleString("es-CL") + "</div>"
+      + "<button onclick='quitarDeIngresoCarrito(" + idx + ")' style='background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px'>✕</button>"
+      + "</div>";
+  }).join("");
+
+  var totalUnd  = _ingresoCarrito.reduce(function(a,i){ return a + i.qty; }, 0);
+  var totalVal  = _ingresoCarrito.reduce(function(a,i){ return a + (i.qty * i.precio_compra); }, 0);
+  document.getElementById("ingresoTotalDetalle").textContent = totalUnd + " " + (totalUnd === 1 ? "producto" : "productos");
+  document.getElementById("ingresoTotalValor").textContent   = "$" + Math.round(totalVal).toLocaleString("es-CL");
+}
+
+function quitarDeIngresoCarrito(idx) {
+  _ingresoCarrito.splice(idx, 1);
+  renderizarIngresoCarrito();
 }
 
 async function guardarMovimiento() {
-  var productoId   = document.getElementById("movProductoId").value;
-  var tipo         = document.getElementById("movTipo").value;
-  var cantidad     = parseInt(document.getElementById("movCantidad").value) || 0;
-  var lote         = document.getElementById("movLote").value.trim();
-  var nota         = document.getElementById("movNota").value.trim();
-  var numDocumento = document.getElementById("movNumDocumento")?.value.trim() || null;
+  if (_ingresoCarrito.length === 0) { showToast("Agrega al menos un producto"); return; }
 
-  if (!productoId) { showToast("Selecciona un producto"); return; }
-  if (cantidad <= 0) { showToast("La cantidad debe ser mayor a 0"); return; }
+  var lote         = document.getElementById("movLote")?.value.trim()         || null;
+  var nota         = document.getElementById("movNota")?.value.trim()         || null;
+  var numDocumento = document.getElementById("movNumDocumento")?.value.trim() || null;
+  var proveedor    = document.getElementById("movProveedor")?.value.trim()    || null;
+
+  var btn = document.getElementById("btnConfirmarIngreso");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
 
   try {
-    await api("/movimientos/", "POST", {
-      producto_id: parseInt(productoId), tipo, cantidad,
-      lote: lote||null, nota: nota||null,
-      num_documento: numDocumento||null
-    });
+    // Registrar cada producto del carrito como entrada
+    for (var item of _ingresoCarrito) {
+      await api("/movimientos/", "POST", {
+        producto_id:   item.id,
+        tipo:          "entrada",
+        cantidad:      item.qty,
+        lote:          lote,
+        nota:          (proveedor ? "Proveedor: " + proveedor + (nota ? " — " + nota : "") : nota),
+        num_documento: numDocumento,
+      });
+    }
+    var totalUnd = _ingresoCarrito.reduce(function(a,i){ return a + i.qty; }, 0);
     closeModalMovimiento();
-    showToast((tipo==="entrada"?"✅ Ingreso":"↓ Salida") + " registrado correctamente");
+    showToast("✅ Ingreso registrado — " + totalUnd + " unidades en " + _ingresoCarrito.length + " productos");
+    _ingresoCarrito = [];
     await cargarMovimientos();
     await cargarStock();
     await cargarDashboard();
-  } catch (error) { showToast("Error: " + error.message); }
+  } catch (error) {
+    if (btn) { btn.disabled = false; btn.textContent = "✔ Confirmar ingreso"; }
+    showToast("Error: " + error.message);
+  }
 }
 
 /* ============================================================
