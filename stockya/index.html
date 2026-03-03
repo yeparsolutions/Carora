@@ -13,6 +13,16 @@
   <title>YeparStock — Sistema de Inventario</title>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
+
+  <!-- PWA — instalable como app en celular y escritorio -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#00C77B">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="YeparStock">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
 <style>
 /* ── SCROLL EN SIDEBAR ──────────────────────────────────────────
    El sidebar tenía overflow oculto — el contenido del footer
@@ -1505,5 +1515,15 @@ input[type="text"]::placeholder { text-transform: none; }
 </div>
 
 <script src="js/app.js"></script>
+  <!-- Registrar Service Worker — activa la PWA -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js')
+          .then(function(reg) { console.log('[PWA] Service Worker registrado:', reg.scope); })
+          .catch(function(err) { console.warn('[PWA] Error registrando SW:', err); });
+      });
+    }
+  </script>
 </body>
 </html>
