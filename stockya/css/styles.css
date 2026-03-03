@@ -278,8 +278,63 @@ tbody td { padding: 14px; vertical-align: middle; }
 /* ============================================================
    LOGIN
    ============================================================ */
-.login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); padding: 20px; }
-.login-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 20px; padding: 40px; width: 100%; max-width: 380px; box-shadow: var(--shadow); }
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  /* Fondo oscuro igual al logo YeparSolutions */
+  background-color: #0e1117;
+  background-image:
+    /* Patrón hexagonal SVG inline — como el fondo del logo de YeparSolutions */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100'%3E%3Cpath d='M28 66L0 50V17L28 1l28 16v33L28 66zm0 0v34M0 50l28 16M56 50L28 66M0 17l28 16M56 17L28 33M28 1v32' fill='none' stroke='%23ffffff' stroke-width='0.6' stroke-opacity='0.07'/%3E%3C/svg%3E");
+}
+
+/* Brillo sutil en el centro — efecto profundidad */
+.login-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(100,160,255,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* La tarjeta blanca flota sobre el fondo oscuro */
+.tema-claro .login-card {
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.35), 0 4px 16px rgba(0,0,0,0.2);
+  color: #1a1a2e;
+}
+
+/* Adaptar textos del card para modo claro sobre fondo oscuro */
+.tema-claro .login-card .login-tagline,
+.tema-claro .login-card .form-label {
+  color: #555;
+}
+
+.tema-claro .login-card .form-input {
+  background: #f4f5f7;
+  border-color: #dde1e9;
+  color: #1a1a2e;
+}
+
+.tema-claro .login-card .form-input:focus {
+  border-color: #00C77B;
+  background: #fff;
+}
+
+.tema-claro .login-card .auth-divider {
+  color: #999;
+}
+.tema-claro .login-card .auth-divider::before,
+.tema-claro .login-card .auth-divider::after {
+  background: #dde1e9;
+}
+.login-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 20px; padding: 40px; width: 100%; max-width: 380px; box-shadow: var(--shadow); position: relative; z-index: 1; }
 .login-logo { text-align: center; margin-bottom: 28px; }
 .login-logo .logo-icon { margin: 0 auto 12px; width: 52px; height: 52px; font-size: 26px; }
 .login-logo .logo-text { font-size: 28px; }
