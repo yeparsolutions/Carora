@@ -22,4 +22,4 @@ Write-Host "  ENV:  $env:ENVIRONMENT" -ForegroundColor Cyan
 Write-Host "  JWT:  $env:ACCESS_TOKEN_MINUTES minutos" -ForegroundColor Cyan
 Write-Host ""
 
-uvicorn main:app --reload
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
