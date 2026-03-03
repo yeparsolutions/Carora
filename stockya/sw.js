@@ -1,18 +1,13 @@
 // ============================================================
 // YEPARSTOCK — Service Worker (sw.js)
-// Analogia: es el empleado de guardia que trabaja 24/7 —
-// intercepta las peticiones y decide qué mostrar.
-// Estrategia: Network First para la API (siempre datos frescos)
-//             Cache First para assets estáticos (carga rápida)
+// Analogia: portero inteligente — deja pasar directo al backend
+// y solo cachea los archivos visuales (HTML, CSS, JS, iconos)
 // ============================================================
 
-const CACHE_NAME    = 'yeparstock-v1';
-const CACHE_STATIC  = 'yeparstock-static-v1';
+const CACHE_STATIC = 'yeparstock-static-v2';
 
-// Archivos que se cachean al instalar la PWA
-// Analogia: el empleado memoriza lo esencial antes de abrir el negocio
+// Solo cacheamos los archivos visuales — nada del backend
 const ARCHIVOS_ESTATICOS = [
-  '/',
   '/index.html',
   '/css/styles.css',
   '/js/app.js',
@@ -21,17 +16,21 @@ const ARCHIVOS_ESTATICOS = [
   '/icons/icon-512.png',
 ];
 
-// ── Instalación: pre-cachear archivos estáticos ─────────────
+// ── Instalación ─────────────────────────────────────────────
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_STATIC).then(function(cache) {
-      console.log('[SW] Pre-cacheando archivos estáticos');
-      return cache.addAll(ARCHIVOS_ESTATICOS);
-    }).catch(function(err) {
-      console.warn('[SW] Error pre-cacheando:', err);
+      console.log('[SW] Cacheando archivos estáticos');
+      // addAll individual para que un fallo no bloquee todo
+      return Promise.allSettled(
+        ARCHIVOS_ESTATICOS.map(function(url) {
+          return cache.add(url).catch(function(e) {
+            console.warn('[SW] No se pudo cachear:', url, e);
+          });
+        })
+      );
     })
   );
-  // Activar inmediatamente sin esperar recarga
   self.skipWaiting();
 });
 
@@ -41,16 +40,13 @@ self.addEventListener('activate', function(event) {
     caches.keys().then(function(keys) {
       return Promise.all(
         keys.filter(function(key) {
-          // Eliminar caches que no sean la versión actual
-          return key !== CACHE_STATIC && key !== CACHE_NAME;
+          return key !== CACHE_STATIC;
         }).map(function(key) {
-          console.log('[SW] Eliminando cache viejo:', key);
           return caches.delete(key);
         })
       );
     })
   );
-  // Tomar control de todas las pestañas abiertas
   self.clients.claim();
 });
 
@@ -58,31 +54,35 @@ self.addEventListener('activate', function(event) {
 self.addEventListener('fetch', function(event) {
   var url = new URL(event.request.url);
 
-  // Las peticiones a la API siempre van a la red (datos en tiempo real)
-  // Analogia: para saber el precio actual, siempre preguntamos al sistema central
-  if (url.hostname === 'localhost' || url.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(event.request));
+  // Dejar pasar SIN interceptar todo lo que no sea GET
+  // Analogia: el portero no revisa los camiones de carga, solo los visitantes
+  if (event.request.method !== 'GET') return;
+
+  // Dejar pasar SIEMPRE las peticiones al backend (puerto 8000)
+  // Sin importar si es localhost o IP local (celular)
+  if (url.port === '8000') return;
+
+  // Dejar pasar peticiones a otros dominios (Google Fonts, CDNs)
+  if (url.hostname !== self.location.hostname &&
+      url.hostname !== '127.0.0.1' &&
+      !url.hostname.startsWith('192.168.')) {
     return;
   }
 
-  // Para archivos estáticos: Cache First (si está en cache, usarlo)
-  // Si no está, buscar en red y guardarlo para la próxima
+  // Para archivos estáticos: Cache First
   event.respondWith(
     caches.match(event.request).then(function(cached) {
-      if (cached) {
-        return cached;
-      }
+      if (cached) return cached;
+
       return fetch(event.request).then(function(response) {
-        // Solo cachear respuestas válidas de nuestro dominio
         if (response && response.status === 200 && response.type === 'basic') {
-          var responseClone = response.clone();
+          var clone = response.clone();
           caches.open(CACHE_STATIC).then(function(cache) {
-            cache.put(event.request, responseClone);
+            cache.put(event.request, clone);
           });
         }
         return response;
       }).catch(function() {
-        // Sin internet y sin cache — mostrar página offline
         if (event.request.destination === 'document') {
           return caches.match('/index.html');
         }
