@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evaluación YeparStock</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600;800&display=swap');
+
+  :root {
+    --bg: #0b0f1a;
+    --bg2: #111827;
+    --bg3: #1a2234;
+    --border: rgba(255,255,255,0.07);
+    --verde: #00c77b;
+    --azul: #5b8eff;
+    --amarillo: #f59e0b;
+    --rojo: #ff5050;
+    --text: #e2e8f0;
+    --muted: #64748b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Sora', sans-serif;
+    min-height: 100vh;
+    padding: 32px 20px;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--verde);
+    border: 1px solid rgba(0,199,123,0.3);
+    border-radius: 20px;
+    padding: 4px 14px;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-size: clamp(24px, 5vw, 38px);
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 8px;
+  }
+
+  h1 span { color: var(--verde); }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  /* Score ring */
+  .score-container {
+    display: flex;
+    justify-content: center;
+    margin: 32px 0;
+  }
+
+  .score-ring {
+    position: relative;
+    width: 140px;
+    height: 140px;
+  }
+
+  .score-ring svg { transform: rotate(-90deg); }
+
+  .score-ring .circle-bg {
+    fill: none;
+    stroke: var(--bg3);
+    stroke-width: 10;
+  }
+
+  .score-ring .circle-fill {
+    fill: none;
+    stroke: var(--verde);
+    stroke-width: 10;
+    stroke-linecap: round;
+    stroke-dasharray: 345;
+    stroke-dashoffset: 345;
+    transition: stroke-dashoffset 1.5s cubic-bezier(0.22,1,0.36,1);
+  }
+
+  .score-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .score-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--verde);
+    line-height: 1;
+  }
+
+  .score-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    max-width: 960px;
+    margin: 0 auto 24px;
+  }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    transition: transform 0.2s, border-color 0.2s;
+    cursor: pointer;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.15);
+  }
+
+  .card.expanded .card-body { display: block; }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+
+  .card-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .icon-verde { background: rgba(0,199,123,0.12); }
+  .icon-amarillo { background: rgba(245,158,11,0.12); }
+  .icon-rojo { background: rgba(255,80,80,0.12); }
+  .icon-azul { background: rgba(91,142,255,0.12); }
+
+  .card-title {
+    font-weight: 700;
+    font-size: 15px;
+    flex: 1;
+  }
+
+  .pill {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-weight: 700;
+  }
+
+  .pill-verde { background: rgba(0,199,123,0.15); color: var(--verde); }
+  .pill-amarillo { background: rgba(245,158,11,0.15); color: var(--amarillo); }
+  .pill-rojo { background: rgba(255,80,80,0.15); color: var(--rojo); }
+  .pill-azul { background: rgba(91,142,255,0.15); color: var(--azul); }
+
+  .card-desc {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 50px;
+  }
+
+  .card-body {
+    display: none;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .finding {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .finding-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-top: 7px;
+    flex-shrink: 0;
+  }
+
+  .dot-verde { background: var(--verde); }
+  .dot-amarillo { background: var(--amarillo); }
+  .dot-rojo { background: var(--rojo); }
+
+  code {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    background: var(--bg3);
+    color: var(--azul);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .chevron {
+    font-size: 12px;
+    color: var(--muted);
+    transition: transform 0.2s;
+    margin-left: auto;
+  }
+
+  .card.expanded .chevron { transform: rotate(180deg); }
+
+  /* Prioridad tabla */
+  .priority-section {
+    max-width: 960px;
+    margin: 0 auto 40px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+
+  .priority-section h2 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  .priority-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .priority-item:last-child { border-bottom: none; }
+
+  .priority-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    width: 22px;
+    flex-shrink: 0;
+    padding-top: 1px;
+  }
+
+  .priority-content { flex: 1; }
+  .priority-title { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+  .priority-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  .urgency {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .u-alta { background: rgba(255,80,80,0.15); color: var(--rojo); }
+  .u-media { background: rgba(245,158,11,0.15); color: var(--amarillo); }
+  .u-baja { background: rgba(91,142,255,0.15); color: var(--azul); }
+
+  .footer-note {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="badge">ANÁLISIS DE CÓDIGO · YEPARSTOCK</div>
+  <h1>Tu app tiene <span>buenas bases</span><br>— aquí están los detalles</h1>
+  <p class="subtitle">Haz clic en cada tarjeta para ver los hallazgos</p>
+</div>
+
+<div class="score-container">
+  <div class="score-ring">
+    <svg width="140" height="140" viewBox="0 0 140 140">
+      <circle class="circle-bg" cx="70" cy="70" r="55"/>
+      <circle class="circle-fill" id="scoreCircle" cx="70" cy="70" r="55"/>
+    </svg>
+    <div class="score-text">
+      <div class="score-num" id="scoreNum">0</div>
+      <div class="score-label">/ 100</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid">
+
+  <!-- FORTALEZAS -->
+  <div class="card" onclick="toggle(this)">
+    <div class="card-header">
+      <div class="card-icon icon-verde">✅</div>
+      <div class="card-title">Fortalezas del código</div>
+      <span class="pill pill-verde">5 hallazgos</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="card-desc">Lo que está muy bien implementado</div>
+    <div class="card-body">
+      <div class="finding">
+        <div class="finding-dot dot-verde"></div>
+        <div><strong>Manejo centralizado de API</strong> — La función <code>api()</code> maneja auth, errores y JSON en un solo lugar. Excelente patrón.</div>
+      </div>
+      <div class="finding">
+        <div class="finding-dot dot-verde"></div>
+        <div><strong>Detección automática de entorno</strong> — El switch entre <code>localhost</code> y la IP local es inteligente para desarrollo móvil simultáneo.</div>
+      </div>
+      <div class="finding">
+        <div class="finding-dot dot-verde"></div>
+        <div><strong>Expiración de sesión silenciosa</strong> — El código 401 limpia localStorage y redirige al login sin toast de error. Buena UX.</div>
+      </div>
+      <div class="finding">
+        <div class="finding-dot dot-verde"></div>
+        <div><strong>Comentarios con analogías</strong> — Documentar con "el mensajero que va al backend" hace el código legible para cualquier dev del equipo.</div>
+      </div>
+      <div class="finding">
+        <div class="finding-dot dot-verde"></div>
+        <div><strong>PWA bien configurada</strong> — Service Worker, manifest, íconos Apple. La app es instalable sin tienda de apps.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIESGOS DE SEGURIDAD -->
+  <div class="card" onclick="toggle(this)">
+    <div class="card-header">
+      <div class="card-icon icon-rojo">🔐</div>
+      <div class="card-title">Riesgos de seguridad</div>
+      <span class="pill pill-rojo">3 issues</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="card-desc">Revisar antes de ir a producción</div>
+    <div class="card-body">
+      <div class="finding">
+        <div class="finding-dot dot-rojo"></div>
+        <div><strong>IP hardcodeada en el código</strong> — <code>192.168.1.87:8000</code> está expuesta en el JS público. En producción usa variables de entorno o un dominio.</div>
+      </div>
+      <div class="finding">
+        <div class="finding-dot dot-rojo"></div>
+        <div><strong>Contraseñas temporales en URL</strong> — En <code>guardarInvitacion()</code> el password viaja como query param (<code>?password=...</code>). Debe ir en el body del POST.</div>
+      </div>
+      <div class="finding">
+        <div class="finding-dot dot-amarillo"></div>
+        <div><strong>Token en localStorage</strong> — Es funcional pero vulnerable a XSS. Para producción considera <code>httpOnly cookies</code> desde el backend.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEUDA TÉCNICA -->
+  <div class="card" onclick="toggle(this)">
+    <div class="card-header">
+      <div class="card-icon icon-amarillo">⚙️</div>
+      <div class="card-title">Deuda técnica</div>
+      <span class="pill pill-amarillo">4 áreas</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="card-desc">Cosas a mejorar con el tiempo</div>
+    <div class="card-body">
+      <div class="finding">
+        <div class="finding-dot dot-amarillo"></div>
+        <div><strong>index.html de 1375+ líneas</strong> — Todos los modales y pantallas en un solo archivo es difícil de mantener. Considera componentes o includes.</div>
+      </div>
+      <div class="finding">
+        <div class="finding-dot dot-amarillo"></div>
+        <div><strong>app.js de 3400+ líneas</strong> — Un solo archivo JS para toda la lógica. Dividir por módulo (auth.js, inventario.js, ventas.js) lo hace más manejable.</div>
+      </div>
+      <div class="finding">
+        <div class="finding-dot dot-amarillo"></div>
+        <div><strong>CSS mezclado en el HTML</strong> — Los estilos del <code>&lt;style&gt;</code> inline conviven con <code>styles.css</code>. Mejor centralizar todo en el CSS externo.</div>
+      </div>
+      <div class="finding">
+        <div class="finding-dot dot-amarillo"></div>
+        <div><strong>Sin validación de email en registro</strong> — La contraseña se evalúa con <code>evaluarFuerzaPassword()</code> pero no hay validación de formato de email visible en el JS.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUENAS PRÁCTICAS DE DEBUGGING -->
+  <div class="card" onclick="toggle(this)">
+    <div class="card-header">
+      <div class="card-icon icon-azul">🐛</div>
+      <div class="card-title">Enfoque de debugging</div>
+      <span class="pill pill-azul">Evaluación</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="card-desc">Cómo está estructurado el manejo de errores</div>
+    <div class="card-body">
+      <div class="finding">
+        <div class="finding-dot dot-verde"></div>
+        <div><strong>try/catch consistente</strong> — Casi todas las funciones async tienen bloque try/catch con <code>showToast()</code> de error. Buen patrón.</div>
+      </div>
+      <div class="finding">
+        <div class="finding-dot dot-verde"></div>
+        <div><strong>Feedback visual al usuario</strong> — Los botones cambian a "Guardando..." durante la espera. Evita doble-click y comunica estado.</div>
+      </div>
+      <div class="finding">
+        <div class="finding-dot dot-amarillo"></div>
+        <div><strong>Catch vacíos en suscripción</strong> — Hay un <code>catch(e) {"{}"}</code> silencioso al verificar el estado de suscripción. Un error aquí pasaría desapercibido.</div>
+      </div>
+      <div class="finding">
+        <div class="finding-dot dot-amarillo"></div>
+        <div><strong>Sin logging a consola en producción</strong> — No hay distinción entre errores dev y prod. Considera un flag <code>DEBUG_MODE</code> para logs.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- PRIORIDADES -->
+<div class="priority-section">
+  <h2>🎯 Qué atacar primero</h2>
+
+  <div class="priority-item">
+    <div class="priority-num">01</div>
+    <div class="priority-content">
+      <div class="priority-title">Mover contraseña de URL a body del POST</div>
+      <div class="priority-desc">En <code>guardarInvitacion()</code> el password está en la query string. Cambio de 2 líneas, impacto de seguridad alto.</div>
+    </div>
+    <div class="urgency u-alta">ALTA</div>
+  </div>
+
+  <div class="priority-item">
+    <div class="priority-num">02</div>
+    <div class="priority-content">
+      <div class="priority-title">Reemplazar IP local con variable de entorno</div>
+      <div class="priority-desc">Antes de subir a servidor público, la IP <code>192.168.1.87</code> debe salir del código fuente.</div>
+    </div>
+    <div class="urgency u-alta">ALTA</div>
+  </div>
+
+  <div class="priority-item">
+    <div class="priority-num">03</div>
+    <div class="priority-content">
+      <div class="priority-title">Eliminar catch vacíos</div>
+      <div class="priority-desc">El bloque <code>catch(e) {"{}"}</code> silencia errores reales. Agregar al menos un <code>console.warn</code>.</div>
+    </div>
+    <div class="urgency u-media">MEDIA</div>
+  </div>
+
+  <div class="priority-item">
+    <div class="priority-num">04</div>
+    <div class="priority-content">
+      <div class="priority-title">Separar app.js en módulos</div>
+      <div class="priority-desc">Dividir la lógica en archivos por función hace el debugging exponencialmente más rápido.</div>
+    </div>
+    <div class="urgency u-baja">LARGO PLAZO</div>
+  </div>
+
+</div>
+
+<p class="footer-note">
+  En general, tu código muestra criterio y experiencia. Los problemas encontrados son comunes en proyectos MVP y todos tienen solución directa. ¡Buen trabajo!
+</p>
+
+<script>
+  function toggle(card) {
+    card.classList.toggle('expanded');
+  }
+
+  // Animar score ring
+  window.addEventListener('load', function() {
+    const score = 74;
+    const circle = document.getElementById('scoreCircle');
+    const numEl = document.getElementById('scoreNum');
+    const circumference = 345;
+    const offset = circumference - (score / 100) * circumference;
+
+    setTimeout(function() {
+      circle.style.strokeDashoffset = offset;
+      // Animar número
+      let current = 0;
+      const step = score / 60;
+      const interval = setInterval(function() {
+        current = Math.min(current + step, score);
+        numEl.textContent = Math.round(current);
+        if (current >= score) clearInterval(interval);
+      }, 16);
+    }, 300);
+
+    // Color del arco según score
+    if (score >= 75) circle.style.stroke = '#00c77b';
+    else if (score >= 50) circle.style.stroke = '#f59e0b';
+    else circle.style.stroke = '#ff5050';
+  });
+</script>
+</body>
+</html>
