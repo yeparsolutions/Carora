@@ -7,7 +7,7 @@
 // Analogia: si estás en casa usas "mi habitación", si vienes de afuera usas la dirección completa
 const API_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
   ? "http://localhost:8000"
-  : "http://192.168.1.87:8000";
+  : "https://yeparstock-api.up.railway.app";
 let authToken     = localStorage.getItem("yeparstock_token")   || null;
 let usuarioActual = JSON.parse(localStorage.getItem("yeparstock_usuario") || "null");
 
