@@ -1,0 +1,15 @@
+{
+  "name": "yeparstock-frontend",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "npx serve . -p $PORT"
+  },
+  "dependencies": {
+    "serve": "^14.0.0"
+  }
+}
+```
+
+Y edita el `Procfile` para que diga:
+```
+web: npm start
