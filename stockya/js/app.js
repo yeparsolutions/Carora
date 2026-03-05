@@ -7,7 +7,7 @@
 // Analogia: si estás en casa usas "mi habitación", si vienes de afuera usas la dirección completa
 const API_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
   ? "http://localhost:8000"
-  : "https://yeparstock-api.up.railway.app";
+  : "http://192.168.1.87:8000";
 let authToken     = localStorage.getItem("yeparstock_token")   || null;
 let usuarioActual = JSON.parse(localStorage.getItem("yeparstock_usuario") || "null");
 
@@ -1394,7 +1394,7 @@ function usarClienteGenerico() {
   setTimeout(function(){ input.style.borderColor = ""; }, 1500);
 }
 
-/* Escaner de camara */
+/* Escaner de camara — beep al escanear + visor arriba del formulario */
 function _beepEscaner() {
   try {
     var ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1412,8 +1412,12 @@ function _beepEscaner() {
 
 function abrirEscanerSalida() {
   var vid = document.getElementById("videoEscanerSalida");
+  var visor = document.getElementById("escanerSalidaVisor");
   if (!vid) return;
-  vid.style.cssText = "display:block;width:100%;max-height:280px;object-fit:cover;border-radius:12px;margin-bottom:12px;";
+  if (visor) visor.style.display = "block";
+  // Scroll al inicio del modal para ver la cámara
+  var scrollEl = visor ? visor.closest("[style*='overflow-y:auto']") || visor.parentElement : null;
+  if (scrollEl) scrollEl.scrollTop = 0;
   navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } })
     .then(function(stream) {
       _streamSalida = stream;
@@ -1440,8 +1444,8 @@ function abrirEscanerSalida() {
 
 function cerrarEscanerSalida() {
   if (_streamSalida) { _streamSalida.getTracks().forEach(function(t){ t.stop(); }); _streamSalida = null; }
-  var vid = document.getElementById("videoEscanerSalida");
-  if (vid) vid.style.display = "none";
+  var visor = document.getElementById("escanerSalidaVisor");
+  if (visor) visor.style.display = "none";
 }
 
 /* Confirmar y guardar toda la venta del carrito */
