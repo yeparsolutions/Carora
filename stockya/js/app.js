@@ -1395,11 +1395,26 @@ function usarClienteGenerico() {
 }
 
 /* Escaner de camara */
+function _beepEscaner() {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 1200;
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.15);
+  } catch(e) {}
+}
+
 function abrirEscanerSalida() {
   var vid = document.getElementById("videoEscanerSalida");
   if (!vid) return;
-  vid.style.display = "block";
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+  vid.style.cssText = "display:block;width:100%;max-height:280px;object-fit:cover;border-radius:12px;margin-bottom:12px;";
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } })
     .then(function(stream) {
       _streamSalida = stream;
       vid.srcObject = stream;
@@ -1411,13 +1426,14 @@ function abrirEscanerSalida() {
           var codes = await detector.detect(vid);
           if (codes.length > 0) {
             clearInterval(_scan);
+            _beepEscaner();
             cerrarEscanerSalida();
             var inputScan = document.getElementById("salidaCodigoBarra");
             if (inputScan) { inputScan.value = codes[0].rawValue; buscarProductoSalida(codes[0].rawValue); }
-            showToast("Codigo escaneado: " + codes[0].rawValue);
+            showToast("✅ Codigo escaneado: " + codes[0].rawValue);
           }
         } catch(e) {}
-      }, 500);
+      }, 300);
     })
     .catch(function() { showToast("No se pudo acceder a la camara"); });
 }
