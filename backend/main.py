@@ -22,19 +22,26 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="YeparStock API", version="1.2.0")
 
-# Orígenes siempre permitidos — producción + desarrollo local
-_ORIGINS_BASE = [
-    "https://yeparstock.yeparsolutions.com",
-    "http://localhost:5500",
-    "http://127.0.0.1:5500",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-]
+# CORS — permite el frontend de producción + desarrollo local
+# Si ALLOWED_ORIGINS="*" en Railway → permite todo (útil para debug)
+# Si tiene valores → usa esa lista + los fijos de abajo
 _origins_env = os.getenv("ALLOWED_ORIGINS", "")
-_origins_extra = [o.strip() for o in _origins_env.split(",") if o.strip()]
-ALLOWED_ORIGINS = list(set(_ORIGINS_BASE + _origins_extra))
 
-app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+if _origins_env.strip() == "*":
+    # Modo permisivo — útil para diagnosticar CORS en producción
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+else:
+    _ORIGINS_BASE = [
+        "https://yeparstock.yeparsolutions.com",
+        "https://www.yeparstock.yeparsolutions.com",
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+    _extras = [o.strip() for o in _origins_env.split(",") if o.strip()]
+    ALLOWED_ORIGINS = list(set(_ORIGINS_BASE + _extras))
+    app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 app.include_router(auth.router)
 app.include_router(productos.router)
