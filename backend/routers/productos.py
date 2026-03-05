@@ -1,10 +1,6 @@
 # ============================================================
 # YEPARSTOCK – Router de Productos
 # Archivo: backend/routers/productos.py
-# Descripción: CRUD completo + búsqueda por código de barras
-# ✅ ACTUALIZADO: filtra por empresa_id para soporte multiusuario
-#    Todos los usuarios de la misma empresa ven el mismo inventario
-#    Analogia: los productos son de la tienda, no del empleado
 # ============================================================
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -58,16 +54,57 @@ def producto_a_dict(p) -> dict:
 
 
 def get_empresa_id(usuario_actual: models.Usuario) -> int:
-    """
-    Obtiene el empresa_id del usuario actual.
-    Analogia: saber a qué tienda pertenece el empleado antes de tocar el inventario.
-    """
     if not usuario_actual.empresa_id:
         raise HTTPException(
             status_code=400,
             detail="Tu cuenta no está asociada a una empresa. Contacta al administrador."
         )
     return usuario_actual.empresa_id
+
+
+def _verificar_duplicado_nombre_marca(db, empresa_id: int, nombre: str, marca: str, excluir_id: int = None):
+    """
+    Valida que no exista otro producto con el mismo NOMBRE + MARCA en la misma empresa.
+    Regla:
+      - "Leche entera" sin marca  + "Leche entera" sin marca  → DUPLICADO
+      - "Leche entera" Nestlé     + "Leche entera" Nestlé     → DUPLICADO
+      - "Leche entera" Nestlé     + "Leche entera" Soprole    → PERMITIDO (distinta marca)
+      - "Leche entera" Nestlé     + "Leche entera" sin marca  → PERMITIDO
+    Cada empresa tiene su propio catálogo — empresa A y B son independientes.
+    """
+    nombre_norm = nombre.strip().upper()
+    marca_norm  = (marca or "").strip().upper()
+
+    query = db.query(models.Producto).filter(
+        models.Producto.empresa_id == empresa_id,
+        models.Producto.activo     == True,
+        models.Producto.nombre.ilike(nombre_norm)
+    )
+    if excluir_id:
+        query = query.filter(models.Producto.id != excluir_id)
+
+    if marca_norm:
+        query = query.filter(models.Producto.marca.ilike(marca_norm))
+    else:
+        query = query.filter(
+            (models.Producto.marca == None) | (models.Producto.marca == "")
+        )
+
+    existe = query.first()
+    if existe:
+        detalle = f"'{existe.nombre}'"
+        if existe.marca:
+            detalle += f" — {existe.marca}"
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "tipo":         "producto_existente",
+                "mensaje":      f"{detalle} ya está registrado en tu inventario",
+                "producto_id":  existe.id,
+                "nombre":       existe.nombre,
+                "stock_actual": existe.stock_actual,
+            }
+        )
 
 
 # ============================================================
@@ -79,14 +116,12 @@ def buscar_por_codigo_barra(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    # ✅ Busca por empresa — cualquier empleado de la empresa puede ver el producto
     empresa_id = get_empresa_id(usuario_actual)
     producto = db.query(models.Producto).filter(
         models.Producto.codigo_barra == codigo_barra,
         models.Producto.activo       == True,
         models.Producto.empresa_id   == empresa_id
     ).first()
-
     if not producto:
         raise HTTPException(
             status_code=404,
@@ -107,13 +142,11 @@ def listar_productos(
     db:          Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    # ✅ Lista todos los productos de la empresa
     empresa_id = get_empresa_id(usuario_actual)
     query = db.query(models.Producto).filter(
         models.Producto.activo     == True,
         models.Producto.empresa_id == empresa_id
     )
-
     if buscar:
         query = query.filter(
             models.Producto.nombre.ilike(f"%{buscar}%") |
@@ -124,7 +157,6 @@ def listar_productos(
         query = query.filter(models.Producto.categoria == categoria)
 
     productos = query.order_by(models.Producto.nombre).all()
-
     resultado = []
     for p in productos:
         d = producto_a_dict(p)
@@ -133,7 +165,6 @@ def listar_productos(
         if vencimiento and d["estado_venc"] != vencimiento:
             continue
         resultado.append(d)
-
     return resultado
 
 
@@ -168,60 +199,64 @@ def crear_producto(
 ):
     empresa_id = get_empresa_id(usuario_actual)
 
-    # ✅ Verificar límite de productos según el plan
-    # Analogia: el plan basico es como un estacionamiento de 500 espacios
+    # ── Límite de productos según plan ──────────────────────────
     empresa = db.query(models.Empresa).filter(models.Empresa.id == empresa_id).first()
     if empresa and empresa.max_productos > 0:
-        total_productos = db.query(models.Producto).filter(
+        total = db.query(models.Producto).filter(
             models.Producto.empresa_id == empresa_id,
             models.Producto.activo     == True
         ).count()
-        if total_productos >= empresa.max_productos:
+        if total >= empresa.max_productos:
             raise HTTPException(
                 status_code=403,
                 detail={
-                    "tipo": "limite_plan",
-                    "mensaje": f"Tu plan {empresa.plan} permite máximo {empresa.max_productos} productos. Actualiza a Premium para agregar más.",
-                    "limite": empresa.max_productos,
-                    "total_actual": total_productos
+                    "tipo":          "limite_plan",
+                    "mensaje":       f"Tu plan {empresa.plan} permite máximo {empresa.max_productos} productos. Actualiza para agregar más.",
+                    "limite":        empresa.max_productos,
+                    "total_actual":  total,
                 }
             )
 
-    # ✅ Verificar codigo de barras duplicado SOLO para esta empresa
+    # ── Código de barras duplicado (solo dentro de esta empresa) ─
     if datos.codigo_barra:
         existe = db.query(models.Producto).filter(
             models.Producto.codigo_barra == datos.codigo_barra,
-            models.Producto.empresa_id   == empresa_id
+            models.Producto.empresa_id   == empresa_id,
+            models.Producto.activo       == True
         ).first()
         if existe:
             raise HTTPException(
                 status_code=409,
                 detail={
-                    "tipo": "producto_existente",
-                    "mensaje": f"El producto '{existe.nombre}' ya está registrado",
-                    "producto_id": existe.id,
-                    "nombre": existe.nombre,
-                    "stock_actual": existe.stock_actual
+                    "tipo":         "producto_existente",
+                    "mensaje":      f"El código de barras ya está registrado para '{existe.nombre}'",
+                    "producto_id":  existe.id,
+                    "nombre":       existe.nombre,
+                    "stock_actual": existe.stock_actual,
                 }
             )
 
+    # ── Nombre + Marca duplicado (solo dentro de esta empresa) ───
+    # Empresa A y Empresa B son independientes — cada una tiene su propio catálogo
+    _verificar_duplicado_nombre_marca(
+        db, empresa_id,
+        nombre=datos.nombre,
+        marca=getattr(datos, "marca", "") or ""
+    )
+
+    # ── Crear el producto ────────────────────────────────────────
     datos_dict = datos.model_dump()
     if datos_dict["porcentaje_ganancia"] > 0 and datos_dict["precio_compra"] > 0:
         datos_dict["precio_venta"] = round(
             datos_dict["precio_compra"] * (1 + datos_dict["porcentaje_ganancia"] / 100), 2
         )
 
-    # ✅ Asignar empresa_id y usuario_id al crear
-    nuevo = models.Producto(
-        **datos_dict,
-        empresa_id = empresa_id,
-        usuario_id = usuario_actual.id   # quien lo creó
-    )
+    nuevo = models.Producto(**datos_dict, empresa_id=empresa_id, usuario_id=usuario_actual.id)
     db.add(nuevo)
     db.flush()
 
     if nuevo.stock_actual > 0:
-        mov_inicial = models.Movimiento(
+        db.add(models.Movimiento(
             producto_id    = nuevo.id,
             empresa_id     = empresa_id,
             usuario_id     = usuario_actual.id,
@@ -230,9 +265,8 @@ def crear_producto(
             stock_anterior = 0,
             stock_nuevo    = nuevo.stock_actual,
             nota           = "Stock inicial al crear el producto",
-            lote           = nuevo.lote
-        )
-        db.add(mov_inicial)
+            lote           = nuevo.lote,
+        ))
 
     db.commit()
     db.refresh(nuevo)
@@ -259,10 +293,20 @@ def actualizar_producto(
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
     cambios = datos.model_dump(exclude_unset=True)
+
+    # ── Si cambia nombre o marca, verificar que no genere duplicado ─
+    if "nombre" in cambios or "marca" in cambios:
+        _verificar_duplicado_nombre_marca(
+            db, empresa_id,
+            nombre      = cambios.get("nombre", p.nombre),
+            marca       = cambios.get("marca",  p.marca) or "",
+            excluir_id  = producto_id
+        )
+
     for campo, valor in cambios.items():
         setattr(p, campo, valor)
 
-    if ("precio_compra" in cambios or "porcentaje_ganancia" in cambios):
+    if "precio_compra" in cambios or "porcentaje_ganancia" in cambios:
         if p.porcentaje_ganancia > 0 and p.precio_compra > 0:
             p.precio_venta = round(p.precio_compra * (1 + p.porcentaje_ganancia / 100), 2)
 
@@ -289,9 +333,8 @@ def eliminar_producto(
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
     nombre = p.nombre
-
     if p.stock_actual > 0:
-        mov_baja = models.Movimiento(
+        db.add(models.Movimiento(
             producto_id    = producto_id,
             empresa_id     = empresa_id,
             usuario_id     = usuario_actual.id,
@@ -300,9 +343,8 @@ def eliminar_producto(
             stock_anterior = p.stock_actual,
             stock_nuevo    = 0,
             nota           = f"Baja por eliminación del producto '{nombre}'",
-            lote           = p.lote
-        )
-        db.add(mov_baja)
+            lote           = p.lote,
+        ))
         db.flush()
 
     db.query(models.Movimiento).filter(
@@ -338,11 +380,10 @@ def sumar_stock_existente(
 
     stock_anterior = p.stock_actual
     p.stock_actual += cantidad
-
     if lote:
         p.lote = lote
 
-    mov = models.Movimiento(
+    db.add(models.Movimiento(
         producto_id    = producto_id,
         empresa_id     = empresa_id,
         usuario_id     = usuario_actual.id,
@@ -351,9 +392,8 @@ def sumar_stock_existente(
         stock_anterior = stock_anterior,
         stock_nuevo    = p.stock_actual,
         nota           = nota or "Entrada por código de barras",
-        lote           = lote or None
-    )
-    db.add(mov)
+        lote           = lote or None,
+    ))
     db.commit()
     db.refresh(p)
     return producto_a_dict(p)
