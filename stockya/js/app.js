@@ -7,7 +7,7 @@
 // Analogia: si estás en casa usas "mi habitación", si vienes de afuera usas la dirección completa
 const API_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
   ? "http://localhost:8000"
-  : "https://yeparstock-api.up.railway.app";
+  : "http://192.168.1.87:8000";
 let authToken     = localStorage.getItem("yeparstock_token")   || null;
 let usuarioActual = JSON.parse(localStorage.getItem("yeparstock_usuario") || "null");
 
@@ -1394,33 +1394,12 @@ function usarClienteGenerico() {
   setTimeout(function(){ input.style.borderColor = ""; }, 1500);
 }
 
-/* Escaner de camara — beep al escanear + visor arriba del formulario */
-function _beepEscaner() {
-  try {
-    var ctx = new (window.AudioContext || window.webkitAudioContext)();
-    var osc = ctx.createOscillator();
-    var gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 1200;
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.15);
-  } catch(e) {}
-}
-
+/* Escaner de camara */
 function abrirEscanerSalida() {
   var vid = document.getElementById("videoEscanerSalida");
-  var visor = document.getElementById("escanerSalidaVisor");
   if (!vid) return;
-  if (visor) visor.style.display = "block";
-  
-  // Scroll al inicio del modal para ver la cámara
-  var modalContent = document.querySelector("#modalSalida [style*='overflow-y:auto']");
-  if (modalContent) modalContent.scrollTop = 0;
-
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } })
+  vid.style.display = "block";
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
     .then(function(stream) {
       _streamSalida = stream;
       vid.srcObject = stream;
@@ -1432,22 +1411,21 @@ function abrirEscanerSalida() {
           var codes = await detector.detect(vid);
           if (codes.length > 0) {
             clearInterval(_scan);
-            _beepEscaner();
             cerrarEscanerSalida();
             var inputScan = document.getElementById("salidaCodigoBarra");
             if (inputScan) { inputScan.value = codes[0].rawValue; buscarProductoSalida(codes[0].rawValue); }
-            showToast("✅ Codigo escaneado: " + codes[0].rawValue);
+            showToast("Codigo escaneado: " + codes[0].rawValue);
           }
         } catch(e) {}
-      }, 300);
+      }, 500);
     })
     .catch(function() { showToast("No se pudo acceder a la camara"); });
 }
 
 function cerrarEscanerSalida() {
   if (_streamSalida) { _streamSalida.getTracks().forEach(function(t){ t.stop(); }); _streamSalida = null; }
-  var visor = document.getElementById("escanerSalidaVisor");
-  if (visor) visor.style.display = "none";
+  var vid = document.getElementById("videoEscanerSalida");
+  if (vid) vid.style.display = "none";
 }
 
 /* Confirmar y guardar toda la venta del carrito */
@@ -2554,6 +2532,7 @@ async function openModalMovimiento() {
 
 function closeModalMovimiento() {
   document.getElementById("modalMovimiento").classList.remove("open");
+  cerrarEscanerIngreso();
   // Limpiar carrito de ingreso
   _ingresoCarrito = [];
   renderizarIngresoCarrito();
@@ -2634,17 +2613,53 @@ function cambiarQtyIngreso(delta) {
   inp.value = v;
 }
 
+var _streamIngreso = null; // Stream de cámara activo para ingreso
+
 function abrirEscanerIngreso() {
-  // Mismo scanner que ventas pero apunta a buscarProductoIngreso
-  var video = document.getElementById("videoEscanerIngreso");
-  if (!video) return;
-  video.style.display = "block";
-  // Reutiliza la misma lógica de la cámara
-  _iniciarEscaner(video, function(codigo) {
-    document.getElementById("movCodigoBuscar").value = codigo;
-    buscarProductoIngreso(codigo);
-    video.style.display = "none";
-  });
+  var vid   = document.getElementById("videoEscanerIngreso");
+  var visor = document.getElementById("escanerIngresoVisor");
+  if (!vid) return;
+  if (visor) visor.style.display = "block";
+
+  // Scroll al inicio del modal para ver la cámara
+  var modalContent = document.querySelector("#modalMovimiento [style*='overflow-y:auto']");
+  if (modalContent) modalContent.scrollTop = 0;
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } })
+    .then(function(stream) {
+      _streamIngreso = stream;
+      vid.srcObject  = stream;
+      vid.play();
+      if (!("BarcodeDetector" in window)) {
+        cerrarEscanerIngreso();
+        showToast("Escaner no soportado en este navegador");
+        return;
+      }
+      var detector = new BarcodeDetector({ formats: ["ean_13","ean_8","code_128","qr_code"] });
+      var _scan = setInterval(async function() {
+        try {
+          var codes = await detector.detect(vid);
+          if (codes.length > 0) {
+            clearInterval(_scan);
+            _beepEscaner();
+            cerrarEscanerIngreso();
+            var inputScan = document.getElementById("movCodigoBuscar");
+            if (inputScan) {
+              inputScan.value = codes[0].rawValue;
+              buscarProductoIngreso(codes[0].rawValue);
+            }
+            showToast("✅ Codigo escaneado: " + codes[0].rawValue);
+          }
+        } catch(e) {}
+      }, 300);
+    })
+    .catch(function() { showToast("No se pudo acceder a la camara"); });
+}
+
+function cerrarEscanerIngreso() {
+  if (_streamIngreso) { _streamIngreso.getTracks().forEach(function(t){ t.stop(); }); _streamIngreso = null; }
+  var visor = document.getElementById("escanerIngresoVisor");
+  if (visor) visor.style.display = "none";
 }
 
 function agregarAlIngresoCarrito() {
