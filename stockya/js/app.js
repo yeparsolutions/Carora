@@ -2261,7 +2261,7 @@ function abrirModalRegistroRapido(codigoEscaneado) {
 async function saveProductRapido() {
   var nombre    = (document.getElementById("inputNombre")?.value || "").trim().toUpperCase();
   var codigoBarra = (document.getElementById("inputCodigoBarra")?.value || "").trim();
-  var proveedor = (document.getElementById("inputProveedor")?.value || "").trim().toUpperCase() || null;
+  var marca     = (document.getElementById("inputProveedor")?.value || "").trim().toUpperCase() || null;
   var codigoInt = (document.getElementById("inputCodigo")?.value || "").trim().toUpperCase() || null;
 
   if (!nombre) { showToast("El nombre del producto es obligatorio"); return; }
@@ -2274,7 +2274,8 @@ async function saveProductRapido() {
       nombre:               nombre,
       codigo_barra:         codigoBarra || null,
       codigo:               codigoInt   || null,
-      proveedor:            proveedor   || null,
+      proveedor:            null,
+      marca:                marca       || null,
       stock_actual:         0,
       stock_minimo:         0,
       precio_compra:        0,
