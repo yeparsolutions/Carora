@@ -25,13 +25,37 @@ async function api(path, method = "GET", body = null) {
   const response = await fetch(API_URL + path, opciones);
 
   if (response.status === 401) {
-    // Limpiar sesión silenciosamente — el usuario verá el login sin toast de error
+    // Token expirado — intentar renovar con las credenciales guardadas
+    var creds = JSON.parse(localStorage.getItem("yeparstock_creds") || "null");
+    if (creds && !path.includes("/auth/")) {
+      try {
+        var renovar = await fetch(API_URL + "/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: creds.email, password: creds.password })
+        });
+        if (renovar.ok) {
+          var rData = await renovar.json();
+          authToken = rData.access_token;
+          localStorage.setItem("yeparstock_token", authToken);
+          // Reintentar la petición original con el nuevo token
+          headers["Authorization"] = "Bearer " + authToken;
+          const retry = await fetch(API_URL + path, { method, headers, body: body ? JSON.stringify(body) : null });
+          if (retry.status === 204) return null;
+          const retryData = await retry.json();
+          if (retry.ok) return retryData;
+        }
+      } catch(e) {}
+    }
+    // Si no se pudo renovar, limpiar sesión
     authToken     = null;
     usuarioActual = null;
     localStorage.removeItem("yeparstock_token");
     localStorage.removeItem("yeparstock_usuario");
+    localStorage.removeItem("yeparstock_creds");
     document.getElementById("loginPage").style.display = "block";
     document.getElementById("appMain").style.display   = "none";
+    showToast("⚠️ Sesión expirada — vuelve a iniciar sesión");
     throw new Error("Sesion expirada");
   }
   if (response.status === 204) return null;
@@ -157,6 +181,8 @@ async function enterApp() {
     usuarioActual = data.usuario;
     localStorage.setItem("yeparstock_token",   authToken);
     localStorage.setItem("yeparstock_usuario", JSON.stringify(usuarioActual));
+    // Guardar credenciales para renovación automática del token
+    localStorage.setItem("yeparstock_creds", JSON.stringify({ email, password }));
 
     // ✅ Verificar onboarding solo para admins
     // Analogia: solo el dueño del negocio configura el local la primera vez —
