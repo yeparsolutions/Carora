@@ -20,6 +20,27 @@ from routers import auth, productos, movimientos, alertas, config, salidas, empr
 
 Base.metadata.create_all(bind=engine)
 
+# ── Migraciones automáticas ──────────────────────────────────
+# Agrega columnas nuevas sin borrar datos existentes
+# Analogia: ampliar una hoja de Excel añadiendo columnas al final
+from sqlalchemy import text
+def ejecutar_migraciones():
+    migraciones = [
+        # num_documento en movimientos — para trazabilidad de ingresos
+        "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS num_documento VARCHAR(100)",
+        # empresa_id en movimientos — por si faltan registros viejos
+        "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS empresa_id INTEGER",
+    ]
+    with engine.connect() as conn:
+        for sql in migraciones:
+            try:
+                conn.execute(text(sql))
+            except Exception:
+                pass  # columna ya existe o error menor — ignorar
+        conn.commit()
+
+ejecutar_migraciones()
+
 app = FastAPI(title="YeparStock API", version="1.2.0")
 
 # CORS — permite el frontend de producción + desarrollo local
