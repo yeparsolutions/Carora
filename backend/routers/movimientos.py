@@ -26,6 +26,7 @@ def movimiento_a_dict(m):
         "stock_nuevo":     m.stock_nuevo,
         "nota":            m.nota,
         "lote":            m.lote,
+        "num_documento":   m.num_documento,
         "created_at":      m.created_at,
         "producto_nombre": m.producto.nombre if m.producto else None,
         "usuario_nombre":  m.usuario.nombre  if m.usuario  else None,
@@ -141,7 +142,7 @@ def registrar_movimiento(
         stock_nuevo    = stock_nuevo,
         nota           = datos.nota,
         lote           = datos.lote,
-        num_documento  = getattr(datos, 'num_documento', None),
+        num_documento  = getattr(datos, "num_documento", None),
     )
     db.add(movimiento)
     db.commit()
@@ -158,7 +159,7 @@ def registrar_movimiento(
         "stock_nuevo":     movimiento.stock_nuevo,
         "nota":            movimiento.nota,
         "lote":            movimiento.lote,
-        "num_documento":   movimiento.num_documento if hasattr(movimiento, 'num_documento') else None,
+        "num_documento":   movimiento.num_documento,
         "created_at":      movimiento.created_at,
         "producto_nombre": producto.nombre,
         "usuario_nombre":  usuario_actual.nombre,
