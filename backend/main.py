@@ -22,7 +22,7 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="YeparStock API", version="1.2.0")
 
-# Orígenes siempre permitidos (producción + desarrollo local)
+# Orígenes siempre permitidos — producción + desarrollo local
 _ORIGINS_BASE = [
     "https://yeparstock.yeparsolutions.com",
     "http://localhost:5500",
