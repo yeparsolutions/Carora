@@ -39,7 +39,11 @@ async function api(path, method = "GET", body = null) {
   const data = await response.json();
 
   if (!response.ok) {
-    const err    = new Error(typeof data.detail === "string" ? data.detail : (data.detail && data.detail.mensaje) || "Error en el servidor");
+    console.error("API Error", response.status, path, JSON.stringify(data));
+    const msg = typeof data.detail === "string" ? data.detail
+              : Array.isArray(data.detail) ? data.detail.map(function(e){ return e.loc + ": " + e.msg; }).join(", ")
+              : (data.detail && data.detail.mensaje) || JSON.stringify(data) || "Error en el servidor";
+    const err    = new Error(msg);
     err.status   = response.status;
     err.detail   = data.detail;
     throw err;
@@ -2683,6 +2687,12 @@ function buscarProductoIngreso(val, desdeEscaner) {
     chip._productoActual = prod;
     chip.style.display = "flex";
     document.getElementById("movCantidad").value = 1;
+    // Pre-llenar precio compra y % ganancia del producto si ya los tiene
+    var elPC  = document.getElementById("movPrecioCompra");
+    var elPct = document.getElementById("movPorcentajeChip");
+    if (elPC)  elPC.value  = prod.precio_compra || "";
+    if (elPct) elPct.value = prod.porcentaje_ganancia || "";
+    calcularPrecioVentaChip();
     if (hint) { hint.textContent = "✓ " + prod.nombre + " — Stock: " + (prod.stock_actual||0) + " und."; hint.style.color = "var(--verde)"; }
   } else {
     chip.style.display = "none";
@@ -2708,6 +2718,30 @@ function cambiarQtyIngreso(delta) {
   var inp = document.getElementById("movCantidad");
   var v   = Math.max(1, (parseInt(inp.value) || 1) + delta);
   inp.value = v;
+}
+
+// Calcula precio venta en el chip de ingreso según precio compra + % ganancia
+function calcularPrecioVentaChip() {
+  var compra = parseFloat(document.getElementById("movPrecioCompra")?.value) || 0;
+  var pct    = parseFloat(document.getElementById("movPorcentajeChip")?.value) || 0;
+  var elPV   = document.getElementById("movPrecioVentaChip");
+  var hint   = document.getElementById("chipPrecioHint");
+
+  if (compra > 0 && pct > 0) {
+    var venta    = Math.round(compra * (1 + pct / 100));
+    var ganancia = venta - compra;
+    if (elPV) elPV.value = venta;
+    if (hint) {
+      hint.textContent = "Ganancia: $" + ganancia.toLocaleString("es-CL") + " por unidad";
+      hint.style.display = "block";
+    }
+  } else if (compra > 0) {
+    if (elPV) elPV.value = "";
+    if (hint) { hint.textContent = "Ingresa % de ganancia para calcular precio venta"; hint.style.color = "var(--muted)"; hint.style.display = "block"; }
+  } else {
+    if (elPV) elPV.value = "";
+    if (hint) hint.style.display = "none";
+  }
 }
 
 function abrirEscanerIngreso() {
@@ -2769,23 +2803,40 @@ function agregarAlIngresoCarrito() {
   if (!chip || chip.style.display === "none" || !chip._productoActual) {
     showToast("Selecciona un producto primero"); return;
   }
-  var prod    = chip._productoActual;
-  var qty     = parseInt(document.getElementById("movCantidad").value) || 1;
-  var precio  = parseFloat(document.getElementById("movPrecioCompra").value) || 0;
+  var prod        = chip._productoActual;
+  var qty         = parseInt(document.getElementById("movCantidad").value) || 1;
+  var precioC     = parseFloat(document.getElementById("movPrecioCompra").value) || 0;
+  var pct         = parseFloat(document.getElementById("movPorcentajeChip")?.value) || 0;
+  var precioV     = parseFloat(document.getElementById("movPrecioVentaChip")?.value) || 0;
+
+  // Actualizar campos ocultos para que guardarMovimiento() los use
+  var mHid = function(id, v){ var el=document.getElementById(id); if(el) el.value=v||""; };
+  mHid("movPrecioCompraExtra", precioC);
+  mHid("movPorcentaje", pct);
+  mHid("movPrecioVenta", precioV);
 
   // Si ya está en el carrito, sumar cantidad
   var existente = _ingresoCarrito.find(function(i){ return i.id === prod.id; });
   if (existente) {
-    existente.qty += qty;
-    existente.precio_compra = precio;
+    existente.qty          += qty;
+    existente.precio_compra = precioC;
+    existente.precio_venta  = precioV;
+    existente.porcentaje    = pct;
   } else {
-    _ingresoCarrito.push({ id: prod.id, nombre: prod.nombre, qty: qty, precio_compra: precio });
+    _ingresoCarrito.push({ id: prod.id, nombre: prod.nombre, qty: qty, precio_compra: precioC, precio_venta: precioV, porcentaje: pct });
   }
 
-  // Limpiar buscador
+  // Limpiar buscador y chip
   document.getElementById("movCodigoBuscar").value = "";
   chip.style.display = "none";
   chip._productoActual = null;
+  var elPC  = document.getElementById("movPrecioCompra");  if (elPC)  elPC.value  = "";
+  var elPct = document.getElementById("movPorcentajeChip"); if (elPct) elPct.value = "";
+  var elPV  = document.getElementById("movPrecioVentaChip"); if (elPV)  elPV.value  = "";
+  var hint  = document.getElementById("chipPrecioHint"); if (hint) hint.style.display = "none";
+
+  var hintScan = document.getElementById("ingresoScanHint");
+  if (hintScan) { hintScan.innerHTML = "Escanea o escribe — Enter o &quot;Agregar&quot; para sumarlo al ingreso"; hintScan.style.color = ""; }
 
   renderizarIngresoCarrito();
 }
