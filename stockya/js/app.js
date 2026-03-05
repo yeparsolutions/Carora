@@ -1415,9 +1415,6 @@ function abrirEscanerSalida() {
   var visor = document.getElementById("escanerSalidaVisor");
   if (!vid) return;
   if (visor) visor.style.display = "block";
-  // Scroll al inicio del modal para ver la cámara
-  var scrollEl = visor ? visor.closest("[style*='overflow-y:auto']") || visor.parentElement : null;
-  if (scrollEl) scrollEl.scrollTop = 0;
   navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } })
     .then(function(stream) {
       _streamSalida = stream;
