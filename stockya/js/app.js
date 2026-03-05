@@ -2247,18 +2247,41 @@ function closeModal() {
   if (btn) { btn.disabled = false; btn.textContent = "✓ Registrar y agregar al ingreso"; }
 }
 
-// Abre el mini-modal de registro rápido con el código ya pegado
-function abrirModalRegistroRapido(codigoEscaneado) {
+// Abre el mini-modal de registro rápido
+// Si el valor viene del escáner (solo dígitos) → va al código de barras
+// Si es texto escrito a mano → va al nombre, el código queda vacío
+function abrirModalRegistroRapido(valorBusqueda) {
   var inputCod  = document.getElementById("inputCodigoBarra");
   var inputNom  = document.getElementById("inputNombre");
   var inputProv = document.getElementById("inputProveedor");
   var inputCI   = document.getElementById("inputCodigo");
-  if (inputCod)  inputCod.value  = codigoEscaneado || "";
-  if (inputNom)  inputNom.value  = "";
+  var inputNomHint = document.getElementById("codigoHint");
+
+  // Es código de barras si es numérico (viene del escáner)
+  var esCodigo = /^[0-9]{4,}$/.test((valorBusqueda || "").trim());
+
+  if (inputCod) inputCod.value = esCodigo ? (valorBusqueda || "") : "";
+  if (inputNom) inputNom.value = esCodigo ? "" : (valorBusqueda || "");
   if (inputProv) inputProv.value = "";
   if (inputCI)   inputCI.value   = "";
+
+  // Actualizar hint del código
+  if (inputNomHint) {
+    if (esCodigo) {
+      inputNomHint.textContent = "✓ Código identificado desde el escáner";
+      inputNomHint.style.color = "var(--verde)";
+    } else {
+      inputNomHint.textContent = "Opcional — agrega el código de barras si lo tienes";
+      inputNomHint.style.color = "var(--muted)";
+    }
+  }
+
   document.getElementById("modalAgregar").classList.add("open");
-  setTimeout(function(){ if (inputNom) inputNom.focus(); }, 150);
+  setTimeout(function(){
+    // Si el nombre ya está pre-llenado, hacer focus en marca; si no, en nombre
+    var focusEl = (inputNom && inputNom.value) ? inputProv : inputNom;
+    if (focusEl) focusEl.focus();
+  }, 150);
 }
 
 // Guarda el producto nuevo rápido y lo deja listo en el chip del ingreso
