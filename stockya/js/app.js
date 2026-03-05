@@ -2687,9 +2687,9 @@ function buscarProductoIngreso(val, desdeEscaner) {
     chip.style.display = "none";
     // Mostrar botón para registrar producto nuevo con el texto/código ya escrito
     if (hint) {
-      hint.innerHTML = "No encontrado &nbsp;<button onclick="abrirModalRegistroRapido(document.getElementById('movCodigoBuscar').value)" "
-        + "style="background:var(--verde);border:none;border-radius:7px;padding:4px 10px;color:#000;font-size:12px;font-weight:700;cursor:pointer">"
-        + "➕ Registrar producto nuevo</button>";
+      hint.innerHTML = 'No encontrado &nbsp;<button onclick="abrirModalRegistroRapido(document.getElementById(\'movCodigoBuscar\').value)" '
+        + 'style="background:var(--verde);border:none;border-radius:7px;padding:4px 10px;color:#000;font-size:12px;font-weight:700;cursor:pointer">'
+        + '➕ Registrar producto nuevo</button>';
       hint.style.color = "var(--muted)";
     }
   }
@@ -2714,27 +2714,52 @@ function abrirEscanerIngreso() {
   var visor = document.getElementById("escanerIngresoVisor");
   if (!video) return;
 
-  // Mostrar visor y hacer scroll arriba
   if (visor) visor.style.display = "block";
   var area = document.getElementById("ingresoScrollArea");
   if (area) area.scrollTop = 0;
 
-  _iniciarEscaner(video, function(codigo) {
-    cerrarEscanerIngreso();
-    var inputScan = document.getElementById("movCodigoBuscar");
-    if (inputScan) inputScan.value = codigo;
-    // desdeEscaner=true → si no existe abre modal de registro rápido
-    buscarProductoIngreso(codigo, true);
-  });
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(function(stream) {
+      video.srcObject = stream;
+      video.play();
+      if (!("BarcodeDetector" in window)) {
+        cerrarEscanerIngreso();
+        showToast("Escaner no soportado en este navegador");
+        return;
+      }
+      var detector = new BarcodeDetector({ formats: ["ean_13","ean_8","code_128","qr_code"] });
+      var _scanInterval = setInterval(async function() {
+        try {
+          var codes = await detector.detect(video);
+          if (codes.length > 0) {
+            clearInterval(_scanInterval);
+            try { if (typeof _beep === "function") _beep(); } catch(e) {}
+            cerrarEscanerIngreso();
+            var inputScan = document.getElementById("movCodigoBuscar");
+            if (inputScan) inputScan.value = codes[0].rawValue;
+            buscarProductoIngreso(codes[0].rawValue, true);
+          }
+        } catch(e) {}
+      }, 300);
+      // Guardar el intervalo para poder limpiarlo al cerrar
+      video._scanInterval = _scanInterval;
+    })
+    .catch(function() {
+      cerrarEscanerIngreso();
+      showToast("No se pudo acceder a la camara");
+    });
 }
 
 function cerrarEscanerIngreso() {
   var visor = document.getElementById("escanerIngresoVisor");
   var video = document.getElementById("videoEscanerIngreso");
   if (visor) visor.style.display = "none";
-  if (video && video.srcObject) {
-    try { video.srcObject.getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
-    video.srcObject = null;
+  if (video) {
+    if (video._scanInterval) { clearInterval(video._scanInterval); video._scanInterval = null; }
+    if (video.srcObject) {
+      try { video.srcObject.getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
+      video.srcObject = null;
+    }
   }
 }
 
