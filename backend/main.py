@@ -22,12 +22,17 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="YeparStock API", version="1.2.0")
 
-_origins_env = os.getenv("ALLOWED_ORIGINS", "")
-ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",")] if _origins_env else [
+# Orígenes siempre permitidos (producción + desarrollo local)
+_ORIGINS_BASE = [
+    "https://yeparstock.yeparsolutions.com",
     "http://localhost:5500",
     "http://127.0.0.1:5500",
     "http://localhost:8000",
+    "http://127.0.0.1:8000",
 ]
+_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+_origins_extra = [o.strip() for o in _origins_env.split(",") if o.strip()]
+ALLOWED_ORIGINS = list(set(_ORIGINS_BASE + _origins_extra))
 
 app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
