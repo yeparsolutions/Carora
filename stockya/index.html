@@ -372,7 +372,7 @@ input[type="text"]::placeholder { text-transform: none; }
           <div class="page-subtitle" id="dashSubtitulo">Cargando...</div>
         </div>
         <button class="btn-primary" onclick="abrirModalSalida('venta')" style="background:var(--azul)">🛒 Nueva venta</button>
-        <button class="btn-primary" onclick="openModal()">+ Nuevo Ingreso</button>
+        <button class="btn-primary" onclick="openModalMovimiento()">+ Nuevo Ingreso</button>
       </div>
       <div class="stats-grid">
         <div class="stat-card verde">
@@ -1021,41 +1021,63 @@ input[type="text"]::placeholder { text-transform: none; }
 </div><!-- fin appMain -->
 
 
-<!-- MODAL: Agregar producto -->
+<!-- MODAL: Registrar producto nuevo (se abre desde ingreso cuando el código no existe) -->
 <div class="modal-overlay" id="modalAgregar">
-  <div class="modal-box">
-    <div class="modal-header"><div class="modal-title">➕ Nuevo Producto</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">📦 Registrar producto nuevo</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div style="padding:0 24px 8px;color:var(--muted);font-size:13px">
+      El código escaneado no existe en tu inventario. Completa los datos básicos para registrarlo.
+    </div>
     <form id="formProducto">
-      <div class="form-grid">
-        <div class="form-group form-full">
-          <label class="form-label">📷 Código de barras</label>
-          <div style="display:flex;gap:8px">
-            <input id="inputCodigoBarra" class="form-input" type="text" placeholder="Escanea o escribe el código" oninput="buscarPorCodigo(this.value)" style="flex:1">
-            <button type="button" class="btn-secondary" onclick="abrirEscaner()" style="padding:10px 14px;white-space:nowrap">📷 Cámara</button>
-          </div>
-          <span class="settings-field-hint" id="codigoHint">Si el código ya existe, los campos se llenan automáticamente</span>
-        </div>
-        <div class="form-group form-full"><label class="form-label">Nombre del producto *</label><input id="inputNombre" class="form-input" type="text" placeholder="Ej: Leche entera 1L"></div>
-        <div class="form-group"><label class="form-label">Marca</label><input id="inputMarca" class="form-input" type="text" placeholder="Ej: Soprole"></div>
-        <div class="form-group"><label class="form-label">Proveedor</label><input id="inputProveedor" class="form-input" type="text" placeholder="Ej: Distribuidora Norte"></div>
+      <div style="padding:0 24px 0;display:flex;flex-direction:column;gap:12px">
+
+        <!-- Código de barras (pre-llenado) -->
         <div class="form-group">
-          <label class="form-label">Categoría</label>
-          <select id="inputCategoria" class="form-input"><option value="">Sin categoría</option><option>Lácteos</option><option>Bebestibles</option><option>Snacks</option><option>Granos</option><option>Limpieza</option><option>Panadería</option><option>Congelados</option><option>Carnes</option><option>Frutas y Verduras</option><option>Otro</option></select>
+          <label class="form-label">📷 Código de barras</label>
+          <input id="inputCodigoBarra" class="form-input" type="text" placeholder="Código escaneado" readonly
+                 style="background:rgba(0,199,123,0.06);border-color:rgba(0,199,123,0.3);font-weight:700">
+          <span class="settings-field-hint" id="codigoHint" style="color:var(--verde)">✓ Código identificado</span>
         </div>
-        <div class="form-group"><label class="form-label">Código interno</label><input id="inputCodigo" class="form-input" type="text" placeholder="Ej: LAC-001"></div>
-        <div class="form-group"><label class="form-label">Stock inicial *</label><input id="inputStock" class="form-input" type="number" placeholder="0" min="0"></div>
-        <div class="form-group"><label class="form-label">Stock mínimo 🔔</label><input id="inputStockMin" class="form-input" type="number" placeholder="10" min="0"><span class="settings-field-hint">Alerta cuando baje de este número</span></div>
-        <div class="form-group"><label class="form-label">Precio compra</label><input id="inputPrecioCompra" class="form-input" type="number" placeholder="0" min="0" oninput="calcularPrecioVenta()"></div>
-        <div class="form-group"><label class="form-label">% Ganancia</label><input id="inputPorcentaje" class="form-input" type="number" placeholder="0" min="0" max="999" oninput="calcularPrecioVenta()"><span class="settings-field-hint">Calcula el precio de venta automáticamente</span></div>
-        <div class="form-group form-full"><label class="form-label">Precio venta</label><input id="inputPrecioVenta" class="form-input" type="number" placeholder="Se calcula automáticamente" min="0"><span class="settings-field-hint" id="precioHint" style="color:var(--verde)"></span></div>
-        <div class="form-group"><label class="form-label">Número de lote</label><input id="inputLote" class="form-input" type="text" placeholder="Ej: LOTE-2026-001"></div>
-        <div class="form-group"><label class="form-label">Fecha de vencimiento</label><input id="inputFechaVenc" class="form-input" type="date"></div>
-        <div class="form-group"><label class="form-label">Alertar X días antes</label><input id="inputDiasAlerta" class="form-input" type="number" placeholder="30" min="1" value="30"></div>
+
+        <!-- Nombre -->
+        <div class="form-group">
+          <label class="form-label">Nombre del producto *</label>
+          <input id="inputNombre" class="form-input" type="text" placeholder="Ej: Leche entera 1L">
+        </div>
+
+        <!-- Proveedor y Código interno en grid -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-group">
+            <label class="form-label">Proveedor</label>
+            <input id="inputProveedor" class="form-input" type="text" placeholder="Ej: Distribuidora Norte">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Código interno</label>
+            <input id="inputCodigo" class="form-input" type="text" placeholder="Ej: LAC-001">
+          </div>
+        </div>
+
+        <!-- Campos ocultos requeridos por saveProduct() -->
+        <input type="hidden" id="inputMarca" value="">
+        <input type="hidden" id="inputCategoria" value="">
+        <input type="hidden" id="inputStock" value="0">
+        <input type="hidden" id="inputStockMin" value="0">
+        <input type="hidden" id="inputPrecioCompra" value="0">
+        <input type="hidden" id="inputPorcentaje" value="0">
+        <input type="hidden" id="inputPrecioVenta" value="0">
+        <input type="hidden" id="inputLote" value="">
+        <input type="hidden" id="inputFechaVenc" value="">
+        <input type="hidden" id="inputDiasAlerta" value="30">
+        <span id="precioHint" style="display:none"></span>
+        <video id="videoEscaner" style="display:none"></video>
       </div>
-      <video id="videoEscaner" style="display:none;width:100%;height:200px;object-fit:cover;border-radius:10px;margin:10px 0"></video>
+
       <div class="form-actions">
         <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
-        <button type="button" class="btn-primary" onclick="saveProduct()">✓ Guardar producto</button>
+        <button type="button" class="btn-primary" onclick="saveProductRapido()">✓ Registrar y agregar al ingreso</button>
       </div>
     </form>
   </div>
@@ -1070,7 +1092,7 @@ input[type="text"]::placeholder { text-transform: none; }
     </div>
     <div style="padding:16px 24px 0;overflow-y:auto;flex:1">
 
-      <!-- VISOR DE CÁMARA — aparece arriba al escanear (igual que ventas) -->
+      <!-- VISOR DE CÁMARA — aparece arriba al activar escáner -->
       <div id="escanerIngresoVisor" style="display:none;margin-bottom:12px;position:relative">
         <video id="videoEscanerIngreso" style="width:100%;max-height:300px;object-fit:cover;border-radius:14px;display:block"></video>
         <div style="position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;display:flex;align-items:center;justify-content:center">
@@ -1081,9 +1103,9 @@ input[type="text"]::placeholder { text-transform: none; }
         <div style="position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,0.85);font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.8)">Apunta al código de barras</div>
       </div>
 
-      <!-- Buscador (igual que ventas) -->
-      <div id="ingresoScanBox" style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📷 Agregar producto al ingreso</div>
+      <!-- Buscador con botón cámara verde -->
+      <div style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📦 Agregar producto al ingreso</div>
         <div style="display:flex;gap:8px;align-items:center">
           <input id="movCodigoBuscar" class="form-input"
                  style="background:none;border:none;font-size:15px;font-weight:600;padding:0;flex:1;outline:none"
@@ -1091,12 +1113,12 @@ input[type="text"]::placeholder { text-transform: none; }
                  oninput="buscarProductoIngreso(this.value)"
                  onkeydown="if(event.key==='Enter'){event.preventDefault();agregarAlIngresoCarrito()}">
           <button type="button" onclick="abrirEscanerIngreso()"
-                  style="background:var(--verde);border:none;border-radius:10px;padding:8px 14px;color:#000;font-size:16px;font-weight:700;cursor:pointer">📷 Cámara</button>
+                  style="background:var(--verde);border:none;border-radius:10px;padding:8px 14px;color:#000;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap">📷 Cámara</button>
         </div>
         <div id="ingresoScanHint" style="font-size:12px;color:var(--muted);margin-top:6px">Escanea o escribe — Enter o "Agregar" para sumarlo al ingreso</div>
       </div>
 
-      <!-- Chip del producto seleccionado (verde igual que ventas) -->
+      <!-- Chip del producto encontrado (verde) -->
       <div id="ingresoChip" style="display:none;background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:12px 14px;margin-bottom:12px;align-items:center;gap:10px">
         <div style="font-size:22px">📦</div>
         <div style="flex:1;min-width:0">
@@ -1119,19 +1141,22 @@ input[type="text"]::placeholder { text-transform: none; }
         </select>
       </div>
 
-      <!-- Carrito de ingreso -->
+      <!-- Lista del carrito de ingreso -->
       <div id="ingresoCarritoWrap" style="display:none;margin-bottom:12px">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📋 Productos en este ingreso</div>
-        <div id="ingresoCarritoLista" style="display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto"></div>
+        <div id="ingresoCarritoLista" style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto"></div>
       </div>
 
-      <!-- Total -->
+      <!-- Total — muestra UNIDADES (no valor monetario) -->
       <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
         <div>
-          <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase">Total del ingreso</div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase">Unidades a ingresar</div>
           <div id="ingresoTotalDetalle" style="font-size:11px;color:var(--muted);margin-top:2px">0 productos</div>
         </div>
-        <div id="ingresoTotalValor" style="font-family:var(--font-head);font-size:26px;font-weight:800;color:var(--azul)">$0</div>
+        <div style="text-align:right">
+          <div id="ingresoTotalUnidades" style="font-family:var(--font-head);font-size:32px;font-weight:900;color:var(--verde);line-height:1">0</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">unidades</div>
+        </div>
       </div>
 
       <!-- Campos del ingreso — solo los esenciales -->
