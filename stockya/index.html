@@ -1070,7 +1070,7 @@ input[type="text"]::placeholder { text-transform: none; }
     </div>
     <div style="padding:16px 24px 0;overflow-y:auto;flex:1">
 
-      <!-- VISOR DE CÁMARA — aparece arriba al escanear -->
+      <!-- VISOR DE CÁMARA — aparece arriba al escanear (igual que ventas) -->
       <div id="escanerIngresoVisor" style="display:none;margin-bottom:12px;position:relative">
         <video id="videoEscanerIngreso" style="width:100%;max-height:300px;object-fit:cover;border-radius:14px;display:block"></video>
         <div style="position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;display:flex;align-items:center;justify-content:center">
@@ -1081,8 +1081,8 @@ input[type="text"]::placeholder { text-transform: none; }
         <div style="position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,0.85);font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.8)">Apunta al código de barras</div>
       </div>
 
-      <!-- Buscador -->
-      <div style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
+      <!-- Buscador (igual que ventas) -->
+      <div id="ingresoScanBox" style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📷 Agregar producto al ingreso</div>
         <div style="display:flex;gap:8px;align-items:center">
           <input id="movCodigoBuscar" class="form-input"
@@ -1093,10 +1093,10 @@ input[type="text"]::placeholder { text-transform: none; }
           <button type="button" onclick="abrirEscanerIngreso()"
                   style="background:var(--verde);border:none;border-radius:10px;padding:8px 14px;color:#000;font-size:16px;font-weight:700;cursor:pointer">📷 Cámara</button>
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-top:6px">Escanea o escribe — Enter o "Agregar" para sumarlo al ingreso</div>
+        <div id="ingresoScanHint" style="font-size:12px;color:var(--muted);margin-top:6px">Escanea o escribe — Enter o "Agregar" para sumarlo al ingreso</div>
       </div>
 
-      <!-- Chip del producto seleccionado -->
+      <!-- Chip del producto seleccionado (verde igual que ventas) -->
       <div id="ingresoChip" style="display:none;background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:12px 14px;margin-bottom:12px;align-items:center;gap:10px">
         <div style="font-size:22px">📦</div>
         <div style="flex:1;min-width:0">
@@ -1134,7 +1134,7 @@ input[type="text"]::placeholder { text-transform: none; }
         <div id="ingresoTotalValor" style="font-family:var(--font-head);font-size:26px;font-weight:800;color:var(--azul)">$0</div>
       </div>
 
-      <!-- Campos del ingreso -->
+      <!-- Campos del ingreso — solo los esenciales -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
         <div class="form-group">
           <label class="form-label">Proveedor</label>
