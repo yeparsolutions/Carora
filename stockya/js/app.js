@@ -2645,7 +2645,7 @@ function buscarProductoIngreso(val, desdeEscaner) {
 
   if (!val || val.length < 2) {
     chip.style.display = "none";
-    if (hint) { hint.textContent = "Escanea o escribe — Enter o \"Agregar\" para sumarlo al ingreso"; hint.style.color = ""; }
+    if (hint) { hint.innerHTML = "Escanea o escribe — Enter o &quot;Agregar&quot; para sumarlo al ingreso"; hint.style.color = ""; }
     return;
   }
 
@@ -2685,7 +2685,13 @@ function buscarProductoIngreso(val, desdeEscaner) {
     if (hint) { hint.textContent = "✓ " + prod.nombre + " — Stock: " + (prod.stock_actual||0) + " und."; hint.style.color = "var(--verde)"; }
   } else {
     chip.style.display = "none";
-    if (hint) { hint.textContent = "Sin resultados — sigue escribiendo o selecciona de la lista"; hint.style.color = "var(--muted)"; }
+    // Mostrar botón para registrar producto nuevo con el texto/código ya escrito
+    if (hint) {
+      hint.innerHTML = "No encontrado &nbsp;<button onclick="abrirModalRegistroRapido(document.getElementById('movCodigoBuscar').value)" "
+        + "style="background:var(--verde);border:none;border-radius:7px;padding:4px 10px;color:#000;font-size:12px;font-weight:700;cursor:pointer">"
+        + "➕ Registrar producto nuevo</button>";
+      hint.style.color = "var(--muted)";
+    }
   }
 }
 
