@@ -1523,6 +1523,11 @@ input[type="text"]::placeholder { text-transform: none; }
   </div>
 </div>
 
+<script>
+  window.onerror = function(msg, src, line) {
+    document.body.innerHTML = '<div style="padding:20px;color:red;font-size:16px;word-break:break-all">' + msg + '<br><br>Línea: ' + line + '</div>';
+  };
+</script>
 <script src="js/app.js"></script>
   <!-- Registrar Service Worker — activa la PWA -->
   <script>
