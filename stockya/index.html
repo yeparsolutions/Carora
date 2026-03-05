@@ -1061,7 +1061,7 @@ input[type="text"]::placeholder { text-transform: none; }
   </div>
 </div>
 
-<!-- MODAL: Nuevo Ingreso (mismo formato que Nueva Venta) -->
+<!-- MODAL: Nuevo Ingreso -->
 <div class="modal-overlay" id="modalMovimiento">
   <div class="modal-box" style="max-width:620px;display:flex;flex-direction:column;max-height:90vh">
     <div class="modal-header">
@@ -1070,7 +1070,7 @@ input[type="text"]::placeholder { text-transform: none; }
     </div>
     <div style="padding:16px 24px 0;overflow-y:auto;flex:1">
 
-      <!-- VISOR DE CÁMARA — aparece arriba al escanear (igual que en ventas) -->
+      <!-- VISOR DE CÁMARA — aparece arriba al escanear -->
       <div id="escanerIngresoVisor" style="display:none;margin-bottom:12px;position:relative">
         <video id="videoEscanerIngreso" style="width:100%;max-height:300px;object-fit:cover;border-radius:14px;display:block"></video>
         <div style="position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;display:flex;align-items:center;justify-content:center">
@@ -1081,9 +1081,9 @@ input[type="text"]::placeholder { text-transform: none; }
         <div style="position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,0.85);font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.8)">Apunta al código de barras</div>
       </div>
 
-      <!-- Buscador de producto igual que en ventas -->
+      <!-- Buscador -->
       <div style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📦 Buscar producto a ingresar</div>
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📷 Agregar producto al ingreso</div>
         <div style="display:flex;gap:8px;align-items:center">
           <input id="movCodigoBuscar" class="form-input"
                  style="background:none;border:none;font-size:15px;font-weight:600;padding:0;flex:1;outline:none"
@@ -1093,11 +1093,11 @@ input[type="text"]::placeholder { text-transform: none; }
           <button type="button" onclick="abrirEscanerIngreso()"
                   style="background:var(--verde);border:none;border-radius:10px;padding:8px 14px;color:#000;font-size:16px;font-weight:700;cursor:pointer">📷 Cámara</button>
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-top:6px">Escanea o escribe — Enter o "Agregar" para sumarlo</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px">Escanea o escribe — Enter o "Agregar" para sumarlo al ingreso</div>
       </div>
 
       <!-- Chip del producto seleccionado -->
-      <div id="ingresoChip" style="display:none;background:rgba(14,165,233,0.08);border:1px solid rgba(14,165,233,0.25);border-radius:12px;padding:12px 14px;margin-bottom:12px;align-items:center;gap:10px">
+      <div id="ingresoChip" style="display:none;background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:12px 14px;margin-bottom:12px;align-items:center;gap:10px">
         <div style="font-size:22px">📦</div>
         <div style="flex:1;min-width:0">
           <div id="ingresoChipNombre" style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
@@ -1109,7 +1109,7 @@ input[type="text"]::placeholder { text-transform: none; }
           <button type="button" onclick="cambiarQtyIngreso(1)" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">+</button>
         </div>
         <input id="movPrecioCompra" type="number" placeholder="Precio compra" style="width:110px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px;color:var(--text);font-size:13px;font-weight:600;outline:none;flex-shrink:0">
-        <button type="button" onclick="agregarAlIngresoCarrito()" style="background:var(--azul);border:none;border-radius:9px;padding:8px 14px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">+ Agregar</button>
+        <button type="button" onclick="agregarAlIngresoCarrito()" style="background:var(--verde);border:none;border-radius:9px;padding:8px 14px;color:#000;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">+ Agregar</button>
       </div>
 
       <!-- Selector desplegable -->
@@ -1121,11 +1121,11 @@ input[type="text"]::placeholder { text-transform: none; }
 
       <!-- Carrito de ingreso -->
       <div id="ingresoCarritoWrap" style="display:none;margin-bottom:12px">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📋 Productos a ingresar</div>
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📋 Productos en este ingreso</div>
         <div id="ingresoCarritoLista" style="display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto"></div>
       </div>
 
-      <!-- Total unidades -->
+      <!-- Total -->
       <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
         <div>
           <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase">Total del ingreso</div>
@@ -1134,10 +1134,8 @@ input[type="text"]::placeholder { text-transform: none; }
         <div id="ingresoTotalValor" style="font-family:var(--font-head);font-size:26px;font-weight:800;color:var(--azul)">$0</div>
       </div>
 
-      <!-- Datos del ingreso -->
+      <!-- Campos del ingreso -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
-
-        <!-- Fila 1: Proveedor y N° Documento -->
         <div class="form-group">
           <label class="form-label">Proveedor</label>
           <input id="movProveedor" class="form-input" type="text" placeholder="Ej: Distribuidora Norte">
@@ -1146,72 +1144,28 @@ input[type="text"]::placeholder { text-transform: none; }
           <label class="form-label">N° Documento</label>
           <input id="movNumDocumento" class="form-input" type="text" placeholder="Factura, guía, orden...">
         </div>
-
-        <!-- Fila 2: Marca y Categoría -->
-        <div class="form-group">
-          <label class="form-label">Marca</label>
-          <input id="movMarca" class="form-input" type="text" placeholder="Ej: Soprole">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Categoría</label>
-          <select id="movCategoria" class="form-input">
-            <option value="">Sin categoría</option>
-            <option>Lácteos</option><option>Bebestibles</option><option>Snacks</option>
-            <option>Granos</option><option>Limpieza</option><option>Panadería</option>
-            <option>Congelados</option><option>Carnes</option><option>Frutas y Verduras</option>
-            <option>Otro</option>
-          </select>
-        </div>
-
-        <!-- Fila 3: Código interno y Stock mínimo -->
-        <div class="form-group">
-          <label class="form-label">Código interno</label>
-          <input id="movCodigoInterno" class="form-input" type="text" placeholder="Ej: LAC-001">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Stock mínimo 🔔</label>
-          <input id="movStockMin" class="form-input" type="number" min="0" placeholder="10">
-          <span class="settings-field-hint">Alerta cuando baje de este número</span>
-        </div>
-
-        <!-- Fila 4: Precio compra y % Ganancia -->
-        <div class="form-group">
-          <label class="form-label">Precio compra</label>
-          <input id="movPrecioCompraExtra" class="form-input" type="number" min="0" placeholder="0" oninput="calcularPrecioVentaIngreso()">
-        </div>
-        <div class="form-group">
-          <label class="form-label">% Ganancia</label>
-          <input id="movPorcentaje" class="form-input" type="number" min="0" max="999" placeholder="0" oninput="calcularPrecioVentaIngreso()">
-          <span class="settings-field-hint">Calcula el precio de venta automáticamente</span>
-        </div>
-
-        <!-- Fila 5: Precio venta (ancho completo) -->
-        <div class="form-group form-full">
-          <label class="form-label">Precio venta</label>
-          <input id="movPrecioVenta" class="form-input" type="number" min="0" placeholder="Se calcula automáticamente">
-          <span class="settings-field-hint" id="movPrecioHint" style="color:var(--verde)"></span>
-        </div>
-
-        <!-- Fila 6: Lote y Fecha vencimiento -->
-        <div class="form-group">
-          <label class="form-label">Número de lote</label>
-          <input id="movLote" class="form-input" type="text" placeholder="Ej: LOTE-2026-001">
-        </div>
         <div class="form-group">
           <label class="form-label">Fecha de vencimiento</label>
           <input id="movFechaVenc" class="form-input" type="date">
         </div>
-
-        <!-- Fila 7: Alertar días y Nota -->
         <div class="form-group">
           <label class="form-label">Alertar X días antes</label>
           <input id="movDiasAlerta" class="form-input" type="number" min="1" placeholder="30" value="30">
         </div>
-        <div class="form-group">
+        <div class="form-group form-full">
           <label class="form-label">Nota u observación</label>
           <input id="movNota" class="form-input" type="text" placeholder="Observación opcional">
         </div>
-
+        <!-- Campos ocultos para compatibilidad con backend -->
+        <input type="hidden" id="movMarca">
+        <input type="hidden" id="movCategoria">
+        <input type="hidden" id="movCodigoInterno">
+        <input type="hidden" id="movStockMin">
+        <input type="hidden" id="movPrecioCompraExtra">
+        <input type="hidden" id="movPorcentaje">
+        <input type="hidden" id="movPrecioVenta">
+        <input type="hidden" id="movLote">
+        <span id="movPrecioHint" style="display:none"></span>
       </div>
     </div>
     <div class="form-actions" style="flex-shrink:0;border-top:1px solid var(--border);padding:16px 24px">
