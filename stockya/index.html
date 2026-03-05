@@ -1,10 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-
-<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
-  
   <!-- ============================================================
        YEPARSTOCK — Archivo principal HTML
        Archivo: index.html
@@ -1074,6 +1070,17 @@ input[type="text"]::placeholder { text-transform: none; }
     </div>
     <div style="padding:16px 24px 0;overflow-y:auto;flex:1">
 
+      <!-- VISOR DE CÁMARA — aparece arriba al escanear (igual que en ventas) -->
+      <div id="escanerIngresoVisor" style="display:none;margin-bottom:12px;position:relative">
+        <video id="videoEscanerIngreso" style="width:100%;max-height:300px;object-fit:cover;border-radius:14px;display:block"></video>
+        <div style="position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;display:flex;align-items:center;justify-content:center">
+          <div style="width:220px;height:140px;border:3px solid rgba(0,199,123,0.9);border-radius:12px;box-shadow:0 0 0 2000px rgba(0,0,0,0.35)"></div>
+        </div>
+        <button type="button" onclick="cerrarEscanerIngreso()"
+                style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.6);border:none;border-radius:50%;width:36px;height:36px;color:#fff;font-size:18px;cursor:pointer;line-height:1">✕</button>
+        <div style="position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,0.85);font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.8)">Apunta al código de barras</div>
+      </div>
+
       <!-- Buscador de producto igual que en ventas -->
       <div style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📦 Buscar producto a ingresar</div>
@@ -1084,10 +1091,9 @@ input[type="text"]::placeholder { text-transform: none; }
                  oninput="buscarProductoIngreso(this.value)"
                  onkeydown="if(event.key==='Enter'){event.preventDefault();agregarAlIngresoCarrito()}">
           <button type="button" onclick="abrirEscanerIngreso()"
-                  style="background:var(--bg4);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-size:16px;cursor:pointer">📷</button>
+                  style="background:var(--verde);border:none;border-radius:10px;padding:8px 14px;color:#000;font-size:16px;font-weight:700;cursor:pointer">📷 Cámara</button>
         </div>
         <div style="font-size:12px;color:var(--muted);margin-top:6px">Escanea o escribe — Enter o "Agregar" para sumarlo</div>
-        <video id="videoEscanerIngreso" style="display:none;width:100%;height:180px;object-fit:cover;border-radius:10px;margin-top:8px"></video>
       </div>
 
       <!-- Chip del producto seleccionado -->
@@ -1264,16 +1270,6 @@ input[type="text"]::placeholder { text-transform: none; }
       <button class="modal-close" onclick="cerrarModalSalida()">✕</button>
     </div>
     <div style="padding:16px 24px 0;overflow-y:auto;flex:1">
-      <!-- VISOR DE CÁMARA — aparece arriba al escanear -->
-      <div id="escanerSalidaVisor" style="display:none;margin-bottom:12px;position:relative">
-        <video id="videoEscanerSalida" style="width:100%;max-height:300px;object-fit:cover;border-radius:14px;display:block"></video>
-        <div style="position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;display:flex;align-items:center;justify-content:center">
-          <div style="width:220px;height:140px;border:3px solid rgba(0,199,123,0.9);border-radius:12px;box-shadow:0 0 0 2000px rgba(0,0,0,0.35)"></div>
-        </div>
-        <button type="button" onclick="cerrarEscanerSalida()"
-                style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.6);border:none;border-radius:50%;width:36px;height:36px;color:#fff;font-size:18px;cursor:pointer;line-height:1">✕</button>
-        <div style="position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,0.85);font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.8)">Apunta al código de barras</div>
-      </div>
       <div id="scanBox" style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📷 Agregar producto al carrito</div>
         <div style="display:flex;gap:8px;align-items:center">
@@ -1283,9 +1279,10 @@ input[type="text"]::placeholder { text-transform: none; }
                  oninput="buscarProductoSalida(this.value)"
                  onkeydown="if(event.key==='Enter'){event.preventDefault();agregarAlCarrito()}">
           <button type="button" onclick="abrirEscanerSalida()"
-                  style="background:var(--verde);border:none;border-radius:10px;padding:8px 14px;color:#000;font-size:16px;font-weight:700;cursor:pointer">📷 Cámara</button>
+                  style="background:var(--bg4);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-size:16px;cursor:pointer">📷</button>
         </div>
         <div id="salidaScanHint" style="font-size:12px;color:var(--muted);margin-top:6px">Escanea o escribe — Enter o "Agregar" para sumarlo al carrito</div>
+        <video id="videoEscanerSalida" style="display:none;width:100%;height:180px;object-fit:cover;border-radius:10px;margin-top:8px"></video>
       </div>
       <div id="productoChip" style="display:none;background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:12px 14px;margin-bottom:12px;align-items:center;gap:10px">
         <div style="font-size:22px">📦</div>
@@ -1527,11 +1524,6 @@ input[type="text"]::placeholder { text-transform: none; }
   </div>
 </div>
 
-<script>
-  window.onerror = function(msg, src, line) {
-    document.body.innerHTML = '<div style="padding:20px;color:red;font-size:16px;word-break:break-all">' + msg + '<br><br>Línea: ' + line + '</div>';
-  };
-</script>
 <script src="js/app.js"></script>
   <!-- Registrar Service Worker — activa la PWA -->
   <script>
