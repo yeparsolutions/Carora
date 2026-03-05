@@ -7,7 +7,7 @@
 // Analogia: si estás en casa usas "mi habitación", si vienes de afuera usas la dirección completa
 const API_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
   ? "http://localhost:8000"
-  : "https://yeparstock-api.up.railway.app";
+  : "http://192.168.1.87:8000";
 let authToken     = localStorage.getItem("yeparstock_token")   || null;
 let usuarioActual = JSON.parse(localStorage.getItem("yeparstock_usuario") || "null");
 
@@ -2533,12 +2533,13 @@ async function openModalMovimiento() {
 function closeModalMovimiento() {
   document.getElementById("modalMovimiento").classList.remove("open");
   cerrarEscanerIngreso();
-  // Limpiar carrito de ingreso
   _ingresoCarrito = [];
   renderizarIngresoCarrito();
   document.getElementById("movCodigoBuscar") && (document.getElementById("movCodigoBuscar").value = "");
   var chip = document.getElementById("ingresoChip");
   if (chip) { chip.style.display = "none"; chip._productoActual = null; }
+  var hint = document.getElementById("ingresoScanHint");
+  if (hint) { hint.textContent = "Escanea o escribe — Enter o \"Agregar\" para sumarlo al ingreso"; hint.style.color = ""; }
 }
 
 // ============================================================
@@ -2567,10 +2568,14 @@ function calcularPrecioVentaIngreso() {
 }
 
 function buscarProductoIngreso(val) {
-  // Reutiliza la lista de productos ya cargados
   var chip = document.getElementById("ingresoChip");
+  var hint = document.getElementById("ingresoScanHint");
   if (!chip) return;
-  if (!val || val.length < 2) { chip.style.display = "none"; return; }
+  if (!val || val.length < 2) {
+    chip.style.display = "none";
+    if (hint) { hint.textContent = "Escanea o escribe — Enter o \"Agregar\" para sumarlo al ingreso"; hint.style.color = ""; }
+    return;
+  }
   var prod = (_productosCache || []).find(function(p) {
     return (p.nombre && p.nombre.toLowerCase().includes(val.toLowerCase()))
         || (p.codigo_barra && p.codigo_barra === val)
@@ -2580,7 +2585,7 @@ function buscarProductoIngreso(val) {
     document.getElementById("ingresoChipNombre").textContent = prod.nombre;
     document.getElementById("ingresoChipDetalle").textContent =
       "Stock actual: " + (prod.stock_actual || 0) + " · Precio compra: $" + (prod.precio_compra || 0).toLocaleString("es-CL");
-    // Rellenar todos los campos del formulario con datos del producto
+    // Rellenar campos del formulario con datos del producto
     document.getElementById("movPrecioCompra").value          = prod.precio_compra  || "";
     document.getElementById("movPrecioCompraExtra") && (document.getElementById("movPrecioCompraExtra").value = prod.precio_compra || "");
     document.getElementById("movPrecioVenta")       && (document.getElementById("movPrecioVenta").value      = prod.precio_venta   || "");
@@ -2594,8 +2599,10 @@ function buscarProductoIngreso(val) {
     chip._productoActual = prod;
     chip.style.display = "flex";
     document.getElementById("movCantidad").value = 1;
+    if (hint) { hint.textContent = "✓ " + prod.nombre + " — Stock: " + prod.stock_actual + " und. — presiona Enter para agregar"; hint.style.color = "var(--verde)"; }
   } else {
     chip.style.display = "none";
+    if (hint) { hint.textContent = "No encontrado — selecciona de la lista o sigue escribiendo"; hint.style.color = "var(--amarillo)"; }
   }
 }
 
@@ -2613,17 +2620,15 @@ function cambiarQtyIngreso(delta) {
   inp.value = v;
 }
 
-var _streamIngreso = null; // Stream de cámara activo para ingreso
-
 function abrirEscanerIngreso() {
   var vid   = document.getElementById("videoEscanerIngreso");
   var visor = document.getElementById("escanerIngresoVisor");
   if (!vid) return;
   if (visor) visor.style.display = "block";
 
-  // Scroll al inicio del modal para ver la cámara
-  var modalContent = document.querySelector("#modalMovimiento [style*='overflow-y:auto']");
-  if (modalContent) modalContent.scrollTop = 0;
+  // Scroll al inicio del modal para ver la cámara arriba
+  var modalBox = document.querySelector("#modalMovimiento .modal-box");
+  if (modalBox && modalBox.children[1]) modalBox.children[1].scrollTop = 0;
 
   navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } })
     .then(function(stream) {
@@ -2641,7 +2646,7 @@ function abrirEscanerIngreso() {
           var codes = await detector.detect(vid);
           if (codes.length > 0) {
             clearInterval(_scan);
-            _beepEscaner();
+            _beepEscaner && _beepEscaner();
             cerrarEscanerIngreso();
             var inputScan = document.getElementById("movCodigoBuscar");
             if (inputScan) {
@@ -2654,12 +2659,6 @@ function abrirEscanerIngreso() {
       }, 300);
     })
     .catch(function() { showToast("No se pudo acceder a la camara"); });
-}
-
-function cerrarEscanerIngreso() {
-  if (_streamIngreso) { _streamIngreso.getTracks().forEach(function(t){ t.stop(); }); _streamIngreso = null; }
-  var visor = document.getElementById("escanerIngresoVisor");
-  if (visor) visor.style.display = "none";
 }
 
 function agregarAlIngresoCarrito() {
