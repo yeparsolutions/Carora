@@ -214,6 +214,7 @@ class Configuracion(Base):
     rubro               = Column(String(100), nullable=True)
     nombre_usuario      = Column(String(150), nullable=True)
     onboarding_completo = Column(Boolean, default=False)
+    sonido_escaner      = Column(String(20), default="scanner")
     updated_at          = Column(DateTime(timezone=True), onupdate=func.now())
 
     usuario = relationship("Usuario")
