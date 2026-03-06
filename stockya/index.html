@@ -14,15 +14,18 @@
 
   <!-- ============================================================
        [SEC-6] Content Security Policy (CSP)
-       Analogia: como el portero de una discoteca — solo deja entrar
-       recursos de dominios que tú mismo aprobaste explícitamente.
-       - default-src 'self'      → solo recursos del propio servidor
-       - script-src 'self'       → no se ejecutan scripts externos
-       - style-src 'self' 'unsafe-inline' → permite estilos inline (necesarios para la app)
-       - img-src 'self' data: blob: → permite imágenes locales, base64 y cámara
-       - media-src 'self' blob:  → permite streams de cámara (escáner)
-       - connect-src 'self'      → fetch/XHR solo al propio backend
-       Sin CSP, un XSS puede cargar scripts de cualquier dominio.
+       Analogia: portero de discoteca que solo deja entrar recursos
+       de dominios aprobados explicitamente.
+
+       NOTA [SEC-7]: frame-ancestors y X-Frame-Options NO funcionan
+       como <meta> — el navegador los ignora. Deben ir como HTTP
+       headers en el servidor (ver instrucciones abajo del archivo).
+
+       - script-src 'self'             → solo scripts del propio servidor
+       - style-src 'self' 'unsafe-inline' → estilos inline necesarios
+       - img-src 'self' data: blob:    → imágenes, base64, cámara
+       - media-src 'self' blob:        → stream de cámara (escáner)
+       - connect-src 'self' + Railway  → permite fetch al API backend
   ============================================================ -->
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self';
@@ -30,18 +33,7 @@
                  style-src 'self' 'unsafe-inline';
                  img-src 'self' data: blob:;
                  media-src 'self' blob:;
-                 connect-src 'self';
-                 frame-ancestors 'none';">
-
-  <!-- ============================================================
-       [SEC-7] Protección contra Clickjacking
-       Analogia: como poner una reja invisible — impide que otro
-       sitio cargue esta app dentro de un <iframe> para engañar
-       al usuario a hacer clic en botones sin darse cuenta.
-       frame-ancestors 'none' en CSP cubre navegadores modernos.
-       Esta meta es un respaldo para navegadores más antiguos.
-  ============================================================ -->
-  <meta http-equiv="X-Frame-Options" content="DENY">
+                 connect-src 'self' https://yeparstock-api.up.railway.app;">
 
   <!-- Fuentes del sistema — carga instantánea sin peticiones externas -->
   <link rel="stylesheet" href="css/styles.css">
@@ -1418,41 +1410,11 @@ input[type="text"]::placeholder { text-transform: none; }
 <script src="js/events.js"></script>
 
 <!-- ============================================================
-     Registrar Service Worker — activa la PWA
-     [SEC-10] Se verifica que el SW no esté ya activo antes de registrar
-     Analogia: como revisar si ya abriste la tienda antes de volver
-     a pasar la llave — evita registros duplicados innecesarios.
+     [SEC-10] Service Worker + logoFallback — movidos a js/sw-init.js
+     El CSP con script-src 'self' bloquea scripts inline.
+     Analogia: el portero no acepta instrucciones verbales (inline),
+     solo admite documentos firmados (archivos .js del servidor).
 ============================================================ -->
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-      // Verificar si ya existe un SW activo para este scope
-      navigator.serviceWorker.getRegistration('./').then(function(existingReg) {
-        if (!existingReg) {
-          // Solo registrar si no existe uno previo
-          navigator.serviceWorker.register('sw.js')
-            .then(function(reg) { console.log('[PWA] Service Worker registrado:', reg.scope); })
-            .catch(function(err) { console.warn('[PWA] Error registrando SW:', err); });
-        } else {
-          console.log('[PWA] Service Worker ya activo:', existingReg.scope);
-        }
-      });
-    });
-  }
-
-  // ============================================================
-  // [SEC-8] logoFallbackHandler — función centralizada para el
-  // fallback del logo de login. Separa la lógica del HTML
-  // (onerror solo llama una función, no ejecuta código inline).
-  // Analogia: en vez de dejar un cartel pegado en la puerta con
-  // instrucciones, hay un guardia capacitado que sabe qué hacer.
-  // ============================================================
-  function logoFallbackHandler() {
-    var img = document.getElementById('logoImg');
-    var fallback = document.getElementById('logoFallback');
-    if (img) img.style.display = 'none';
-    if (fallback) fallback.style.display = 'flex';
-  }
-</script>
+<script src="js/sw-init.js"></script>
 </body>
 </html>
