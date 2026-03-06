@@ -46,21 +46,50 @@ function _beep(tipo) {
     }
 
     if (tipo === "error") {
-      // BUZZ descendente — dos tonos graves separados
+      // BUZZ descendente — dos tonos graves
       tono(520, 260, 0.22, 0.9, "sawtooth", 0);
       tono(420, 200, 0.22, 0.9, "sawtooth", 0.27);
+
     } else if (tipo === "ok") {
       // Melodía corta ascendente — Do Mi Sol
       tono(523, null, 0.14, 0.85, "sine", 0);
       tono(659, null, 0.14, 0.85, "sine", 0.15);
       tono(784, null, 0.20, 0.85, "sine", 0.30);
-    } else {
-      // BEEP de escáner profesional — tono largo y nítido, característico Zebra/Honeywell
-      // Tono principal fuerte y sostenido
+
+    } else if (tipo === "scanner") {
+      // 🔫 Escáner profesional — beep doble nítido Zebra/Honeywell
       tono(1850, 1750, 0.28, 0.95, "square", 0);
-      // Armónico para darle cuerpo y presencia
       tono(3700, 3500, 0.28, 0.35, "square", 0);
-      // Segundo pitido más corto y agudo después de una pausa (el "bip" clásico doble)
+      tono(2100, 2000, 0.20, 0.85, "square", 0.33);
+      tono(4200, 4000, 0.20, 0.28, "square", 0.33);
+
+    } else if (tipo === "single") {
+      // 📟 Beep simple — un solo tono corto y limpio
+      tono(1600, 1500, 0.18, 0.95, "square", 0);
+      tono(3200, 3000, 0.18, 0.30, "square", 0);
+
+    } else if (tipo === "soft") {
+      // 🎵 Tono suave — sine wave agradable
+      tono(880,  840,  0.25, 0.75, "sine", 0);
+      tono(1100, 1060, 0.20, 0.60, "sine", 0.28);
+
+    } else if (tipo === "retro") {
+      // 🕹️ Retro 8-bit — tres notas de videojuego
+      tono(440, null, 0.08, 0.85, "square", 0);
+      tono(554, null, 0.08, 0.85, "square", 0.10);
+      tono(659, null, 0.12, 0.85, "square", 0.20);
+
+    } else if (tipo === "cash") {
+      // 💰 Caja registradora — ding metálico con resonancia
+      tono(1200, 600,  0.05, 0.95, "sine",    0);
+      tono(2400, 1200, 0.05, 0.40, "sine",    0);
+      tono(1200, 400,  0.35, 0.55, "sine",    0.05);
+      tono(2400, 800,  0.35, 0.20, "triangle",0.05);
+
+    } else {
+      // Default — escáner profesional
+      tono(1850, 1750, 0.28, 0.95, "square", 0);
+      tono(3700, 3500, 0.28, 0.35, "square", 0);
       tono(2100, 2000, 0.20, 0.85, "square", 0.33);
       tono(4200, 4000, 0.20, 0.28, "square", 0.33);
     }
@@ -3197,6 +3226,7 @@ async function guardarConfiguracion() {
       moneda:          moneda,
       color_principal: configTemporal.color,
       logo_base64:     configTemporal.logoData || null,
+      sonido_escaner:  _sonidoActivo,
     });
 
     // 2) Guardar datos del usuario si cambio algo
@@ -3274,6 +3304,16 @@ async function cargarConfiguracion() {
     if (inputMoneda)  inputMoneda.value  = config.moneda         || "CLP";
 
     if (config.color_principal) previsualizarColor(config.color_principal);
+
+    // Cargar sonido del escáner guardado en BD
+    if (config.sonido_escaner) {
+      _sonidoActivo = config.sonido_escaner;
+      localStorage.setItem("yeparstock_sonido", config.sonido_escaner);
+    }
+    // Marcar la opción activa en el selector
+    document.querySelectorAll(".sound-option").forEach(function(o){ o.classList.remove("active"); });
+    var optActiva = document.querySelector('.sound-option[data-sound="' + _sonidoActivo + '"]');
+    if (optActiva) optActiva.classList.add("active");
 
     var img = document.getElementById("logoImg");
     var ini = document.getElementById("logoInitials");
