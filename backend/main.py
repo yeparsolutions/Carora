@@ -31,6 +31,13 @@ def ejecutar_migraciones():
         "ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS sonido_escaner VARCHAR(20) DEFAULT 'scanner'",
         # plan gratis — agregar al enum si no existe
         "ALTER TYPE plan_empresa_enum ADD VALUE IF NOT EXISTS 'gratis'",
+        # ── Sistema de colaboradores con username ──────────────
+        "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS username VARCHAR(50)",
+        "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS color_interfaz VARCHAR(10)",
+        "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS sonido_escaner VARCHAR(20)",
+        "ALTER TABLE usuarios ALTER COLUMN email DROP NOT NULL",
+        """CREATE UNIQUE INDEX IF NOT EXISTS uq_usuario_empresa_username ON usuarios (empresa_id, username) WHERE username IS NOT NULL""",
+        """CREATE TABLE IF NOT EXISTS permisos_usuario (id SERIAL PRIMARY KEY, usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE, seccion VARCHAR(50) NOT NULL, permitido BOOLEAN DEFAULT TRUE, created_at TIMESTAMPTZ DEFAULT now(), CONSTRAINT uq_permiso_usuario_seccion UNIQUE (usuario_id, seccion))""",
     ]
     with engine.connect() as conn:
         for sql in migraciones:
