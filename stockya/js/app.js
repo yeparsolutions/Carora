@@ -3484,17 +3484,7 @@ document.addEventListener("DOMContentLoaded", function(){
     // Intencional: no se agrega listener de cierre por clic en overlay
   });
 
-  // Generar username automático al escribir nombre/apellido
-  var elN = document.getElementById("invitarNombre");
-  var elA = document.getElementById("invitarApellido");
-  var elU = document.getElementById("invitarUsername");
-  if (elN) elN.addEventListener("input", generarUsernameAuto);
-  if (elA) elA.addEventListener("input", generarUsernameAuto);
-  if (elU) elU.addEventListener("input", function() {
-    var pos = this.selectionStart;
-    this.value = this.value.toLowerCase().replace(/[^a-z0-9._]/g,"");
-    this.setSelectionRange(pos, pos);
-  });
+
 
   // Generar username automático al escribir nombre o apellido del colaborador
   var elNombre   = document.getElementById("invitarNombre");
@@ -4147,19 +4137,27 @@ async function abrirModalPermisos(usuarioId, nombreUsuario) {
     var div = document.createElement("div");
     div.id = "modalPermisos";
     div.className = "modal-overlay";
-    div.innerHTML =
-      '<div class="modal-box" style="max-width:500px">'
-      + '<div class="modal-header">'
-      +   '<div class="modal-title" id="permisosModalTitulo">Permisos</div>'
-      +   '<button class="modal-close" onclick="cerrarModalPermisos()">✕</button>'
-      + '</div>'
-      + '<div style="padding:0 24px 8px;font-size:13px;color:var(--muted)">Activa o desactiva el acceso a cada sección para este colaborador.</div>'
-      + '<div style="padding:0 24px 20px"><div id="permisosLista" style="display:flex;flex-direction:column;gap:10px"></div></div>'
-      + '<div class="form-actions">'
-      +   '<button type="button" class="btn-secondary" onclick="cerrarModalPermisos()">Cancelar</button>'
-      +   '<button type="button" class="btn-primary" id="btnGuardarPermisos" onclick="guardarPermisos()">✓ Guardar permisos</button>'
-      + '</div>'
-      + '</div>';
+    var box = document.createElement("div");
+    box.className = "modal-box"; box.style.maxWidth = "500px";
+    var hdr = document.createElement("div"); hdr.className = "modal-header";
+    var ttl = document.createElement("div"); ttl.className = "modal-title"; ttl.id = "permisosModalTitulo"; ttl.textContent = "Permisos";
+    var bX  = document.createElement("button"); bX.className = "modal-close"; bX.textContent = "✕";
+    bX.addEventListener("click", cerrarModalPermisos);
+    hdr.append(ttl, bX);
+    var dsc = document.createElement("div");
+    dsc.style.cssText = "padding:0 24px 8px;font-size:13px;color:var(--muted)";
+    dsc.textContent = "Activa o desactiva el acceso a cada sección para este colaborador.";
+    var lWrap = document.createElement("div"); lWrap.style.cssText = "padding:0 24px 20px";
+    var lst = document.createElement("div"); lst.id = "permisosLista"; lst.style.cssText = "display:flex;flex-direction:column;gap:10px";
+    lWrap.appendChild(lst);
+    var act = document.createElement("div"); act.className = "form-actions";
+    var bCan = document.createElement("button"); bCan.type = "button"; bCan.className = "btn-secondary"; bCan.textContent = "Cancelar";
+    bCan.addEventListener("click", cerrarModalPermisos);
+    var bSav = document.createElement("button"); bSav.type = "button"; bSav.id = "btnGuardarPermisos"; bSav.className = "btn-primary"; bSav.textContent = "✓ Guardar permisos";
+    bSav.addEventListener("click", guardarPermisos);
+    act.append(bCan, bSav);
+    box.append(hdr, dsc, lWrap, act);
+    div.appendChild(box);
     document.body.appendChild(div);
   }
 
@@ -4168,21 +4166,29 @@ async function abrirModalPermisos(usuarioId, nombreUsuario) {
 
   var lista = document.getElementById("permisosLista");
   if (lista) {
-    lista.innerHTML = SECCIONES_PERMISOS.map(function(s) {
+    lista.innerHTML = "";
+    SECCIONES_PERMISOS.forEach(function(s) {
       var activo = _permisosActualesEdit[s.key] !== false;
-      return '<div style="display:flex;align-items:center;justify-content:space-between;'
-        + 'background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px">'
-        + '<div><div style="font-size:14px;font-weight:600">' + _esc(s.label) + '</div>'
-        + '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + _esc(s.desc) + '</div></div>'
-        + '<label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0;margin-left:12px">'
-        + '<input type="checkbox"' + (activo ? ' checked' : '') + ' style="opacity:0;width:0;height:0"'
-        + ' onchange="_togglePermiso(\'' + s.key + '\',this.checked)">'
-        + '<span id="pslider_' + s.key + '" style="position:absolute;inset:0;border-radius:24px;background:'
-        + (activo ? 'var(--verde)' : 'var(--border)') + ';transition:background .2s">'
-        + '<span style="position:absolute;height:18px;width:18px;left:' + (activo ? '23px' : '3px')
-        + ';bottom:3px;background:#fff;border-radius:50%;transition:left .2s"></span></span>'
-        + '</label></div>';
-    }).join("");
+      var row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;justify-content:space-between;"
+        + "background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px";
+      var info = document.createElement("div");
+      var nm = document.createElement("div"); nm.style.cssText = "font-size:14px;font-weight:600"; nm.textContent = s.label;
+      var ds = document.createElement("div"); ds.style.cssText = "font-size:11px;color:var(--muted);margin-top:2px"; ds.textContent = s.desc;
+      info.append(nm, ds);
+      var lbl = document.createElement("label");
+      lbl.style.cssText = "position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;flex-shrink:0;margin-left:12px";
+      var chk = document.createElement("input"); chk.type = "checkbox"; chk.checked = activo;
+      chk.style.cssText = "opacity:0;width:0;height:0"; chk.dataset.seccion = s.key;
+      chk.addEventListener("change", function(){ _togglePermiso(this.dataset.seccion, this.checked); });
+      var trk = document.createElement("span"); trk.id = "pslider_" + s.key;
+      trk.style.cssText = "position:absolute;inset:0;border-radius:24px;background:"
+        + (activo ? "var(--verde)" : "var(--border)") + ";transition:background .2s";
+      var knb = document.createElement("span");
+      knb.style.cssText = "position:absolute;height:18px;width:18px;left:"
+        + (activo ? "23px" : "3px") + ";bottom:3px;background:#fff;border-radius:50%;transition:left .2s";
+      trk.appendChild(knb); lbl.append(chk, trk); row.append(info, lbl); lista.appendChild(row);
+    });
   }
 
   document.getElementById("modalPermisos").classList.add("open");
