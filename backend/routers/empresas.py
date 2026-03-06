@@ -3,9 +3,7 @@
 # Archivo: backend/routers/empresas.py
 # ============================================================
 
-import fastapi
-from fastapi import APIRouter, Depends, HTTPException, Body
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sqlfunc
 from datetime import datetime, timedelta, timezone
@@ -82,11 +80,6 @@ def cambiar_plan(
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
     solo_admin(usuario_actual)
-
-    nombre   = datos.nombre
-    username = datos.username
-    password = datos.password
-    rol      = datos.rol
 
     empresa = db.query(models.Empresa).filter(
         models.Empresa.id == usuario_actual.empresa_id
@@ -227,21 +220,12 @@ def listar_usuarios_empresa(
 #    El operador no necesita correo — solo nombre visible,
 #    username para login y password.
 # ============================================================
-class InvitarSchema(BaseModel):
-    nombre:   str
-    username: str
-    password: str
-    rol:      str = "operador"
-
-class MiConfigSchema(BaseModel):
-    password_actual: str = None
-    password_nuevo:  str = None
-    color_interfaz:  str = None
-    sonido_escaner:  str = None
-
 @router.post("/invitar", status_code=201)
 def invitar_usuario(
-    datos: InvitarSchema,
+    nombre:   str,
+    username: str,
+    password: str,
+    rol:      str = "operador",
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
@@ -251,6 +235,11 @@ def invitar_usuario(
     y una clave — sin necesidad de su correo personal.
     """
     solo_admin(usuario_actual)
+
+    nombre   = datos.nombre
+    username = datos.username
+    password = datos.password
+    rol      = datos.rol
 
     empresa = db.query(models.Empresa).filter(
         models.Empresa.id == usuario_actual.empresa_id
@@ -378,7 +367,7 @@ def obtener_permisos(
 @router.put("/usuarios/{usuario_id}/permisos")
 def actualizar_permisos(
     usuario_id: int,
-    permisos:   dict = Body(...),   # {"dashboard": true, "salidas": false, ...}
+    permisos:   dict,           # {"dashboard": true, "salidas": false, ...}
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
