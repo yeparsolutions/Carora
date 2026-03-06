@@ -1,7 +1,6 @@
 # ============================================================
 # STOCKYA — Router de Empresas
 # Archivo: backend/routers/empresas.py
-# Descripcion: Gestiona plan, usuarios y suscripción de la empresa
 # ============================================================
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,9 +13,15 @@ import models
 
 router = APIRouter(prefix="/empresa", tags=["Empresa"])
 
+# Secciones válidas para permisos
+SECCIONES_VALIDAS = {
+    "dashboard", "productos", "stock", "movimientos",
+    "salidas", "alertas", "reportes", "fiados"
+}
+
 
 # ============================================================
-# GET /empresa/info — Info del plan y límites actuales
+# GET /empresa/info
 # ============================================================
 @router.get("/info")
 def obtener_info_empresa(
@@ -40,8 +45,7 @@ def obtener_info_empresa(
         models.Producto.activo     == True
     ).scalar() or 0
 
-    # Estado de cancelación
-    ahora         = datetime.now(timezone.utc)
+    ahora          = datetime.now(timezone.utc)
     esta_cancelado = empresa.cancelado_en is not None
     en_gracia      = esta_cancelado and empresa.gracia_hasta and ahora < empresa.gracia_hasta
     bloqueado      = esta_cancelado and (not empresa.gracia_hasta or ahora >= empresa.gracia_hasta)
@@ -58,7 +62,6 @@ def obtener_info_empresa(
         "max_productos":     empresa.max_productos,
         "total_usuarios":    total_usuarios,
         "total_productos":   total_productos,
-        # Cancelación
         "cancelado_en":      empresa.cancelado_en,
         "gracia_hasta":      empresa.gracia_hasta,
         "esta_cancelado":    esta_cancelado,
@@ -68,7 +71,7 @@ def obtener_info_empresa(
 
 
 # ============================================================
-# PATCH /empresa/cambiar-plan — Cambia entre básico y pro
+# PATCH /empresa/cambiar-plan
 # ============================================================
 @router.patch("/cambiar-plan")
 def cambiar_plan(
@@ -93,7 +96,6 @@ def cambiar_plan(
     if nuevo_plan == plan_actual:
         raise HTTPException(status_code=400, detail="Ya estás en ese plan")
 
-    # Validar downgrade: no puede tener más usuarios o productos de los permitidos
     if nuevo_plan == "basico":
         total_usuarios = db.query(sqlfunc.count(models.Usuario.id)).filter(
             models.Usuario.empresa_id == empresa.id,
@@ -108,56 +110,42 @@ def cambiar_plan(
         if total_usuarios > 1:
             raise HTTPException(
                 status_code=400,
-                detail=f"Tienes {total_usuarios} usuarios activos. Desactiva {total_usuarios - 1} antes de bajar a Básico (máximo 1 usuario)."
+                detail=f"Tienes {total_usuarios} usuarios activos. Desactiva {total_usuarios - 1} antes de bajar a Básico."
             )
         if total_productos > 200:
             raise HTTPException(
                 status_code=400,
-                detail=f"Tienes {total_productos} productos. Elimina {total_productos - 200} antes de bajar a Básico (máximo 200 productos)."
+                detail=f"Tienes {total_productos} productos. Elimina {total_productos - 200} antes de bajar a Básico."
             )
 
-    # Aplicar cambio
     if nuevo_plan == "pro":
-        empresa.plan        = "pro"
-        empresa.plan_precio = 29990
+        empresa.plan          = "pro"
+        empresa.plan_precio   = 29990
         empresa.max_usuarios  = 3
         empresa.max_productos = 1500
     else:
-        empresa.plan        = "basico"
-        empresa.plan_precio = 14990
+        empresa.plan          = "basico"
+        empresa.plan_precio   = 14990
         empresa.max_usuarios  = 1
         empresa.max_productos = 200
 
-    # Si estaba cancelado y vuelve a suscribirse, limpiar cancelación
     empresa.cancelado_en = None
     empresa.gracia_hasta = None
     empresa.plan_activo  = True
 
     db.commit()
     db.refresh(empresa)
-
     return {"ok": True, "plan": nuevo_plan}
 
 
 # ============================================================
 # POST /empresa/cancelar-suscripcion
-# Cualquier usuario puede cancelar (confirmación requerida)
-# Flujo:
-#   1. Se registra cancelado_en = ahora
-#   2. gracia_hasta = plan_expira (fin del periodo pagado)
-#   3. Pasado gracia_hasta + 7 días → acceso bloqueado
 # ============================================================
 @router.post("/cancelar-suscripcion")
 def cancelar_suscripcion(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    """
-    Cancela la suscripción de la empresa.
-    Analogia: cancelar el arriendo — puedes seguir viviendo
-    hasta que termine el mes pagado, luego hay una semana para
-    sacar tus cosas (ver reportes), después se cierra la puerta.
-    """
     empresa = db.query(models.Empresa).filter(
         models.Empresa.id == usuario_actual.empresa_id
     ).first()
@@ -170,37 +158,32 @@ def cancelar_suscripcion(
 
     ahora = datetime.now(timezone.utc)
 
-    # Periodo de gracia: fin del periodo pagado + 7 días de solo lectura
-    # Si no hay fecha de expiración, usar fin del mes actual + 7 días
     if empresa.plan_expira and empresa.plan_expira > ahora:
         gracia = empresa.plan_expira + timedelta(days=7)
     else:
-        # Sin fecha de pago registrada — 7 días desde hoy
         gracia = ahora + timedelta(days=7)
 
     empresa.cancelado_en = ahora
     empresa.gracia_hasta = gracia
     empresa.plan_activo  = False
-
     db.commit()
 
     return {
         "ok":           True,
         "cancelado_en": empresa.cancelado_en,
         "gracia_hasta": empresa.gracia_hasta,
-        "mensaje":      f"Suscripción cancelada. Podrás ver reportes y dashboard hasta el {gracia.strftime('%d/%m/%Y')}. Después de esa fecha el acceso quedará bloqueado."
+        "mensaje":      f"Suscripción cancelada. Podrás ver reportes y dashboard hasta el {gracia.strftime('%d/%m/%Y')}."
     }
 
 
 # ============================================================
-# POST /empresa/reactivar — Reactiva suscripción cancelada
+# POST /empresa/reactivar
 # ============================================================
 @router.post("/reactivar")
 def reactivar_suscripcion(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    """Reactiva una suscripción cancelada. Útil si el cliente se arrepiente."""
     empresa = db.query(models.Empresa).filter(
         models.Empresa.id == usuario_actual.empresa_id
     ).first()
@@ -217,7 +200,7 @@ def reactivar_suscripcion(
 
 
 # ============================================================
-# GET /empresa/usuarios — Lista usuarios de la empresa
+# GET /empresa/usuarios
 # ============================================================
 @router.get("/usuarios")
 def listar_usuarios_empresa(
@@ -232,17 +215,25 @@ def listar_usuarios_empresa(
 
 
 # ============================================================
-# POST /empresa/invitar — Invita un nuevo usuario al equipo
+# POST /empresa/invitar
+# ✅ ACTUALIZADO: opera con username en lugar de email
+#    El operador no necesita correo — solo nombre visible,
+#    username para login y password.
 # ============================================================
 @router.post("/invitar", status_code=201)
 def invitar_usuario(
     nombre:   str,
-    email:    str,
+    username: str,
     password: str,
     rol:      str = "operador",
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
+    """
+    Crea un colaborador con username en lugar de email.
+    Analogia: dar de alta a un empleado con su apodo de trabajo
+    y una clave — sin necesidad de su correo personal.
+    """
     solo_admin(usuario_actual)
 
     empresa = db.query(models.Empresa).filter(
@@ -260,45 +251,44 @@ def invitar_usuario(
             detail=f"Tu plan {empresa.plan} permite máximo {empresa.max_usuarios} usuario(s). Mejora el plan para agregar más."
         )
 
-    existe = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    # Username único dentro de la empresa
+    existe = db.query(models.Usuario).filter(
+        models.Usuario.empresa_id == empresa.id,
+        models.Usuario.username   == username.lower().strip()
+    ).first()
     if existe:
-        raise HTTPException(status_code=400, detail="Ese email ya está registrado")
+        raise HTTPException(status_code=400, detail="Ese nombre de usuario ya existe en tu empresa")
 
     from auth import encriptar_password
-    from email_service import enviar_email, template_bienvenida_usuario
 
     nuevo = models.Usuario(
         empresa_id       = empresa.id,
         nombre           = nombre,
-        email            = email,
+        email            = None,                         # operadores sin email
+        username         = username.lower().strip(),
         password_hash    = encriptar_password(password),
         rol              = rol,
         activo           = True,
-        email_verificado = True,  # invitados se consideran verificados por el admin
+        email_verificado = True,
     )
     db.add(nuevo)
+    db.flush()  # obtener el id antes de crear permisos
+
+    # Crear permisos con todas las secciones habilitadas por defecto
+    # El admin podrá ajustarlos luego. Analogia: dar todas las llaves
+    # al empleado nuevo — el admin decide cuáles retirar.
+    for seccion in SECCIONES_VALIDAS:
+        permiso = models.PermisoUsuario(
+            usuario_id = nuevo.id,
+            seccion    = seccion,
+            permitido  = True,
+        )
+        db.add(permiso)
+
     db.commit()
     db.refresh(nuevo)
 
-    # Enviar correo de bienvenida con credenciales
-    # Analogia: el sobre de bienvenida que le das al empleado nuevo
-    #           con su carnet y las llaves del local
-    html = template_bienvenida_usuario(
-        nombre_usuario   = nombre,
-        email            = email,
-        password_temp    = password,
-        nombre_negocio   = empresa.nombre,
-        nombre_invitador = usuario_actual.nombre,
-    )
-    email_enviado = enviar_email(
-        destinatario = email,
-        asunto       = f"Bienvenido a {empresa.nombre} en YeparStock 🎉",
-        html         = html,
-    )
-
-    resultado = _usuario_dict(nuevo)
-    resultado["email_enviado"] = email_enviado
-    return resultado
+    return _usuario_dict(nuevo)
 
 
 # ============================================================
@@ -312,12 +302,7 @@ def cambiar_rol(
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
     solo_admin(usuario_actual)
-    u = db.query(models.Usuario).filter(
-        models.Usuario.id         == usuario_id,
-        models.Usuario.empresa_id == usuario_actual.empresa_id
-    ).first()
-    if not u:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    u = _get_usuario_empresa(usuario_id, usuario_actual.empresa_id, db)
     u.rol = rol
     db.commit()
     return _usuario_dict(u)
@@ -334,27 +319,191 @@ def cambiar_estado_usuario(
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
     solo_admin(usuario_actual)
-    u = db.query(models.Usuario).filter(
-        models.Usuario.id         == usuario_id,
-        models.Usuario.empresa_id == usuario_actual.empresa_id
-    ).first()
-    if not u:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    u = _get_usuario_empresa(usuario_id, usuario_actual.empresa_id, db)
+
     if u.id == usuario_actual.id:
         raise HTTPException(status_code=400, detail="No puedes desactivarte a ti mismo")
+
     u.activo = activo
     db.commit()
     return _usuario_dict(u)
 
 
 # ============================================================
-# Helper
+# GET /empresa/usuarios/{id}/permisos  ✅ NUEVO
+# Devuelve los permisos actuales de un colaborador
 # ============================================================
+@router.get("/usuarios/{usuario_id}/permisos")
+def obtener_permisos(
+    usuario_id: int,
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
+    solo_admin(usuario_actual)
+    _get_usuario_empresa(usuario_id, usuario_actual.empresa_id, db)  # validar pertenencia
+
+    permisos = db.query(models.PermisoUsuario).filter(
+        models.PermisoUsuario.usuario_id == usuario_id
+    ).all()
+
+    # Si no tiene registros (usuario antiguo), devolver todas habilitadas
+    if not permisos:
+        return {s: True for s in SECCIONES_VALIDAS}
+
+    return {p.seccion: p.permitido for p in permisos}
+
+
+# ============================================================
+# PUT /empresa/usuarios/{id}/permisos  ✅ NUEVO
+# Reemplaza todos los permisos de un colaborador de una sola vez
+# Body: {"dashboard": true, "productos": false, ...}
+# ============================================================
+@router.put("/usuarios/{usuario_id}/permisos")
+def actualizar_permisos(
+    usuario_id: int,
+    permisos:   dict,           # {"dashboard": true, "salidas": false, ...}
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
+    """
+    Guarda el mapa completo de permisos del colaborador.
+    Analogia: cambiar el llavero del empleado de una sola vez
+    en lugar de agregar/quitar llaves una por una.
+    """
+    solo_admin(usuario_actual)
+    u = _get_usuario_empresa(usuario_id, usuario_actual.empresa_id, db)
+
+    if u.rol == "admin":
+        raise HTTPException(status_code=400, detail="Los administradores tienen acceso total y no requieren permisos granulares")
+
+    # Validar secciones recibidas
+    secciones_invalidas = set(permisos.keys()) - SECCIONES_VALIDAS
+    if secciones_invalidas:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Secciones inválidas: {', '.join(secciones_invalidas)}. Válidas: {', '.join(SECCIONES_VALIDAS)}"
+        )
+
+    # Borrar permisos actuales y recrear — upsert manual
+    db.query(models.PermisoUsuario).filter(
+        models.PermisoUsuario.usuario_id == usuario_id
+    ).delete()
+
+    for seccion, permitido in permisos.items():
+        db.add(models.PermisoUsuario(
+            usuario_id = usuario_id,
+            seccion    = seccion,
+            permitido  = bool(permitido),
+        ))
+
+    # Asegurar que todas las secciones existan (rellenar faltantes con False)
+    secciones_recibidas = set(permisos.keys())
+    for seccion in SECCIONES_VALIDAS - secciones_recibidas:
+        db.add(models.PermisoUsuario(
+            usuario_id = usuario_id,
+            seccion    = seccion,
+            permitido  = False,
+        ))
+
+    db.commit()
+    return {"ok": True, "permisos": permisos}
+
+
+# ============================================================
+# GET /empresa/mis-permisos  ✅ NUEVO
+# Lo llama el operador al iniciar sesión para saber a qué accede
+# ============================================================
+@router.get("/mis-permisos")
+def mis_permisos(
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
+    """
+    Devuelve los permisos del usuario autenticado.
+    Los admins tienen acceso total a todo.
+    """
+    rol = usuario_actual.rol.value if hasattr(usuario_actual.rol, "value") else usuario_actual.rol
+
+    if rol == "admin":
+        # El admin siempre tiene todo habilitado
+        return {s: True for s in SECCIONES_VALIDAS}
+
+    permisos = db.query(models.PermisoUsuario).filter(
+        models.PermisoUsuario.usuario_id == usuario_actual.id
+    ).all()
+
+    if not permisos:
+        # Usuario operador sin permisos registrados → acceso total por compatibilidad
+        return {s: True for s in SECCIONES_VALIDAS}
+
+    return {p.seccion: p.permitido for p in permisos}
+
+
+# ============================================================
+# PUT /empresa/mi-config  ✅ NUEVO
+# El operador puede cambiar su password, color de interfaz y sonido de escáner
+# ============================================================
+@router.put("/mi-config")
+def actualizar_config_colaborador(
+    password_actual:  str  = None,
+    password_nuevo:   str  = None,
+    color_interfaz:   str  = None,
+    sonido_escaner:   str  = None,
+    db: Session = Depends(get_db),
+    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+):
+    """
+    Config personal del colaborador: password, color e interfaz y sonido.
+    Analogia: el empleado puede cambiar su uniforme de color y
+    el tono de su timbre — sin tocar la caja registradora.
+    """
+    from auth import encriptar_password, verificar_password
+
+    if password_nuevo:
+        if not password_actual:
+            raise HTTPException(status_code=400, detail="Debes ingresar tu contraseña actual para cambiarla")
+        if not verificar_password(password_actual, usuario_actual.password_hash):
+            raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
+        usuario_actual.password_hash = encriptar_password(password_nuevo)
+
+    if color_interfaz is not None:
+        usuario_actual.color_interfaz = color_interfaz
+
+    if sonido_escaner is not None:
+        usuario_actual.sonido_escaner = sonido_escaner
+
+    db.add(usuario_actual)
+    db.commit()
+    db.refresh(usuario_actual)
+
+    return {
+        "ok":             True,
+        "color_interfaz": usuario_actual.color_interfaz,
+        "sonido_escaner": usuario_actual.sonido_escaner,
+    }
+
+
+# ============================================================
+# Helpers privados
+# ============================================================
+def _get_usuario_empresa(usuario_id: int, empresa_id: int, db: Session) -> models.Usuario:
+    u = db.query(models.Usuario).filter(
+        models.Usuario.id         == usuario_id,
+        models.Usuario.empresa_id == empresa_id
+    ).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return u
+
+
 def _usuario_dict(u) -> dict:
     return {
-        "id":     u.id,
-        "nombre": u.nombre,
-        "email":  u.email,
-        "rol":    u.rol.value if hasattr(u.rol, "value") else u.rol,
-        "activo": u.activo,
+        "id":             u.id,
+        "nombre":         u.nombre,
+        "email":          u.email,
+        "username":       u.username,
+        "rol":            u.rol.value if hasattr(u.rol, "value") else u.rol,
+        "activo":         u.activo,
+        "color_interfaz": u.color_interfaz,
+        "sonido_escaner": u.sonido_escaner,
     }
