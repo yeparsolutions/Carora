@@ -930,7 +930,7 @@ input[type="text"]::placeholder { text-transform: none; }
       </div>
 
 
-      <!-- PANEL COLABORADOR: configuración simplificada para operadores (oculto para admin) -->
+      <!-- PANEL COLABORADOR -->
       <div id="configColaboradorPanel" style="display:none">
         <div class="settings-section">
           <div class="settings-section-title">🔒 Cambiar mi contraseña</div>
@@ -958,24 +958,20 @@ input[type="text"]::placeholder { text-transform: none; }
             </div>
           </div>
         </div>
-
         <div class="settings-section">
           <div class="settings-section-title">🎨 Color de interfaz</div>
           <div class="settings-card">
             <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Personaliza el color principal de tu sesión</div>
             <div style="display:flex;align-items:center;gap:14px">
               <input id="colabColor" type="color" value="#00C77B"
-                     style="width:48px;height:48px;border:none;background:none;cursor:pointer;border-radius:8px"
-                     oninput="previsualizarColor(this.value)">
+                     style="width:48px;height:48px;border:none;background:none;cursor:pointer;border-radius:8px">
               <span style="font-size:13px;color:var(--muted)">Haz clic para elegir un color</span>
             </div>
           </div>
         </div>
-
         <div class="settings-section">
           <div class="settings-card" style="padding:18px 20px">
-            <button id="btnGuardarConfigColab" type="button" class="btn-primary" style="width:100%;justify-content:center"
-                    onclick="guardarConfigColaborador()">
+            <button id="btnGuardarConfigColab" type="button" class="btn-primary" style="width:100%;justify-content:center">
               Guardar cambios
             </button>
           </div>
@@ -1430,33 +1426,30 @@ input[type="text"]::placeholder { text-transform: none; }
     <form id="formInvitar">
       <div style="padding:0 24px">
 
-        <!-- Nombre y Apellido en dos columnas -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">Nombre *</label>
             <input id="invitarNombre" class="form-input" type="text" placeholder="Ej: María"
-                   oninput="generarUsernameAuto()" autocomplete="off">
+                   autocomplete="off" style="text-transform:none">
           </div>
           <div class="form-group" style="margin-bottom:0">
             <label class="form-label">Apellido *</label>
             <input id="invitarApellido" class="form-input" type="text" placeholder="Ej: Pérez"
-                   oninput="generarUsernameAuto()" autocomplete="off">
+                   autocomplete="off" style="text-transform:none">
           </div>
         </div>
 
-        <!-- Usuario generado automáticamente -->
         <div class="form-group" style="margin-bottom:14px">
           <label class="form-label">
             Usuario
-            <span style="font-weight:400;color:var(--muted);font-size:11px"> — generado automáticamente, puedes editarlo</span>
+            <span style="font-weight:400;color:var(--muted);font-size:11px"> — se genera solo, puedes editarlo</span>
           </label>
           <div style="position:relative">
             <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;font-family:monospace;pointer-events:none">@</span>
             <input id="invitarUsername" class="form-input" type="text"
-                   style="padding-left:26px;font-family:monospace;background:var(--bg3)"
+                   style="padding-left:26px;font-family:monospace;background:var(--bg3);text-transform:none"
                    placeholder="nombre.apellido"
-                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-                   oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9._]/g,'')">
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
           </div>
           <span class="settings-field-hint">Solo letras minúsculas, números, punto y guión bajo</span>
         </div>
