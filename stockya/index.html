@@ -1499,42 +1499,60 @@ input[type="text"]::placeholder { text-transform: none; }
       <button class="modal-close" onclick="cerrarModalUpgrade()">✕</button>
     </div>
     <div style="padding:0 24px 24px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">
+
+        <!-- Plan Gratis -->
+        <div id="cardPlanGratis" style="border:2px solid var(--border);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s" onclick="seleccionarPlan('gratis')">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">🆓 Gratis</div>
+          <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:8px">$0<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
+          <div style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:5px">
+            <div>✓ 1 usuario</div>
+            <div>✓ Hasta 30 productos</div>
+            <div>✓ Inventario básico</div>
+            <div>✓ Ventas y entradas</div>
+            <div style="color:var(--rojo)">✗ Sin reportes</div>
+            <div style="color:var(--rojo)">✗ Marca de agua</div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--muted);background:var(--bg3);border-radius:8px;padding:6px 10px">🎯 Para probar YeparStock</div>
+        </div>
 
         <!-- Plan Básico -->
-        <div id="cardPlanBasico" style="border:2px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;transition:border 0.2s" onclick="seleccionarPlan('basico')">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">🟢 Básico</div>
-          <div style="font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:8px">$14.990<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span><div style="font-size:10px;color:var(--muted);margin-top:2px">+ IVA</div></div>
-          <div style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:5px">
-            <div>✓ Hasta 200 productos</div>
-            <div>✓ 1 usuario</div>
-            <div>✓ Inventario básico</div>
-            <div>✓ Reportes diario/mensual</div>
-            <div>✓ Alertas de stock bajo</div>
-            <div>✓ Soporte WhatsApp</div>
+        <div id="cardPlanBasico" style="border:2px solid var(--verde);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s;background:rgba(0,199,123,0.03)" onclick="seleccionarPlan('basico')">
+          <div style="font-size:11px;color:var(--verde);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">🟢 Básico</div>
+          <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:8px">$9.99<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
+          <div style="font-size:11px;display:flex;flex-direction:column;gap:5px">
+            <div style="color:var(--verde)">✓ Usuarios ilimitados</div>
+            <div style="color:var(--verde)">✓ Productos ilimitados</div>
+            <div style="color:var(--verde)">✓ Ventas, ingresos, alertas</div>
+            <div style="color:var(--verde)">✓ Reportes básicos</div>
+            <div style="color:var(--verde)">✓ Soporte WhatsApp</div>
+            <div style="color:var(--muted)">✗ Sin multisucursales</div>
           </div>
-          <div style="margin-top:10px;font-size:11px;color:var(--muted);background:var(--bg3);border-radius:8px;padding:6px 10px">🎯 Bodegas · Minimarkets pequeños</div>
+          <div style="margin-top:10px;font-size:11px;color:var(--verde);background:rgba(0,199,123,0.08);border-radius:8px;padding:6px 10px">🎯 Comercios y tiendas</div>
         </div>
 
         <!-- Plan Pro -->
-        <div id="cardPlanPro" style="border:2px solid var(--azul);border-radius:14px;padding:16px;cursor:pointer;transition:border 0.2s;background:rgba(91,142,255,0.04)" onclick="seleccionarPlan('pro')">
-          <div style="font-size:11px;color:var(--azul);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">🔵 Pro</div>
-          <div style="font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:8px">$29.990<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span><div style="font-size:10px;color:var(--muted);margin-top:2px">+ IVA</div></div>
-          <div style="font-size:12px;display:flex;flex-direction:column;gap:5px">
-            <div style="color:var(--verde)">✓ Hasta 1.500 productos</div>
-            <div style="color:var(--verde)">✓ Hasta 3 usuarios</div>
-            <div style="color:var(--verde)">✓ Inventario avanzado</div>
-            <div style="color:var(--verde)">✓ Reportes de margen y rotación</div>
-            <div style="color:var(--verde)">✓ Exportación Excel</div>
-            <div style="color:var(--verde)">✓ Soporte prioritario</div>
+        <div id="cardPlanPro" style="border:2px solid var(--azul);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s;background:rgba(91,142,255,0.04)" onclick="seleccionarPlan('pro')">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div style="font-size:11px;color:var(--azul);text-transform:uppercase;letter-spacing:1px;font-weight:700">🔵 Pro</div>
+            <div style="font-size:10px;background:var(--azul);color:#fff;border-radius:20px;padding:2px 8px;font-weight:700">POPULAR</div>
           </div>
-          <div style="margin-top:10px;font-size:11px;color:var(--azul);background:rgba(91,142,255,0.08);border-radius:8px;padding:6px 10px">🎯 Minimarket grande · Alta rotación</div>
+          <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:8px">$19.99<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
+          <div style="font-size:11px;display:flex;flex-direction:column;gap:5px">
+            <div style="color:var(--verde)">✓ Todo lo del Básico</div>
+            <div style="color:var(--verde)">✓ Usuarios ilimitados</div>
+            <div style="color:var(--verde)">✓ Productos ilimitados</div>
+            <div style="color:var(--azul);font-weight:700">✓ 🏪 Multisucursales</div>
+            <div style="color:var(--verde)">✓ Reportes avanzados</div>
+            <div style="color:var(--verde)">✓ Exportar Excel / PDF</div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--azul);background:rgba(91,142,255,0.08);border-radius:8px;padding:6px 10px">🎯 Negocios en crecimiento</div>
         </div>
       </div>
 
-      <!-- Precio fundador -->
+      <!-- Banner fundador -->
       <div style="background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:12px">
-        🎉 <strong>Precio fundador Pro:</strong> Primeros 100 negocios acceden a Pro por <strong>$24.990/mes de por vida</strong>. ¡Pocos cupos disponibles!
+        🎉 <strong>Precio fundador:</strong> Primeros 100 negocios acceden a Pro por <strong>$14.99/mes de por vida</strong>. ¡Pocos cupos disponibles!
       </div>
 
       <!-- Mensaje de error o advertencia -->
