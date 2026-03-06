@@ -2,13 +2,11 @@
 # YEPARSTOCK - Servidor principal FastAPI
 # Archivo: backend/main.py
 # ============================================================
-
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 
 # Cargar .env PRIMERO antes de cualquier otro import
-# Analogia: encender las luces antes de entrar a la habitacion
 load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
 from fastapi import FastAPI
@@ -21,35 +19,44 @@ from routers import auth, productos, movimientos, alertas, config, salidas, empr
 Base.metadata.create_all(bind=engine)
 
 # ── Migraciones automáticas ──────────────────────────────────
-# Agrega columnas nuevas sin borrar datos existentes
-# Analogia: ampliar una hoja de Excel añadiendo columnas al final
 from sqlalchemy import text
+
 def ejecutar_migraciones():
     migraciones = [
-        # num_documento en movimientos — para trazabilidad de ingresos
+        # num_documento en movimientos
         "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS num_documento VARCHAR(100)",
-        # empresa_id en movimientos — por si faltan registros viejos
+        # empresa_id en movimientos
         "ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS empresa_id INTEGER",
+        # sonido_escaner en configuracion
+        "ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS sonido_escaner VARCHAR(20) DEFAULT 'scanner'",
+        # plan gratis — agregar al enum si no existe
+        "ALTER TYPE plan_empresa_enum ADD VALUE IF NOT EXISTS 'gratis'",
     ]
     with engine.connect() as conn:
         for sql in migraciones:
             try:
                 conn.execute(text(sql))
             except Exception:
-                pass  # columna ya existe o error menor — ignorar
+                pass
         conn.commit()
+
+    # Actualizar limites a ilimitado (0) para basico y pro
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(
+                "UPDATE empresas SET max_usuarios = 0, max_productos = 0 "
+                "WHERE plan IN ('basico', 'pro') AND max_usuarios <= 3"
+            ))
+            conn.commit()
+    except Exception:
+        pass
 
 ejecutar_migraciones()
 
 app = FastAPI(title="YeparStock API", version="1.2.0")
 
-# CORS — permite el frontend de producción + desarrollo local
-# Si ALLOWED_ORIGINS="*" en Railway → permite todo (útil para debug)
-# Si tiene valores → usa esa lista + los fijos de abajo
 _origins_env = os.getenv("ALLOWED_ORIGINS", "")
-
 if _origins_env.strip() == "*":
-    # Modo permisivo — útil para diagnosticar CORS en producción
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 else:
     _ORIGINS_BASE = [
