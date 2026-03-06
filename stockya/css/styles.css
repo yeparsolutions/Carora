@@ -474,12 +474,12 @@ body.tema-claro .filter-select { border-color: rgba(0,0,0,0.15); }
 
 /* ── PANTALLAS — fade+slide al cambiar sección ──────────────── */
 .screen.active {
-  animation: fadeInUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fadeInUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* ── PAGE HEADER — baja desde arriba ────────────────────────── */
 .page-header {
-  animation: fadeInDown 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fadeInDown 0.50s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* ── STAT CARDS — entrada escalonada ────────────────────────── */
@@ -491,23 +491,23 @@ body.tema-claro .filter-select { border-color: rgba(0,0,0,0.15); }
   transform: translateY(-5px) scale(1.01);
   box-shadow: 0 16px 40px rgba(0,0,0,0.4);
 }
-.stats-grid .stat-card:nth-child(1) { animation: fadeInUp 0.30s 0.04s cubic-bezier(0.22,1,0.36,1) both; }
-.stats-grid .stat-card:nth-child(2) { animation: fadeInUp 0.30s 0.09s cubic-bezier(0.22,1,0.36,1) both; }
-.stats-grid .stat-card:nth-child(3) { animation: fadeInUp 0.30s 0.14s cubic-bezier(0.22,1,0.36,1) both; }
-.stats-grid .stat-card:nth-child(4) { animation: fadeInUp 0.30s 0.19s cubic-bezier(0.22,1,0.36,1) both; }
-.stats-grid .stat-card:nth-child(5) { animation: fadeInUp 0.30s 0.24s cubic-bezier(0.22,1,0.36,1) both; }
+.stats-grid .stat-card:nth-child(1) { animation: fadeInUp 0.55s 0.06s cubic-bezier(0.22,1,0.36,1) both; }
+.stats-grid .stat-card:nth-child(2) { animation: fadeInUp 0.55s 0.13s cubic-bezier(0.22,1,0.36,1) both; }
+.stats-grid .stat-card:nth-child(3) { animation: fadeInUp 0.55s 0.20s cubic-bezier(0.22,1,0.36,1) both; }
+.stats-grid .stat-card:nth-child(4) { animation: fadeInUp 0.55s 0.27s cubic-bezier(0.22,1,0.36,1) both; }
+.stats-grid .stat-card:nth-child(5) { animation: fadeInUp 0.55s 0.34s cubic-bezier(0.22,1,0.36,1) both; }
 
 /* ── MODAL — scale + fade estilo iOS ────────────────────────── */
 .modal-overlay.open {
   animation: overlayIn 0.20s ease both;
 }
 .modal-overlay.open .modal-box {
-  animation: modalIn 0.28s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  animation: modalIn 0.50s cubic-bezier(0.34, 1.4, 0.64, 1) both;
 }
 
 /* ── TOAST — slide desde abajo + desvanece ──────────────────── */
 .toast.show {
-  animation: toastIn 0.26s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  animation: toastIn 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both;
 }
 .toast.hide {
   animation: toastOut 0.20s ease both;
@@ -557,11 +557,11 @@ tbody tr:hover { transform: translateX(2px); }
   transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .alert-item:hover { transform: translateX(4px); }
-.alert-item:nth-child(1) { animation: slideInRight 0.28s 0.04s cubic-bezier(0.22,1,0.36,1) both; }
-.alert-item:nth-child(2) { animation: slideInRight 0.28s 0.09s cubic-bezier(0.22,1,0.36,1) both; }
-.alert-item:nth-child(3) { animation: slideInRight 0.28s 0.14s cubic-bezier(0.22,1,0.36,1) both; }
-.alert-item:nth-child(4) { animation: slideInRight 0.28s 0.19s cubic-bezier(0.22,1,0.36,1) both; }
-.alert-item:nth-child(5) { animation: slideInRight 0.28s 0.24s cubic-bezier(0.22,1,0.36,1) both; }
+.alert-item:nth-child(1) { animation: slideInRight 0.50s 0.06s cubic-bezier(0.22,1,0.36,1) both; }
+.alert-item:nth-child(2) { animation: slideInRight 0.50s 0.13s cubic-bezier(0.22,1,0.36,1) both; }
+.alert-item:nth-child(3) { animation: slideInRight 0.50s 0.20s cubic-bezier(0.22,1,0.36,1) both; }
+.alert-item:nth-child(4) { animation: slideInRight 0.50s 0.27s cubic-bezier(0.22,1,0.36,1) both; }
+.alert-item:nth-child(5) { animation: slideInRight 0.50s 0.34s cubic-bezier(0.22,1,0.36,1) both; }
 
 /* ── ALERT BIG ITEMS ────────────────────────────────────────── */
 .alert-big-item {
@@ -573,7 +573,7 @@ tbody tr:hover { transform: translateX(2px); }
 /* ── CHIP PRODUCTO (ingreso/venta) ──────────────────────────── */
 #ingresoChip,
 #productoChip {
-  animation: scaleIn 0.22s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  animation: scaleIn 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both;
 }
 
 /* ── BADGE — pop al actualizarse ────────────────────────────── */
@@ -583,7 +583,7 @@ tbody tr:hover { transform: translateX(2px); }
 
 /* ── LOGO — pulse verde sutil ───────────────────────────────── */
 .logo-icon {
-  animation: pulse 3.5s ease-in-out infinite;
+  animation: pulse 2.5s ease-in-out infinite;
 }
 
 /* ── FORMULARIOS — glow al enfocar ──────────────────────────── */
@@ -617,7 +617,7 @@ tbody tr:hover { transform: translateX(2px); }
 
 /* ── CARDS ──────────────────────────────────────────────────── */
 .card {
-  animation: fadeInUp 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fadeInUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* ── RESPETO A PREFERENCIAS DE ACCESIBILIDAD ────────────────── */
@@ -627,4 +627,139 @@ tbody tr:hover { transform: translateX(2px); }
     animation-iteration-count: 1     !important;
     transition-duration:      0.01ms !important;
   }
+}
+
+/* ── ÍCONOS SIDEBAR — animaciones individuales ──────────────── */
+
+/* Cada ícono tiene su propia micro-animación al hover del nav-item */
+.nav-item:hover .nav-icon,
+.nav-item.active .nav-icon {
+  display: inline-block;
+  animation: iconBounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes iconBounce {
+  0%   { transform: scale(1)    rotate(0deg); }
+  30%  { transform: scale(1.35) rotate(-8deg); }
+  60%  { transform: scale(0.9)  rotate(4deg); }
+  100% { transform: scale(1)    rotate(0deg); }
+}
+
+/* Íconos específicos con animaciones únicas */
+
+/* Dashboard 🏠 — late como un corazón */
+.nav-item[onclick*="dashboard"]:hover .nav-icon {
+  animation: iconPulseHeart 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes iconPulseHeart {
+  0%   { transform: scale(1); }
+  25%  { transform: scale(1.4); }
+  50%  { transform: scale(1.1); }
+  75%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* Productos 📦 — rebota como caja */
+.nav-item[onclick*="productos"]:hover .nav-icon {
+  animation: iconDrop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes iconDrop {
+  0%   { transform: translateY(0)   scale(1); }
+  40%  { transform: translateY(-8px) scale(1.2); }
+  70%  { transform: translateY(2px)  scale(0.95); }
+  100% { transform: translateY(0)   scale(1); }
+}
+
+/* Stock 📊 — crece como una barra */
+.nav-item[onclick*="stock"]:hover .nav-icon {
+  animation: iconGrow 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes iconGrow {
+  0%   { transform: scaleY(0.6) scaleX(1.1); }
+  60%  { transform: scaleY(1.2) scaleX(0.95); }
+  100% { transform: scaleY(1)   scaleX(1); }
+}
+
+/* Movimientos ↕ — oscila arriba/abajo */
+.nav-item[onclick*="movimientos"]:hover .nav-icon {
+  animation: iconSwing 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes iconSwing {
+  0%   { transform: translateY(0); }
+  25%  { transform: translateY(-6px); }
+  50%  { transform: translateY(4px); }
+  75%  { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
+}
+
+/* Salidas 🚀 — sale volando */
+.nav-item[onclick*="salidas"]:hover .nav-icon {
+  animation: iconLaunch 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes iconLaunch {
+  0%   { transform: translate(0, 0)    rotate(0deg); }
+  40%  { transform: translate(4px, -6px) rotate(-15deg); }
+  70%  { transform: translate(-1px, 2px) rotate(5deg); }
+  100% { transform: translate(0, 0)    rotate(0deg); }
+}
+
+/* Alertas 🔔 — suena como campana */
+.nav-item[onclick*="alertas"]:hover .nav-icon {
+  animation: iconRing 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: top center;
+}
+@keyframes iconRing {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(18deg); }
+  30%  { transform: rotate(-16deg); }
+  45%  { transform: rotate(12deg); }
+  60%  { transform: rotate(-8deg); }
+  75%  { transform: rotate(4deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Reportes 📈 — sube como gráfico */
+.nav-item[onclick*="reportes"]:hover .nav-icon {
+  animation: iconChart 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes iconChart {
+  0%   { transform: translateY(0)    scale(1); }
+  50%  { transform: translateY(-7px) scale(1.25); }
+  100% { transform: translateY(0)    scale(1); }
+}
+
+/* Configuración ⚙️ — gira */
+.nav-item[onclick*="config"]:hover .nav-icon,
+.nav-item[onclick*="configuracion"]:hover .nav-icon {
+  animation: iconSpin 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes iconSpin {
+  0%   { transform: rotate(0deg)   scale(1); }
+  50%  { transform: rotate(180deg) scale(1.2); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+/* Mi Equipo 👥 — rebota */
+.nav-item[onclick*="equipo"]:hover .nav-icon,
+.nav-item[onclick*="team"]:hover .nav-icon {
+  animation: iconTeam 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes iconTeam {
+  0%   { transform: scale(1) translateX(0); }
+  30%  { transform: scale(1.3) translateX(-3px); }
+  60%  { transform: scale(1.2) translateX(3px); }
+  100% { transform: scale(1) translateX(0); }
+}
+
+/* Deudores/Fiados 💰 — tiembla como monedas */
+.nav-item[onclick*="deudores"]:hover .nav-icon,
+.nav-item[onclick*="fiados"]:hover .nav-icon {
+  animation: iconShake 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes iconShake {
+  0%,100% { transform: rotate(0deg); }
+  20%     { transform: rotate(-12deg); }
+  40%     { transform: rotate(10deg); }
+  60%     { transform: rotate(-8deg); }
+  80%     { transform: rotate(6deg); }
 }
