@@ -11,8 +11,41 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>YeparStock — Sistema de Inventario</title>
-  <!-- Google Fonts removido — fuentes del sistema para carga instantánea -->
+
+  <!-- ============================================================
+       [SEC-6] Content Security Policy (CSP)
+       Analogia: como el portero de una discoteca — solo deja entrar
+       recursos de dominios que tú mismo aprobaste explícitamente.
+       - default-src 'self'      → solo recursos del propio servidor
+       - script-src 'self'       → no se ejecutan scripts externos
+       - style-src 'self' 'unsafe-inline' → permite estilos inline (necesarios para la app)
+       - img-src 'self' data: blob: → permite imágenes locales, base64 y cámara
+       - media-src 'self' blob:  → permite streams de cámara (escáner)
+       - connect-src 'self'      → fetch/XHR solo al propio backend
+       Sin CSP, un XSS puede cargar scripts de cualquier dominio.
+  ============================================================ -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self';
+                 script-src 'self';
+                 style-src 'self' 'unsafe-inline';
+                 img-src 'self' data: blob:;
+                 media-src 'self' blob:;
+                 connect-src 'self';
+                 frame-ancestors 'none';">
+
+  <!-- ============================================================
+       [SEC-7] Protección contra Clickjacking
+       Analogia: como poner una reja invisible — impide que otro
+       sitio cargue esta app dentro de un <iframe> para engañar
+       al usuario a hacer clic en botones sin darse cuenta.
+       frame-ancestors 'none' en CSP cubre navegadores modernos.
+       Esta meta es un respaldo para navegadores más antiguos.
+  ============================================================ -->
+  <meta http-equiv="X-Frame-Options" content="DENY">
+
+  <!-- Fuentes del sistema — carga instantánea sin peticiones externas -->
   <link rel="stylesheet" href="css/styles.css">
+
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="shortcut icon" type="image/png" href="icons/icon-192.png">
@@ -121,7 +154,13 @@ input[type="text"]::placeholder { text-transform: none; }
   <div class="login-screen">
     <div class="login-card">
       <div class="login-logo">
-        <img id="logoImg" src="img/IsotipoStock.png" onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex'" style="width:72px;height:72px;object-fit:contain;margin-bottom:8px">
+        <!-- [SEC-8] onerror movido a handler inline mínimo sin cadena de JS larga
+             Analogia: en vez de dejar la llave bajo el felpudo (onerror ejecutando
+             múltiples comandos), usamos una función controlada en app.js.
+             logoFallbackHandler() está definida en app.js y solo hace lo necesario. -->
+        <img id="logoImg" src="img/IsotipoStock.png"
+             onerror="logoFallbackHandler()"
+             style="width:72px;height:72px;object-fit:contain;margin-bottom:8px">
         <div id="logoFallback" style="display:none;width:72px;height:72px;align-items:center;justify-content:center;font-size:52px;margin-bottom:8px">📦</div>
         <div class="logo-text">Yepar<span>Stock</span></div>
         <div style="font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:1px;text-transform:uppercase;font-weight:600">by YEPARSOLUTIONS</div>
@@ -130,11 +169,13 @@ input[type="text"]::placeholder { text-transform: none; }
         <p class="login-tagline">Sabe qué se está acabando<br>antes de quedarte sin stock.</p>
         <div class="form-group" style="margin-bottom:12px">
           <label class="form-label">Correo electrónico</label>
-          <input id="loginEmail" class="form-input" type="email" placeholder="tu@negocio.com">
+          <input id="loginEmail" class="form-input" type="email" placeholder="tu@negocio.com"
+                 autocomplete="username">
         </div>
         <div class="form-group" style="margin-bottom:20px">
           <label class="form-label">Contraseña</label>
-          <input id="loginPassword" class="form-input" type="password" placeholder="••••••••">
+          <input id="loginPassword" class="form-input" type="password" placeholder="••••••••"
+                 autocomplete="current-password">
         </div>
         <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="enterApp()">Entrar al negocio →</button>
         <p style="text-align:right;margin:8px 0 4px"><span onclick="mostrarOlvidePass()" style="font-size:12px;color:var(--azul);cursor:pointer;text-decoration:underline">¿Olvidaste tu contraseña?</span></p>
@@ -146,15 +187,20 @@ input[type="text"]::placeholder { text-transform: none; }
         <p class="login-tagline">Crea tu cuenta y empieza a<br>controlar tu inventario hoy.</p>
         <div class="form-group" style="margin-bottom:12px">
           <label class="form-label">Nombre completo *</label>
-          <input id="regNombre" class="form-input" type="text" placeholder="Ej: Juan Rodríguez">
+          <input id="regNombre" class="form-input" type="text" placeholder="Ej: Juan Rodríguez"
+                 autocomplete="name">
         </div>
         <div class="form-group" style="margin-bottom:12px">
           <label class="form-label">Correo electrónico *</label>
-          <input id="regEmail" class="form-input" type="email" placeholder="tu@negocio.com">
+          <input id="regEmail" class="form-input" type="email" placeholder="tu@negocio.com"
+                 autocomplete="email">
         </div>
         <div class="form-group" style="margin-bottom:20px">
+          <!-- [SEC-3] Placeholder y label consistentes con la validación real (8 caracteres) -->
           <label class="form-label">Contraseña * (mínimo 8 caracteres)</label>
-          <input id="regPassword" class="form-input" type="password" placeholder="••••••••" oninput="evaluarFuerzaPassword(this.value)">
+          <input id="regPassword" class="form-input" type="password" placeholder="Mínimo 8 caracteres"
+                 autocomplete="new-password"
+                 oninput="evaluarFuerzaPassword(this.value)">
           <div class="pass-strength-wrap" id="regStrengthWrap" style="display:none;margin-top:6px">
             <div class="pass-strength-bar"><div class="pass-strength-fill" id="regStrengthFill"></div></div>
             <span class="pass-strength-label" id="regStrengthLabel"></span>
@@ -173,7 +219,7 @@ input[type="text"]::placeholder { text-transform: none; }
           <p style="color:var(--muted);font-size:13px;margin:0">Enviamos un código de 6 dígitos a<br><strong id="verifiEmailMostrar"></strong></p>
         </div>
         <div style="display:flex;gap:8px;justify-content:center;margin-bottom:20px" id="codigoInputs">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,0)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,0)" autocomplete="one-time-code">
           <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,1)">
           <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,2)">
           <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,3)">
@@ -196,7 +242,8 @@ input[type="text"]::placeholder { text-transform: none; }
         </div>
         <div class="form-group" style="margin-bottom:20px">
           <label class="form-label">Correo electrónico</label>
-          <input id="resetEmail" class="form-input" type="email" placeholder="tu@negocio.com">
+          <input id="resetEmail" class="form-input" type="email" placeholder="tu@negocio.com"
+                 autocomplete="email">
         </div>
         <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="solicitarReset()">Enviar código →</button>
         <p class="divider-text"></p>
@@ -211,7 +258,7 @@ input[type="text"]::placeholder { text-transform: none; }
           <p style="color:var(--muted);font-size:13px;margin:0">Revisa tu email e ingresa el código</p>
         </div>
         <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px" id="resetCodigoInputs">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,0)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,0)" autocomplete="one-time-code">
           <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,1)">
           <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,2)">
           <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,3)">
@@ -219,8 +266,11 @@ input[type="text"]::placeholder { text-transform: none; }
           <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,5)">
         </div>
         <div class="form-group" style="margin-bottom:20px">
-          <label class="form-label">Nueva contraseña</label>
-          <input id="resetNuevaPass" class="form-input" type="password" placeholder="Mínimo 6 caracteres">
+          <!-- [SEC-3] Placeholder corregido — dice "6 caracteres" en el original, debe decir 8
+               para ser consistente con la validación real de confirmarReset() en app.js -->
+          <label class="form-label">Nueva contraseña (mínimo 8 caracteres)</label>
+          <input id="resetNuevaPass" class="form-input" type="password" placeholder="Mínimo 8 caracteres"
+                 autocomplete="new-password">
         </div>
         <div id="resetError" style="display:none;color:var(--rojo);font-size:13px;text-align:center;margin-bottom:12px"></div>
         <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="confirmarReset()">🔐 Cambiar contraseña</button>
@@ -257,7 +307,8 @@ input[type="text"]::placeholder { text-transform: none; }
     <!-- Nombre del negocio -->
     <div class="form-group" style="margin-bottom:14px">
       <label class="form-label">Nombre del negocio *</label>
-      <input id="onboardingNombreNegocio" class="form-input" type="text" placeholder="Ej: Minimarket Don Pedro">
+      <input id="onboardingNombreNegocio" class="form-input" type="text" placeholder="Ej: Minimarket Don Pedro"
+             autocomplete="organization">
     </div>
 
     <!-- Rubro -->
@@ -286,7 +337,8 @@ input[type="text"]::placeholder { text-transform: none; }
     <!-- Nombre del usuario -->
     <div class="form-group" style="margin-bottom:24px">
       <label class="form-label">¿Cómo te llamamos? *</label>
-      <input id="onboardingNombreUsuario" class="form-input" type="text" placeholder="Ej: Pedro González">
+      <input id="onboardingNombreUsuario" class="form-input" type="text" placeholder="Ej: Pedro González"
+             autocomplete="given-name">
     </div>
 
     <button id="btnGuardarOnboarding" class="btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px" onclick="guardarOnboarding()">
@@ -318,11 +370,11 @@ input[type="text"]::placeholder { text-transform: none; }
   <!-- SIDEBAR -->
   <nav class="sidebar" id="sidebar">
     <div class="logo-block">
-      <img src="img/IsotipoStock.png" 
-        onerror="this.style.display='none'" 
-        style="width:50px; height:50px; object-fit:contain"> <!-- Cubo más grande -->
+      <img src="img/IsotipoStock.png"
+        onerror="this.style.display='none'"
+        style="width:50px; height:50px; object-fit:contain">
       <div>
-        <div class="logo-text" style="font-size:16px;">Yepar<span>Stock</span></div> <!-- Texto más pequeño -->
+        <div class="logo-text" style="font-size:16px;">Yepar<span>Stock</span></div>
         <div style="font-size:8px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-top:-2px">
           by YEPARSOLUTIONS
         </div>
@@ -584,7 +636,7 @@ input[type="text"]::placeholder { text-transform: none; }
       </div>
     </div>
 
-    <!-- ✅ ALERTAS — dinámico, se llena desde cargarAlertas() en app.js -->
+    <!-- ALERTAS — dinámico, se llena desde cargarAlertas() en app.js -->
     <div class="screen" id="screen-alertas">
       <div class="page-header">
         <div>
@@ -593,8 +645,6 @@ input[type="text"]::placeholder { text-transform: none; }
         </div>
         <button class="btn-secondary" onclick="showToast('✓ Marcadas como revisadas')">✓ Marcar todas como vistas</button>
       </div>
-
-      <!-- Contadores -->
       <div class="stats-grid" style="margin-bottom:24px">
         <div class="stat-card rojo">
           <div class="stat-label">CRÍTICOS 🔴</div>
@@ -607,32 +657,22 @@ input[type="text"]::placeholder { text-transform: none; }
           <div class="stat-trend">Pedir esta semana</div>
         </div>
       </div>
-
-      <!-- Sección críticos — oculta si no hay -->
       <div id="alertasCriticosSec" style="display:none">
         <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">🔴 Stock Crítico — Pedir urgente</div>
         <div class="alert-big-list" id="alertasCriticosList" style="margin-bottom:28px"></div>
       </div>
-
-      <!-- Sección alerta — oculta si no hay -->
       <div id="alertasAlertaSec" style="display:none">
         <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">🟡 Stock en Alerta — Pedir pronto</div>
         <div class="alert-big-list" id="alertasAlertaList" style="margin-bottom:28px"></div>
       </div>
-
-      <!-- Sección vencidos — oculta si no hay -->
       <div id="alertasVencidosSec" style="display:none">
         <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">⛔ Productos Vencidos</div>
         <div class="alert-big-list" id="alertasVencidosList" style="margin-bottom:28px"></div>
       </div>
-
-      <!-- Sección próximos a vencer — oculta si no hay -->
       <div id="alertasProximosSec" style="display:none">
         <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">⏰ Próximos a Vencer</div>
         <div class="alert-big-list" id="alertasProximosList" style="margin-bottom:28px"></div>
       </div>
-
-      <!-- Mensaje vacío — visible solo cuando no hay alertas -->
       <div id="alertasVacioMsg" style="text-align:center;padding:64px 24px;color:var(--muted)">
         <div style="font-size:48px;margin-bottom:16px">✅</div>
         <div style="font-size:16px;font-weight:600;margin-bottom:8px">Todo en orden</div>
@@ -640,7 +680,7 @@ input[type="text"]::placeholder { text-transform: none; }
       </div>
     </div>
 
-    <!-- ✅ REPORTES — con gráficos, valorado de ventas y rangos de fecha -->
+    <!-- REPORTES -->
     <div class="screen" id="screen-reportes">
       <div class="page-header">
         <div><div class="page-title">📊 Reportes</div><div class="page-subtitle">Ventas, inventario y análisis del negocio</div></div>
@@ -658,111 +698,39 @@ input[type="text"]::placeholder { text-transform: none; }
             <button onclick="cargarReportes()" style="background:var(--azul);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">Filtrar →</button>
           </div>
         </div>
-        <!-- Botones exportación Pro -->
         <div id="botonesExportPro" style="display:none;gap:8px;flex-wrap:wrap">
-          <button onclick="exportarExcel()" style="display:flex;align-items:center;gap:6px;background:#16a34a;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">
-            📊 Descargar Excel
-          </button>
-          <button onclick="exportarPDF()" style="display:flex;align-items:center;gap:6px;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">
-            📄 Descargar PDF
-          </button>
-          <button onclick="enviarReportePorEmail()" style="display:flex;align-items:center;gap:6px;background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">
-            📧 Enviar por email
-          </button>
+          <button onclick="exportarExcel()" style="display:flex;align-items:center;gap:6px;background:#16a34a;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">📊 Descargar Excel</button>
+          <button onclick="exportarPDF()" style="display:flex;align-items:center;gap:6px;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">📄 Descargar PDF</button>
+          <button onclick="enviarReportePorEmail()" style="display:flex;align-items:center;gap:6px;background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">📧 Enviar por email</button>
         </div>
       </div>
-
-      <!-- Tarjetas de ventas del periodo -->
       <div class="stats-grid" style="margin-bottom:20px;grid-template-columns:repeat(3,1fr)">
-        <div class="stat-card verde">
-          <div class="stat-label">VENTAS DEL PERIODO</div>
-          <div class="stat-value" id="reporteValorVentas">—</div>
-          <div class="stat-trend">Total facturado</div>
-        </div>
-        <div class="stat-card azul">
-          <div class="stat-label">UNIDADES VENDIDAS</div>
-          <div class="stat-value" id="reporteUnidades">—</div>
-          <div class="stat-trend">Total de unidades</div>
-        </div>
-        <div class="stat-card rojo">
-          <div class="stat-label">MERMAS DEL PERIODO</div>
-          <div class="stat-value" id="reporteMermas">—</div>
-          <div class="stat-trend">Unidades perdidas</div>
-        </div>
+        <div class="stat-card verde"><div class="stat-label">VENTAS DEL PERIODO</div><div class="stat-value" id="reporteValorVentas">—</div><div class="stat-trend">Total facturado</div></div>
+        <div class="stat-card azul"><div class="stat-label">UNIDADES VENDIDAS</div><div class="stat-value" id="reporteUnidades">—</div><div class="stat-trend">Total de unidades</div></div>
+        <div class="stat-card rojo"><div class="stat-label">MERMAS DEL PERIODO</div><div class="stat-value" id="reporteMermas">—</div><div class="stat-trend">Unidades perdidas</div></div>
       </div>
-
-      <!-- Tarjetas de inventario -->
       <div class="stats-grid" style="margin-bottom:20px;grid-template-columns:repeat(2,1fr)">
-        <div class="stat-card verde">
-          <div class="stat-label">VALOR BODEGA ACTUAL</div>
-          <div class="stat-value" id="reporteValorBodega">—</div>
-          <div class="stat-trend">Inventario en stock</div>
-        </div>
-        <div class="stat-card azul">
-          <div class="stat-label">MARGEN BRUTO EST.</div>
-          <div class="stat-value" id="reporteMargen">—</div>
-          <div class="stat-trend">Promedio del inventario</div>
-        </div>
+        <div class="stat-card verde"><div class="stat-label">VALOR BODEGA ACTUAL</div><div class="stat-value" id="reporteValorBodega">—</div><div class="stat-trend">Inventario en stock</div></div>
+        <div class="stat-card azul"><div class="stat-label">MARGEN BRUTO EST.</div><div class="stat-value" id="reporteMargen">—</div><div class="stat-trend">Promedio del inventario</div></div>
       </div>
-
-      <!-- Mensaje vacío -->
       <div id="reportesVacioMsg" style="display:none;text-align:center;padding:64px 24px;color:var(--muted)">
         <div style="font-size:48px;margin-bottom:16px">📊</div>
         <div style="font-size:16px;font-weight:600;margin-bottom:8px">Sin datos aún</div>
         <div style="font-size:13px">Agrega productos y registra ventas para ver reportes</div>
       </div>
-
-      <!-- Contenido de reportes -->
       <div id="reportesContenido" style="display:none">
-
-        <!-- Gráfico de ventas por día -->
         <div class="card" style="margin-bottom:20px">
           <div class="card-title">📈 Ventas por día</div>
           <div id="reporteGrafico" style="min-height:160px;padding:8px 0"></div>
         </div>
-
         <div class="report-grid">
-          <!-- Top productos -->
-          <div class="card">
-            <div class="card-title">🏆 Top Productos más Vendidos</div>
-            <div id="reporteTopProductos" class="top-products"></div>
-          </div>
-
-          <!-- Distribución por tipo -->
-          <div class="card">
-            <div class="card-title">🥧 Distribución por Tipo de Salida</div>
-            <div id="reportePorTipo" style="padding:8px 0"></div>
-          </div>
-
-          <!-- Stock por categoría -->
-          <div class="card">
-            <div class="card-title">📂 Stock por Categoría</div>
-            <div id="reporteCategorias" style="display:flex;flex-direction:column;gap:10px;padding:8px 0"></div>
-          </div>
-
-          <!-- Ventas por método de pago -->
-          <div class="card">
-            <div class="card-title">💳 Ventas por Método de Pago</div>
-            <div id="reporteMetodoPago" style="display:flex;flex-direction:column;gap:10px;padding:8px 0">
-              <div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div>
-            </div>
-          </div>
-
-          <!-- Resumen global de deudas -->
-          <div class="card">
-            <div class="card-title">📒 Resumen de Deudas</div>
-            <div id="reporteDeudas" style="display:flex;flex-direction:column;gap:10px;padding:8px 0">
-              <div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div>
-            </div>
-          </div>
+          <div class="card"><div class="card-title">🏆 Top Productos más Vendidos</div><div id="reporteTopProductos" class="top-products"></div></div>
+          <div class="card"><div class="card-title">🥧 Distribución por Tipo de Salida</div><div id="reportePorTipo" style="padding:8px 0"></div></div>
+          <div class="card"><div class="card-title">📂 Stock por Categoría</div><div id="reporteCategorias" style="display:flex;flex-direction:column;gap:10px;padding:8px 0"></div></div>
+          <div class="card"><div class="card-title">💳 Ventas por Método de Pago</div><div id="reporteMetodoPago" style="display:flex;flex-direction:column;gap:10px;padding:8px 0"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div></div></div>
+          <div class="card"><div class="card-title">📒 Resumen de Deudas</div><div id="reporteDeudas" style="display:flex;flex-direction:column;gap:10px;padding:8px 0"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div></div></div>
         </div>
-
-        <!-- ============================================================ -->
-        <!-- SECCIÓN PRO — visible pero bloqueada para usuarios Básico    -->
-        <!-- ============================================================ -->
         <div id="seccionPro" style="margin-top:24px">
-
-          <!-- Banner upgrade -->
           <div id="bannerUpgradePro" style="display:none;background:linear-gradient(135deg,#1e40af,#7c3aed);border-radius:16px;padding:24px 28px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
             <div>
               <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Plan Pro</div>
@@ -771,48 +739,13 @@ input[type="text"]::placeholder { text-transform: none; }
             </div>
             <button onclick="showScreen('equipo')" style="background:#fff;color:#1e40af;border:none;border-radius:10px;padding:12px 24px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">⬆️ Ver planes →</button>
           </div>
-
           <div class="report-grid">
-
-            <!-- Ganancia real — PRO -->
-            <div class="card" id="cardGananciaReal" style="position:relative">
-              <div class="card-title">💰 Ganancia Real del Periodo</div>
-              <div id="reporteGananciaReal" style="padding:8px 0">
-                <div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div>
-              </div>
-              <div id="lockGananciaReal" class="pro-lock-overlay" style="display:none"></div>
-            </div>
-
-            <!-- Comparación de periodos — PRO -->
-            <div class="card" id="cardComparacion" style="position:relative">
-              <div class="card-title">📅 Comparación de Periodos</div>
-              <div id="reporteComparacion" style="padding:8px 0">
-                <div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div>
-              </div>
-              <div id="lockComparacion" class="pro-lock-overlay" style="display:none"></div>
-            </div>
-
-            <!-- Rotación inventario — PRO -->
-            <div class="card" id="cardRotacion" style="position:relative">
-              <div class="card-title">🔄 Rotación de Inventario</div>
-              <div id="reporteRotacionPro" style="padding:8px 0">
-                <div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div>
-              </div>
-              <div id="lockRotacion" class="pro-lock-overlay" style="display:none"></div>
-            </div>
-
-            <!-- Productos sin movimiento — PRO -->
-            <div class="card" id="cardSinMovimiento" style="position:relative">
-              <div class="card-title">📦 Capital Dormido</div>
-              <div id="reporteSinMovimiento" style="padding:8px 0">
-                <div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div>
-              </div>
-              <div id="lockSinMovimiento" class="pro-lock-overlay" style="display:none"></div>
-            </div>
-
+            <div class="card" id="cardGananciaReal" style="position:relative"><div class="card-title">💰 Ganancia Real del Periodo</div><div id="reporteGananciaReal" style="padding:8px 0"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div></div><div id="lockGananciaReal" class="pro-lock-overlay" style="display:none"></div></div>
+            <div class="card" id="cardComparacion" style="position:relative"><div class="card-title">📅 Comparación de Periodos</div><div id="reporteComparacion" style="padding:8px 0"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div></div><div id="lockComparacion" class="pro-lock-overlay" style="display:none"></div></div>
+            <div class="card" id="cardRotacion" style="position:relative"><div class="card-title">🔄 Rotación de Inventario</div><div id="reporteRotacionPro" style="padding:8px 0"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div></div><div id="lockRotacion" class="pro-lock-overlay" style="display:none"></div></div>
+            <div class="card" id="cardSinMovimiento" style="position:relative"><div class="card-title">📦 Capital Dormido</div><div id="reporteSinMovimiento" style="padding:8px 0"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div></div><div id="lockSinMovimiento" class="pro-lock-overlay" style="display:none"></div></div>
           </div>
         </div>
-
       </div>
     </div>
 
@@ -825,30 +758,16 @@ input[type="text"]::placeholder { text-transform: none; }
         </div>
         <input class="search-input" id="fiadosBuscar" placeholder="🔍 Buscar cliente..." oninput="filtrarFiados()" style="max-width:260px">
       </div>
-
-      <!-- Resumen de deuda -->
       <div class="stats-grid" style="margin-bottom:20px;grid-template-columns:repeat(2,1fr)">
-        <div class="stat-card amarillo">
-          <div class="stat-label">DEUDA TOTAL PENDIENTE</div>
-          <div class="stat-value" id="fiadosTotalDeuda">—</div>
-          <div class="stat-trend">Por cobrar</div>
-        </div>
-        <div class="stat-card rojo">
-          <div class="stat-label">CLIENTES CON DEUDA</div>
-          <div class="stat-value" id="fiadosTotalClientes">—</div>
-          <div class="stat-trend">Cuentas abiertas</div>
-        </div>
+        <div class="stat-card amarillo"><div class="stat-label">DEUDA TOTAL PENDIENTE</div><div class="stat-value" id="fiadosTotalDeuda">—</div><div class="stat-trend">Por cobrar</div></div>
+        <div class="stat-card rojo"><div class="stat-label">CLIENTES CON DEUDA</div><div class="stat-value" id="fiadosTotalClientes">—</div><div class="stat-trend">Cuentas abiertas</div></div>
       </div>
-
-      <!-- Filtros -->
       <div style="display:flex;gap:8px;margin-bottom:16px">
         <button class="btn-secondary fiado-filtro active" data-estado="" onclick="setFiltroFiado(this,'')">Todos</button>
         <button class="btn-secondary fiado-filtro" data-estado="pendiente" onclick="setFiltroFiado(this,'pendiente')">⏳ Pendiente</button>
         <button class="btn-secondary fiado-filtro" data-estado="pagado_parcial" onclick="setFiltroFiado(this,'pagado_parcial')">🔄 Parcial</button>
         <button class="btn-secondary fiado-filtro" data-estado="pagado" onclick="setFiltroFiado(this,'pagado')">✅ Pagado</button>
       </div>
-
-      <!-- Lista de deudores -->
       <div id="fiadosLista" class="card" style="padding:0;overflow:hidden">
         <div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Cargando deudores...</div>
       </div>
@@ -863,7 +782,6 @@ input[type="text"]::placeholder { text-transform: none; }
         </div>
         <button class="btn-primary" id="btnInvitarUsuario" onclick="abrirModalInvitar()" style="display:none">+ Invitar usuario</button>
       </div>
-      <!-- Info del plan -->
       <div class="card" style="margin-bottom:20px" id="equipoPlanCard">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
           <div>
@@ -892,7 +810,6 @@ input[type="text"]::placeholder { text-transform: none; }
           </div>
         </div>
       </div>
-      <!-- Tabla de usuarios -->
       <div class="card" style="padding:0;overflow:hidden">
         <div class="table-wrap">
           <table>
@@ -926,7 +843,7 @@ input[type="text"]::placeholder { text-transform: none; }
           <div class="settings-logo-row">
             <div class="settings-logo-preview" id="logoPreview">
               <span id="logoInitials">MR</span>
-              <img id="logoImg" src="" alt="Logo" style="display:none;width:100%;height:100%;object-fit:contain;border-radius:12px;">
+              <img id="logoImgSettings" src="" alt="Logo" style="display:none;width:100%;height:100%;object-fit:contain;border-radius:12px;">
             </div>
             <div class="settings-logo-info">
               <div class="settings-logo-label">Logo del negocio</div>
@@ -937,7 +854,6 @@ input[type="text"]::placeholder { text-transform: none; }
                 <button class="btn-secondary" style="font-size:13px;padding:8px 16px" onclick="toggleInputUrlLogo()">🔗 Pegar URL</button>
                 <button class="btn-secondary" style="font-size:13px;padding:8px 16px" onclick="quitarLogo()">🗑️ Quitar</button>
               </div>
-              <!-- Input de URL — se muestra al hacer clic en "Pegar URL" -->
               <div id="logoUrlWrap" style="display:none;margin-top:10px">
                 <div style="display:flex;gap:8px;align-items:center">
                   <input id="inputLogoUrl" class="form-input" type="url"
@@ -996,11 +912,20 @@ input[type="text"]::placeholder { text-transform: none; }
           <div class="form-grid">
             <div class="form-group form-full">
               <label class="form-label">Contraseña actual</label>
-              <div class="settings-pass-row"><input id="inputPassActual" class="form-input" type="password" placeholder="Tu contraseña actual"><button class="settings-eye-btn" onclick="togglePass('inputPassActual',this)">👁️</button></div>
+              <div class="settings-pass-row">
+                <input id="inputPassActual" class="form-input" type="password" placeholder="Tu contraseña actual"
+                       autocomplete="current-password">
+                <button class="settings-eye-btn" onclick="togglePass('inputPassActual',this)">👁️</button>
+              </div>
             </div>
             <div class="form-group">
-              <label class="form-label">Nueva contraseña</label>
-              <div class="settings-pass-row"><input id="inputPassNueva" class="form-input" type="password" placeholder="Mínimo 8 caracteres" oninput="evaluarFuerzaPassword(this.value)"><button class="settings-eye-btn" onclick="togglePass('inputPassNueva',this)">👁️</button></div>
+              <label class="form-label">Nueva contraseña (mínimo 8 caracteres)</label>
+              <div class="settings-pass-row">
+                <input id="inputPassNueva" class="form-input" type="password" placeholder="Mínimo 8 caracteres"
+                       autocomplete="new-password"
+                       oninput="evaluarFuerzaPassword(this.value)">
+                <button class="settings-eye-btn" onclick="togglePass('inputPassNueva',this)">👁️</button>
+              </div>
               <div class="pass-strength-wrap" id="passStrengthWrap" style="display:none">
                 <div class="pass-strength-bar"><div class="pass-strength-fill" id="passStrengthFill"></div></div>
                 <span class="pass-strength-label" id="passStrengthLabel"></span>
@@ -1008,86 +933,42 @@ input[type="text"]::placeholder { text-transform: none; }
             </div>
             <div class="form-group">
               <label class="form-label">Confirmar nueva contraseña</label>
-              <div class="settings-pass-row"><input id="inputPassConfirm" class="form-input" type="password" placeholder="Repite la nueva contraseña"><button class="settings-eye-btn" onclick="togglePass('inputPassConfirm',this)">👁️</button></div>
+              <div class="settings-pass-row">
+                <input id="inputPassConfirm" class="form-input" type="password" placeholder="Repite la nueva contraseña"
+                       autocomplete="new-password">
+                <button class="settings-eye-btn" onclick="togglePass('inputPassConfirm',this)">👁️</button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-      <!-- ── SECCIÓN: Sonido del escáner ─────────────────────── -->
+
+      <!-- SECCIÓN: Sonido del escáner -->
       <div class="settings-section">
         <div class="settings-section-title">🔊 Sonido del escáner</div>
         <div class="settings-card">
           <div style="margin-bottom:18px;font-size:13px;color:var(--muted)">
             Elige el sonido que se reproduce al escanear un código de barras
           </div>
-
           <div id="soundOptions" style="display:flex;flex-direction:column;gap:10px">
-
             <label class="sound-option" data-sound="scanner" onclick="seleccionarSonido('scanner',this)">
-              <div class="sound-option-inner">
-                <div class="sound-radio" id="radio-scanner"></div>
-                <div class="sound-info">
-                  <div class="sound-name">🔫 Escáner profesional</div>
-                  <div class="sound-desc">Beep doble nítido — estilo Zebra / Honeywell</div>
-                </div>
-                <button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('scanner')">▶ Probar</button>
-              </div>
+              <div class="sound-option-inner"><div class="sound-radio" id="radio-scanner"></div><div class="sound-info"><div class="sound-name">🔫 Escáner profesional</div><div class="sound-desc">Beep doble nítido — estilo Zebra / Honeywell</div></div><button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('scanner')">▶ Probar</button></div>
             </label>
-
             <label class="sound-option" data-sound="single" onclick="seleccionarSonido('single',this)">
-              <div class="sound-option-inner">
-                <div class="sound-radio" id="radio-single"></div>
-                <div class="sound-info">
-                  <div class="sound-name">📟 Beep simple</div>
-                  <div class="sound-desc">Un solo tono corto y limpio</div>
-                </div>
-                <button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('single')">▶ Probar</button>
-              </div>
+              <div class="sound-option-inner"><div class="sound-radio" id="radio-single"></div><div class="sound-info"><div class="sound-name">📟 Beep simple</div><div class="sound-desc">Un solo tono corto y limpio</div></div><button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('single')">▶ Probar</button></div>
             </label>
-
             <label class="sound-option" data-sound="soft" onclick="seleccionarSonido('soft',this)">
-              <div class="sound-option-inner">
-                <div class="sound-radio" id="radio-soft"></div>
-                <div class="sound-info">
-                  <div class="sound-name">🎵 Tono suave</div>
-                  <div class="sound-desc">Pitido suave y agradable, ideal para oficinas</div>
-                </div>
-                <button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('soft')">▶ Probar</button>
-              </div>
+              <div class="sound-option-inner"><div class="sound-radio" id="radio-soft"></div><div class="sound-info"><div class="sound-name">🎵 Tono suave</div><div class="sound-desc">Pitido suave y agradable, ideal para oficinas</div></div><button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('soft')">▶ Probar</button></div>
             </label>
-
             <label class="sound-option" data-sound="retro" onclick="seleccionarSonido('retro',this)">
-              <div class="sound-option-inner">
-                <div class="sound-radio" id="radio-retro"></div>
-                <div class="sound-info">
-                  <div class="sound-name">🕹️ Retro</div>
-                  <div class="sound-desc">Sonido de videojuego clásico 8-bit</div>
-                </div>
-                <button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('retro')">▶ Probar</button>
-              </div>
+              <div class="sound-option-inner"><div class="sound-radio" id="radio-retro"></div><div class="sound-info"><div class="sound-name">🕹️ Retro</div><div class="sound-desc">Sonido de videojuego clásico 8-bit</div></div><button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('retro')">▶ Probar</button></div>
             </label>
-
             <label class="sound-option" data-sound="cash" onclick="seleccionarSonido('cash',this)">
-              <div class="sound-option-inner">
-                <div class="sound-radio" id="radio-cash"></div>
-                <div class="sound-info">
-                  <div class="sound-name">💰 Caja registradora</div>
-                  <div class="sound-desc">Ding metálico de caja registradora antigua</div>
-                </div>
-                <button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('cash')">▶ Probar</button>
-              </div>
+              <div class="sound-option-inner"><div class="sound-radio" id="radio-cash"></div><div class="sound-info"><div class="sound-name">💰 Caja registradora</div><div class="sound-desc">Ding metálico de caja registradora antigua</div></div><button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('cash')">▶ Probar</button></div>
             </label>
-
             <label class="sound-option" data-sound="none" onclick="seleccionarSonido('none',this)">
-              <div class="sound-option-inner">
-                <div class="sound-radio" id="radio-none"></div>
-                <div class="sound-info">
-                  <div class="sound-name">🔇 Sin sonido</div>
-                  <div class="sound-desc">Desactivar sonido del escáner</div>
-                </div>
-              </div>
+              <div class="sound-option-inner"><div class="sound-radio" id="radio-none"></div><div class="sound-info"><div class="sound-name">🔇 Sin sonido</div><div class="sound-desc">Desactivar sonido del escáner</div></div></div>
             </label>
-
           </div>
         </div>
       </div>
@@ -1102,7 +983,7 @@ input[type="text"]::placeholder { text-transform: none; }
 </div><!-- fin appMain -->
 
 
-<!-- MODAL: Registro rápido de producto nuevo (se abre desde ingreso cuando el código no existe) -->
+<!-- MODAL: Registro rápido de producto nuevo -->
 <div class="modal-overlay" id="modalAgregar" style="z-index:9000">
   <div class="modal-box" style="max-width:460px">
     <div class="modal-header">
@@ -1146,7 +1027,7 @@ input[type="text"]::placeholder { text-transform: none; }
         <input type="hidden" id="inputFechaVenc" value="">
         <input type="hidden" id="inputDiasAlerta" value="30">
         <span id="precioHint" style="display:none"></span>
-        <video id="videoEscaner" style="display:none"></video>
+        <!-- [SEC-9] video de escáner movido fuera del form — evita stream embebido en form -->
       </div>
       <div class="form-actions">
         <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
@@ -1155,6 +1036,8 @@ input[type="text"]::placeholder { text-transform: none; }
     </form>
   </div>
 </div>
+<!-- [SEC-9] Video del escáner del modal Agregar — fuera del <form> para no interferir con submit -->
+<video id="videoEscaner" style="display:none"></video>
 
 <!-- MODAL: Nuevo Ingreso -->
 <div class="modal-overlay" id="modalMovimiento">
@@ -1164,8 +1047,7 @@ input[type="text"]::placeholder { text-transform: none; }
       <button class="modal-close" onclick="closeModalMovimiento()">✕</button>
     </div>
     <div id="ingresoScrollArea" style="padding:16px 24px 0;overflow-y:auto;flex:1">
-
-      <!-- VISOR CÁMARA (aparece arriba al escanear) -->
+      <!-- VISOR CÁMARA -->
       <div id="escanerIngresoVisor" style="display:none;margin-bottom:12px;position:relative;border-radius:14px;overflow:hidden">
         <video id="videoEscanerIngreso" style="width:100%;max-height:260px;object-fit:cover;display:block"></video>
         <div style="position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center">
@@ -1175,8 +1057,7 @@ input[type="text"]::placeholder { text-transform: none; }
                 style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.6);border:none;border-radius:50%;width:36px;height:36px;color:#fff;font-size:18px;cursor:pointer;line-height:1;z-index:2">✕</button>
         <div style="position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,0.9);font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.9)">Apunta al código de barras</div>
       </div>
-
-      <!-- Buscador con botón cámara verde -->
+      <!-- Buscador -->
       <div style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📦 Agregar producto al ingreso</div>
         <div style="display:flex;gap:8px;align-items:center">
@@ -1190,10 +1071,8 @@ input[type="text"]::placeholder { text-transform: none; }
         </div>
         <div id="ingresoScanHint" style="font-size:12px;color:var(--muted);margin-top:6px">Escanea o escribe — Enter o "Agregar" para sumarlo al ingreso</div>
       </div>
-
-      <!-- Chip producto encontrado (verde) -->
+      <!-- Chip producto encontrado -->
       <div id="ingresoChip" style="display:none;background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:12px 14px;margin-bottom:12px;flex-direction:column;gap:10px">
-        <!-- Fila 1: nombre + cantidad -->
         <div style="display:flex;align-items:center;gap:10px">
           <div style="font-size:22px">📦</div>
           <div style="flex:1;min-width:0">
@@ -1206,45 +1085,32 @@ input[type="text"]::placeholder { text-transform: none; }
             <button type="button" onclick="cambiarQtyIngreso(1)" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">+</button>
           </div>
         </div>
-        <!-- Fila 2: precio compra + % ganancia + precio venta calculado + botón -->
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <div style="flex:1;min-width:90px">
             <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px">PRECIO COMPRA</div>
-            <input id="movPrecioCompra" type="number" placeholder="$0" min="0"
-                   oninput="calcularPrecioVentaChip()"
-                   style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:7px 10px;color:var(--text);font-size:13px;font-weight:700;outline:none">
+            <input id="movPrecioCompra" type="number" placeholder="$0" min="0" oninput="calcularPrecioVentaChip()" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:7px 10px;color:var(--text);font-size:13px;font-weight:700;outline:none">
           </div>
           <div style="flex:1;min-width:70px">
             <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px">% GANANCIA</div>
-            <input id="movPorcentajeChip" type="number" placeholder="0%" min="0" max="999"
-                   oninput="calcularPrecioVentaChip()"
-                   style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:7px 10px;color:var(--text);font-size:13px;font-weight:700;outline:none">
+            <input id="movPorcentajeChip" type="number" placeholder="0%" min="0" max="999" oninput="calcularPrecioVentaChip()" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:7px 10px;color:var(--text);font-size:13px;font-weight:700;outline:none">
           </div>
           <div style="flex:1;min-width:90px">
             <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px">PRECIO VENTA</div>
-            <input id="movPrecioVentaChip" type="number" placeholder="Calculado" min="0"
-                   style="width:100%;background:rgba(0,199,123,0.1);border:1px solid rgba(0,199,123,0.3);border-radius:9px;padding:7px 10px;color:var(--verde);font-size:13px;font-weight:800;outline:none">
+            <input id="movPrecioVentaChip" type="number" placeholder="Calculado" min="0" style="width:100%;background:rgba(0,199,123,0.1);border:1px solid rgba(0,199,123,0.3);border-radius:9px;padding:7px 10px;color:var(--verde);font-size:13px;font-weight:800;outline:none">
           </div>
-          <button type="button" onclick="agregarAlIngresoCarrito()"
-                  style="background:var(--verde);border:none;border-radius:9px;padding:9px 16px;color:#000;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;align-self:flex-end">+ Agregar</button>
+          <button type="button" onclick="agregarAlIngresoCarrito()" style="background:var(--verde);border:none;border-radius:9px;padding:9px 16px;color:#000;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;align-self:flex-end">+ Agregar</button>
         </div>
         <div id="chipPrecioHint" style="font-size:11px;color:var(--verde);margin-top:-4px;display:none"></div>
       </div>
-
-      <!-- Selector desplegable -->
       <div style="margin-bottom:12px">
         <select id="movProductoId" class="form-input" onchange="onProductoIngresoSeleccionado()" style="font-size:13px">
           <option value="">— O selecciona de la lista —</option>
         </select>
       </div>
-
-      <!-- Lista carrito -->
       <div id="ingresoCarritoWrap" style="display:none;margin-bottom:12px">
         <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📋 Productos en este ingreso</div>
         <div id="ingresoCarritoLista" style="display:flex;flex-direction:column;gap:6px;max-height:150px;overflow-y:auto"></div>
       </div>
-
-      <!-- Total — muestra UNIDADES -->
       <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
         <div>
           <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase">Unidades a ingresar</div>
@@ -1255,30 +1121,12 @@ input[type="text"]::placeholder { text-transform: none; }
           <div style="font-size:11px;color:var(--muted);margin-top:2px">unidades</div>
         </div>
       </div>
-
-      <!-- Campos del ingreso — solo los esenciales -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
-        <div class="form-group">
-          <label class="form-label">Proveedor</label>
-          <input id="movProveedor" class="form-input" type="text" placeholder="Ej: Distribuidora Norte">
-        </div>
-        <div class="form-group">
-          <label class="form-label">N° Documento</label>
-          <input id="movNumDocumento" class="form-input" type="text" placeholder="Factura, guía, orden...">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Fecha de vencimiento</label>
-          <input id="movFechaVenc" class="form-input" type="date">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Alertar X días antes</label>
-          <input id="movDiasAlerta" class="form-input" type="number" min="1" placeholder="30" value="30">
-        </div>
-        <div class="form-group form-full">
-          <label class="form-label">Nota u observación</label>
-          <input id="movNota" class="form-input" type="text" placeholder="Observación opcional">
-        </div>
-        <!-- Campos ocultos para compatibilidad backend -->
+        <div class="form-group"><label class="form-label">Proveedor</label><input id="movProveedor" class="form-input" type="text" placeholder="Ej: Distribuidora Norte"></div>
+        <div class="form-group"><label class="form-label">N° Documento</label><input id="movNumDocumento" class="form-input" type="text" placeholder="Factura, guía, orden..."></div>
+        <div class="form-group"><label class="form-label">Fecha de vencimiento</label><input id="movFechaVenc" class="form-input" type="date"></div>
+        <div class="form-group"><label class="form-label">Alertar X días antes</label><input id="movDiasAlerta" class="form-input" type="number" min="1" placeholder="30" value="30"></div>
+        <div class="form-group form-full"><label class="form-label">Nota u observación</label><input id="movNota" class="form-input" type="text" placeholder="Observación opcional"></div>
         <input type="hidden" id="movMarca">
         <input type="hidden" id="movCategoria">
         <input type="hidden" id="movCodigoInterno">
@@ -1408,34 +1256,17 @@ input[type="text"]::placeholder { text-transform: none; }
             <button type="button" class="metodo-pago-btn fiado"  data-metodo="fiado"         onclick="seleccionarMetodoPago('fiado')">📒 Fiado</button>
             <button type="button" class="metodo-pago-btn"        data-metodo="mixto"         onclick="seleccionarMetodoPago('mixto')" style="grid-column:1/-1">🔀 Pago Mixto (varios métodos)</button>
           </div>
-
-          <!-- Panel pago mixto — aparece solo al seleccionar Mixto -->
           <div id="pagoMixtoPanel" style="display:none;margin-top:12px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px">
-            <!-- Total de la venta prominente -->
             <div style="text-align:center;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
               <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Total a distribuir</div>
               <div id="mixtoTotalVenta" style="font-family:var(--font-head);font-size:28px;font-weight:900;color:var(--text)">$0</div>
             </div>
-            <!-- Campos por método -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <div>
-                <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💵 Efectivo</label>
-                <input id="mixtoEfectivo" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()">
-              </div>
-              <div>
-                <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💳 Débito</label>
-                <input id="mixtoDebito" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()">
-              </div>
-              <div>
-                <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💳 Crédito</label>
-                <input id="mixtoCredito" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()">
-              </div>
-              <div>
-                <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">📱 Transferencia</label>
-                <input id="mixtoTransferencia" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()">
-              </div>
+              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💵 Efectivo</label><input id="mixtoEfectivo" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()"></div>
+              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💳 Débito</label><input id="mixtoDebito" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()"></div>
+              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💳 Crédito</label><input id="mixtoCredito" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()"></div>
+              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">📱 Transferencia</label><input id="mixtoTransferencia" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()"></div>
             </div>
-            <!-- Barra de progreso de asignación -->
             <div style="margin-top:12px">
               <div style="height:6px;background:var(--bg2);border-radius:99px;overflow:hidden;margin-bottom:8px">
                 <div id="mixtoBarra" style="height:100%;background:var(--verde);border-radius:99px;transition:width 0.2s;width:0%"></div>
@@ -1445,12 +1276,10 @@ input[type="text"]::placeholder { text-transform: none; }
                 <span id="mixtoRestanteLabel" style="color:var(--azul);font-weight:700">Falta: <span id="mixtoRestante">$0</span></span>
               </div>
             </div>
-            <!-- Alerta si se pasa del total -->
             <div id="mixtoAlertaExceso" style="display:none;margin-top:10px;background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--rojo)">
               ⚠️ <strong>El monto asignado supera el total de la venta.</strong> Ajusta los valores.
             </div>
           </div>
-
           <div id="fiadoAviso" style="display:none;margin-top:8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:#f59e0b">
             ⚠️ <strong>Venta fiada</strong> — El cliente lleva el producto y paga después. El nombre del cliente es <strong>obligatorio</strong>.
           </div>
@@ -1494,7 +1323,7 @@ input[type="text"]::placeholder { text-transform: none; }
 <!-- TOAST -->
 <div class="toast" id="toast"><span id="toastMsg">¡Guardado!</span></div>
 
-<!-- MODAL: Cambio de plan automático -->
+<!-- MODAL: Cambio de plan -->
 <div class="modal-overlay" id="modalUpgrade">
   <div class="modal-box" style="max-width:520px">
     <div class="modal-header">
@@ -1503,38 +1332,25 @@ input[type="text"]::placeholder { text-transform: none; }
     </div>
     <div style="padding:0 24px 24px">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">
-
-        <!-- Plan Gratis -->
         <div id="cardPlanGratis" style="border:2px solid var(--border);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s" onclick="seleccionarPlan('gratis')">
           <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">🆓 Gratis</div>
           <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:8px">$0<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
           <div style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:5px">
-            <div>✓ 1 usuario</div>
-            <div>✓ Hasta 30 productos</div>
-            <div>✓ Inventario básico</div>
-            <div>✓ Ventas y entradas</div>
-            <div style="color:var(--rojo)">✗ Sin reportes</div>
-            <div style="color:var(--rojo)">✗ Marca de agua</div>
+            <div>✓ 1 usuario</div><div>✓ Hasta 30 productos</div><div>✓ Inventario básico</div><div>✓ Ventas y entradas</div>
+            <div style="color:var(--rojo)">✗ Sin reportes</div><div style="color:var(--rojo)">✗ Marca de agua</div>
           </div>
           <div style="margin-top:10px;font-size:11px;color:var(--muted);background:var(--bg3);border-radius:8px;padding:6px 10px">🎯 Para probar YeparStock</div>
         </div>
-
-        <!-- Plan Básico -->
         <div id="cardPlanBasico" style="border:2px solid var(--verde);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s;background:rgba(0,199,123,0.03)" onclick="seleccionarPlan('basico')">
           <div style="font-size:11px;color:var(--verde);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">🟢 Básico</div>
           <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:8px">$9.99 + IVA<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
           <div style="font-size:11px;display:flex;flex-direction:column;gap:5px">
-            <div style="color:var(--verde)">✓ Usuarios ilimitados</div>
-            <div style="color:var(--verde)">✓ Productos ilimitados</div>
-            <div style="color:var(--verde)">✓ Ventas, ingresos, alertas</div>
-            <div style="color:var(--verde)">✓ Reportes básicos</div>
-            <div style="color:var(--verde)">✓ Soporte WhatsApp</div>
-            <div style="color:var(--muted)">✗ Sin multisucursales</div>
+            <div style="color:var(--verde)">✓ Usuarios ilimitados</div><div style="color:var(--verde)">✓ Productos ilimitados</div>
+            <div style="color:var(--verde)">✓ Ventas, ingresos, alertas</div><div style="color:var(--verde)">✓ Reportes básicos</div>
+            <div style="color:var(--verde)">✓ Soporte WhatsApp</div><div style="color:var(--muted)">✗ Sin multisucursales</div>
           </div>
           <div style="margin-top:10px;font-size:11px;color:var(--verde);background:rgba(0,199,123,0.08);border-radius:8px;padding:6px 10px">🎯 Comercios y tiendas</div>
         </div>
-
-        <!-- Plan Pro -->
         <div id="cardPlanPro" style="border:2px solid var(--azul);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s;background:rgba(91,142,255,0.04)" onclick="seleccionarPlan('pro')">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
             <div style="font-size:11px;color:var(--azul);text-transform:uppercase;letter-spacing:1px;font-weight:700">🔵 Pro</div>
@@ -1542,32 +1358,21 @@ input[type="text"]::placeholder { text-transform: none; }
           </div>
           <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:8px">$19.99 + IVA<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
           <div style="font-size:11px;display:flex;flex-direction:column;gap:5px">
-            <div style="color:var(--verde)">✓ Todo lo del Básico</div>
-            <div style="color:var(--verde)">✓ Usuarios ilimitados</div>
-            <div style="color:var(--verde)">✓ Productos ilimitados</div>
-            <div style="color:var(--azul);font-weight:700">✓ 🏪 Multisucursales</div>
-            <div style="color:var(--verde)">✓ Reportes avanzados</div>
-            <div style="color:var(--verde)">✓ Exportar Excel / PDF</div>
+            <div style="color:var(--verde)">✓ Todo lo del Básico</div><div style="color:var(--verde)">✓ Usuarios ilimitados</div>
+            <div style="color:var(--verde)">✓ Productos ilimitados</div><div style="color:var(--azul);font-weight:700">✓ 🏪 Multisucursales</div>
+            <div style="color:var(--verde)">✓ Reportes avanzados</div><div style="color:var(--verde)">✓ Exportar Excel / PDF</div>
           </div>
           <div style="margin-top:10px;font-size:11px;color:var(--azul);background:rgba(91,142,255,0.08);border-radius:8px;padding:6px 10px">🎯 Negocios en crecimiento</div>
         </div>
       </div>
-
-      <!-- Banner fundador -->
       <div style="background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:12px">
         🎉 <strong>Precio fundador:</strong> Primeros 50 negocios acceden a Pro por <strong>$14.99 + IVA/mes de por vida</strong>. ¡Pocos cupos disponibles!
       </div>
-
-      <!-- Mensaje de error o advertencia -->
       <div id="upgradeMensaje" style="display:none;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px"></div>
-
-      <!-- Botón confirmar -->
       <button id="btnConfirmarPlan" onclick="confirmarCambioPlan()" class="btn-primary" disabled style="width:100%;justify-content:center;padding:13px;font-size:15px;opacity:0.5">
         Selecciona un plan para continuar
       </button>
       <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:10px">El cambio es inmediato · Sin compromiso</p>
-
-      <!-- Cancelar / Reactivar suscripción -->
       <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;display:flex;justify-content:center">
         <button id="btnCancelarSuscripcionModal" style="background:transparent;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline" onclick="cerrarModalUpgrade(); cancelarSuscripcion()">
           ❌ Cancelar suscripción
@@ -1598,8 +1403,9 @@ input[type="text"]::placeholder { text-transform: none; }
           <input id="invitarEmail" class="form-input" type="email" placeholder="empleado@negocio.com">
         </div>
         <div class="form-group" style="margin-bottom:14px">
-          <label class="form-label">Contraseña temporal *</label>
-          <input id="invitarPassword" class="form-input" type="password" placeholder="Mínimo 8 caracteres">
+          <label class="form-label">Contraseña temporal * (mínimo 8 caracteres)</label>
+          <input id="invitarPassword" class="form-input" type="password" placeholder="Mínimo 8 caracteres"
+                 autocomplete="new-password">
           <span class="settings-field-hint">Comparte esta contraseña con el usuario — puede cambiarla después</span>
         </div>
         <div class="form-group" style="margin-bottom:20px">
@@ -1619,15 +1425,43 @@ input[type="text"]::placeholder { text-transform: none; }
 </div>
 
 <script src="js/app.js"></script>
-  <!-- Registrar Service Worker — activa la PWA -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('sw.js')
-          .then(function(reg) { console.log('[PWA] Service Worker registrado:', reg.scope); })
-          .catch(function(err) { console.warn('[PWA] Error registrando SW:', err); });
+
+<!-- ============================================================
+     Registrar Service Worker — activa la PWA
+     [SEC-10] Se verifica que el SW no esté ya activo antes de registrar
+     Analogia: como revisar si ya abriste la tienda antes de volver
+     a pasar la llave — evita registros duplicados innecesarios.
+============================================================ -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      // Verificar si ya existe un SW activo para este scope
+      navigator.serviceWorker.getRegistration('./').then(function(existingReg) {
+        if (!existingReg) {
+          // Solo registrar si no existe uno previo
+          navigator.serviceWorker.register('sw.js')
+            .then(function(reg) { console.log('[PWA] Service Worker registrado:', reg.scope); })
+            .catch(function(err) { console.warn('[PWA] Error registrando SW:', err); });
+        } else {
+          console.log('[PWA] Service Worker ya activo:', existingReg.scope);
+        }
       });
-    }
-  </script>
+    });
+  }
+
+  // ============================================================
+  // [SEC-8] logoFallbackHandler — función centralizada para el
+  // fallback del logo de login. Separa la lógica del HTML
+  // (onerror solo llama una función, no ejecuta código inline).
+  // Analogia: en vez de dejar un cartel pegado en la puerta con
+  // instrucciones, hay un guardia capacitado que sabe qué hacer.
+  // ============================================================
+  function logoFallbackHandler() {
+    var img = document.getElementById('logoImg');
+    var fallback = document.getElementById('logoFallback');
+    if (img) img.style.display = 'none';
+    if (fallback) fallback.style.display = 'flex';
+  }
+</script>
 </body>
 </html>
