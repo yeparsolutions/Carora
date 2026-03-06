@@ -3457,6 +3457,19 @@ document.addEventListener("DOMContentLoaded", function(){
     // Intencional: no se agrega listener de cierre por clic en overlay
   });
 
+  // Generar username automático al escribir nombre o apellido del colaborador
+  var elNombre   = document.getElementById("invitarNombre");
+  var elApellido = document.getElementById("invitarApellido");
+  var elUsername = document.getElementById("invitarUsername");
+  if (elNombre)   elNombre.addEventListener("input",   generarUsernameAuto);
+  if (elApellido) elApellido.addEventListener("input", generarUsernameAuto);
+  // Forzar minúsculas al editar username manualmente
+  if (elUsername) elUsername.addEventListener("input", function() {
+    var pos = this.selectionStart;
+    this.value = this.value.toLowerCase().replace(/[^a-z0-9._]/g, "");
+    this.setSelectionRange(pos, pos);
+  });
+
   // Si ya hay sesión activa, verificar onboarding
   // Operadores (invitados) entran directo — la empresa ya fue configurada
   if (authToken && usuarioActual) {
@@ -3817,7 +3830,6 @@ function abrirModalInvitar() {
   if (!esAdmin) return;
   document.getElementById("modalInvitar").classList.add("open");
   document.getElementById("formInvitar").reset();
-  // Limpiar username generado
   var uEl = document.getElementById("invitarUsername");
   if (uEl) uEl.value = "";
   if (empresaInfo) {
@@ -3830,36 +3842,26 @@ function cerrarModalInvitar() {
   document.getElementById("modalInvitar").classList.remove("open");
 }
 
-// Genera usuario nombre.apellido en minúsculas sin tildes
-// Si ya existe en el equipo agrega número al final: nombre.apellido1, nombre.apellido2...
+// Quita tildes y deja solo a-z y 0-9
+function _limpiarUsername(s) {
+  return (s || "").normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+// Genera usuario nombre.apellido; si ya existe en el equipo agrega número
 function generarUsernameAuto() {
-  var nombre   = (document.getElementById("invitarNombre")?.value   || "").trim();
-  var apellido = (document.getElementById("invitarApellido")?.value || "").trim();
+  var nombre   = (_limpiarUsername(document.getElementById("invitarNombre")?.value   || ""));
+  var apellido = (_limpiarUsername(document.getElementById("invitarApellido")?.value || ""));
   if (!nombre && !apellido) return;
 
-  // Quitar tildes y caracteres especiales
-  function limpiar(s) {
-    return s.normalize("NFD")
-            .replace(/[̀-ͯ]/g, "")   // tildes
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, "");         // solo letras y números
-  }
+  var base = apellido ? nombre + "." + apellido : nombre;
 
-  var base = apellido
-    ? limpiar(nombre) + "." + limpiar(apellido)
-    : limpiar(nombre);
-
-  // Verificar colisión con usuarios existentes del equipo
-  var usernamesActuales = (equipoData || []).map(function(u) {
-    return (u.username || "").toLowerCase();
-  });
-
+  var usados = (equipoData || []).map(function(u){ return (u.username || "").toLowerCase(); });
   var candidato = base;
   var n = 1;
-  while (usernamesActuales.indexOf(candidato) !== -1) {
-    candidato = base + n;
-    n++;
-  }
+  while (usados.indexOf(candidato) !== -1) { candidato = base + n; n++; }
 
   var uEl = document.getElementById("invitarUsername");
   if (uEl) uEl.value = candidato;
@@ -3871,11 +3873,10 @@ async function guardarInvitacion() {
   var username = (document.getElementById("invitarUsername")?.value || "").trim().toLowerCase();
   var password = document.getElementById("invitarPassword").value.trim();
   var rol      = document.getElementById("invitarRol").value;
-
   var nombreCompleto = apellido ? nombre + " " + apellido : nombre;
 
   if (!nombre || !username || !password) { showToast("Completa todos los campos obligatorios"); return; }
-  if (!/^[a-z0-9._]+$/.test(username))  { showToast("El usuario solo puede tener letras, números, punto y guión bajo"); return; }
+  if (!/^[a-z0-9._]+$/.test(username))  { showToast("El usuario solo puede tener letras minúsculas, números y punto"); return; }
   if (password.length < 8)              { showToast("La contraseña debe tener al menos 8 caracteres"); return; }
 
   var btn = document.querySelector("#modalInvitar .btn-primary");
@@ -3888,7 +3889,7 @@ async function guardarInvitacion() {
       password: password,
       rol:      rol
     });
-    showToast("✅ " + _esc(nombreCompleto) + " agregado — usuario: @" + _esc(username));
+    showToast("✅ " + _esc(nombreCompleto) + " agregado — @" + _esc(username));
     cerrarModalInvitar();
     await cargarEquipo();
   } catch (e) {
