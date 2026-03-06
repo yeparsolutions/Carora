@@ -21,7 +21,7 @@ class UsuarioCrear(BaseModel):
     password: str
 
 class LoginRequest(BaseModel):
-    email:    EmailStr
+    email:    str      # acepta email (admin) o username (operador)
     password: str
 
 class UsuarioRespuesta(BaseModel):
