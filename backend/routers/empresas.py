@@ -3,7 +3,9 @@
 # Archivo: backend/routers/empresas.py
 # ============================================================
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
+from pydantic import BaseModel
+from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sqlfunc
 from datetime import datetime, timedelta, timezone
@@ -12,6 +14,19 @@ from auth import get_usuario_actual, solo_admin
 import models
 
 router = APIRouter(prefix="/empresa", tags=["Empresa"])
+
+# ── Schemas Pydantic ──────────────────────────────────────────
+class InvitarSchema(BaseModel):
+    nombre:   str
+    username: str
+    password: str
+    rol:      str = "operador"
+
+class MiConfigSchema(BaseModel):
+    password_actual: Optional[str] = None
+    password_nuevo:  Optional[str] = None
+    color_interfaz:  Optional[str] = None
+    sonido_escaner:  Optional[str] = None
 
 # Secciones válidas para permisos
 SECCIONES_VALIDAS = {
@@ -222,10 +237,7 @@ def listar_usuarios_empresa(
 # ============================================================
 @router.post("/invitar", status_code=201)
 def invitar_usuario(
-    nombre:   str,
-    username: str,
-    password: str,
-    rol:      str = "operador",
+    datos: InvitarSchema,
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
@@ -367,7 +379,7 @@ def obtener_permisos(
 @router.put("/usuarios/{usuario_id}/permisos")
 def actualizar_permisos(
     usuario_id: int,
-    permisos:   dict,           # {"dashboard": true, "salidas": false, ...}
+    permisos:   dict = Body(...),  # {"dashboard": true, "salidas": false, ...}
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
