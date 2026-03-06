@@ -1,9 +1,6 @@
 # ============================================================
 # YEPARSTOCK - Modelos de base de datos
 # Archivo: backend/models.py
-# Descripcion: Define las tablas de PostgreSQL usando SQLAlchemy
-# Analogia: cada clase es como el diseño de una hoja de Excel —
-#           define qué columnas tiene cada tabla
 # ============================================================
 
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Enum, UniqueConstraint
@@ -31,21 +28,17 @@ class EstadoSalida(str, enum.Enum):
     enviado_proveedor = "enviado_proveedor"
 
 class PlanEmpresa(str, enum.Enum):
-    # Analogia: como los tipos de membresía de un gimnasio
-    gratis = "gratis"  # 1 usuario, hasta 30 productos, con marca de agua
-    basico = "basico"  # usuarios ilimitados, productos ilimitados
-    pro    = "pro"     # usuarios ilimitados, productos ilimitados, multisucursales
+    gratis = "gratis"
+    basico = "basico"
+    pro    = "pro"
 
 class RolUsuario(str, enum.Enum):
-    # Analogia: el admin es el dueño del negocio, el operador es el empleado
-    admin    = "admin"     # puede configurar, agregar usuarios y ver todo
-    operador = "operador"  # puede registrar ventas y movimientos
+    admin    = "admin"
+    operador = "operador"
 
 
 # ============================================================
 # TABLA: empresas
-# Nueva tabla central — todos los datos pertenecen a una empresa
-# Analogia: es el "edificio de oficinas" que contiene todo
 # ============================================================
 class Empresa(Base):
     __tablename__ = "empresas"
@@ -81,6 +74,7 @@ class Empresa(Base):
 
 # ============================================================
 # TABLA: usuarios
+# ✅ NUEVO: columna username para login de operadores sin email
 # ============================================================
 class Usuario(Base):
     __tablename__ = "usuarios"
@@ -88,17 +82,49 @@ class Usuario(Base):
     id                  = Column(Integer, primary_key=True, index=True)
     empresa_id          = Column(Integer, ForeignKey("empresas.id"), nullable=False, index=True)
     nombre              = Column(String(100), nullable=False)
-    email               = Column(String(150), unique=True, nullable=False, index=True)
+    email               = Column(String(150), unique=True, nullable=True, index=True)  # nullable para operadores
+    username            = Column(String(50),  nullable=True, index=True)               # ✅ NUEVO: login sin email
     password_hash       = Column(String(255), nullable=False)
     rol                 = Column(Enum(RolUsuario, name="rol_usuario_enum"), default=RolUsuario.admin)
     activo              = Column(Boolean, default=True)
     email_verificado    = Column(Boolean, default=False)
     codigo_verificacion = Column(String(10), nullable=True)
+    # Preferencias personales del operador
+    color_interfaz      = Column(String(10), nullable=True)   # ✅ NUEVO: color personalizado
+    sonido_escaner      = Column(String(20), nullable=True)   # ✅ NUEVO: sonido preferido
     created_at          = Column(DateTime(timezone=True), server_default=func.now())
 
-    empresa     = relationship("Empresa",    back_populates="usuarios")
-    movimientos = relationship("Movimiento", back_populates="usuario")
-    salidas     = relationship("Salida", back_populates="usuario", foreign_keys="Salida.usuario_id")
+    empresa     = relationship("Empresa",         back_populates="usuarios")
+    movimientos = relationship("Movimiento",       back_populates="usuario")
+    salidas     = relationship("Salida",           back_populates="usuario", foreign_keys="Salida.usuario_id")
+    permisos    = relationship("PermisoUsuario",   back_populates="usuario", cascade="all, delete-orphan")  # ✅ NUEVO
+
+    __table_args__ = (
+        # username único por empresa (dos empresas pueden tener un "juan")
+        UniqueConstraint("empresa_id", "username", name="uq_usuario_empresa_username"),
+    )
+
+
+# ============================================================
+# TABLA: permisos_usuario  ✅ NUEVA
+# Guarda qué secciones puede ver/usar cada operador
+# Analogia: las llaves del negocio — el admin decide cuáles
+# le da a cada empleado: bodega sí, caja no, etc.
+# ============================================================
+class PermisoUsuario(Base):
+    __tablename__ = "permisos_usuario"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    seccion    = Column(String(50), nullable=False)   # dashboard, productos, stock, movimientos, salidas, alertas, reportes, fiados
+    permitido  = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    usuario = relationship("Usuario", back_populates="permisos")
+
+    __table_args__ = (
+        UniqueConstraint("usuario_id", "seccion", name="uq_permiso_usuario_seccion"),
+    )
 
 
 # ============================================================
@@ -135,12 +161,11 @@ class Producto(Base):
     empresa     = relationship("Empresa",    back_populates="productos")
     usuario     = relationship("Usuario")
     movimientos = relationship("Movimiento", back_populates="producto")
-    salidas     = relationship("Salida", back_populates="producto", foreign_keys="Salida.producto_id")
+    salidas     = relationship("Salida",     back_populates="producto", foreign_keys="Salida.producto_id")
 
 
 # ============================================================
 # TABLA: movimientos
-# ✅ AGREGADO: num_documento para trazabilidad de ingresos
 # ============================================================
 class Movimiento(Base):
     __tablename__ = "movimientos"
@@ -155,7 +180,7 @@ class Movimiento(Base):
     stock_nuevo    = Column(Integer,     nullable=False)
     nota           = Column(String(255), nullable=True)
     lote           = Column(String(100), nullable=True)
-    num_documento  = Column(String(100), nullable=True)   # ✅ NUEVO: factura, guía, orden de compra
+    num_documento  = Column(String(100), nullable=True)
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
 
     empresa  = relationship("Empresa",  back_populates="movimientos")
