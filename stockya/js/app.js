@@ -12,6 +12,87 @@ let authToken     = localStorage.getItem("yeparstock_token")   || null;
 let usuarioActual = JSON.parse(localStorage.getItem("yeparstock_usuario") || "null");
 
 /* ============================================================
+   SONIDO DE ESCÁNER — Web Audio API, sin archivos externos
+   Simula el beep electrónico de un lector de código de barras
+   ============================================================ */
+function _beep(tipo) {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Oscilador principal — frecuencia característica de escáner
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+
+    // Filtro para darle el tono "electrónico" del escáner
+    var filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 1800;
+    filter.Q.value = 1.5;
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    // Tipos de beep según contexto
+    if (tipo === "error") {
+      // Beep de error — tono descendente doble
+      osc.type = "square";
+      osc.frequency.setValueAtTime(600, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.18);
+    } else if (tipo === "ok") {
+      // Beep de confirmación — tono ascendente doble
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.18);
+    } else {
+      // Beep estándar de escáner — tono corto y nítido
+      osc.type = "square";
+      osc.frequency.setValueAtTime(1900, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1700, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.28, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.10);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.10);
+
+      // Segundo tono más agudo (hace el "bi-bip" del escáner)
+      setTimeout(function() {
+        try {
+          var ctx2  = new (window.AudioContext || window.webkitAudioContext)();
+          var osc2  = ctx2.createOscillator();
+          var gain2 = ctx2.createGain();
+          var filt2 = ctx2.createBiquadFilter();
+          filt2.type = "bandpass";
+          filt2.frequency.value = 2200;
+          filt2.Q.value = 1.5;
+          osc2.connect(filt2);
+          filt2.connect(gain2);
+          gain2.connect(ctx2.destination);
+          osc2.type = "square";
+          osc2.frequency.setValueAtTime(2100, ctx2.currentTime);
+          osc2.frequency.exponentialRampToValueAtTime(1900, ctx2.currentTime + 0.09);
+          gain2.gain.setValueAtTime(0.22, ctx2.currentTime);
+          gain2.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 0.11);
+          osc2.start(ctx2.currentTime);
+          osc2.stop(ctx2.currentTime + 0.11);
+          setTimeout(function(){ try { ctx2.close(); } catch(e){} }, 300);
+        } catch(e) {}
+      }, 110);
+    }
+    setTimeout(function(){ try { ctx.close(); } catch(e){} }, 400);
+  } catch(e) {
+    // Si el navegador no soporta Web Audio, silencio sin error
+  }
+}
+
+/* ============================================================
    FUNCION CENTRAL DE API
    Analogia: el mensajero que va al backend y trae los datos
    ============================================================ */
@@ -1444,6 +1525,7 @@ function abrirEscanerSalida() {
             cerrarEscanerSalida();
             var inputScan = document.getElementById("salidaCodigoBarra");
             if (inputScan) { inputScan.value = codes[0].rawValue; buscarProductoSalida(codes[0].rawValue); }
+            _beep();
             showToast("Codigo escaneado: " + codes[0].rawValue);
           }
         } catch(e) {}
@@ -2424,6 +2506,7 @@ function abrirEscaner() {
             clearInterval(_scan);
             cerrarEscaner();
             document.getElementById("inputCodigoBarra").value = codes[0].rawValue;
+            _beep();
             buscarPorCodigo(codes[0].rawValue);
           }
         } catch(e){}
