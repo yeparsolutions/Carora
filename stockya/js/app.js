@@ -17,79 +17,56 @@ let usuarioActual = JSON.parse(localStorage.getItem("yeparstock_usuario") || "nu
    ============================================================ */
 function _beep(tipo) {
   try {
-    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var ctx  = new (window.AudioContext || window.webkitAudioContext)();
+    var t    = ctx.currentTime;
 
-    // Oscilador principal — frecuencia característica de escáner
-    var osc = ctx.createOscillator();
-    var gain = ctx.createGain();
-
-    // Filtro para darle el tono "electrónico" del escáner
-    var filter = ctx.createBiquadFilter();
-    filter.type = "bandpass";
-    filter.frequency.value = 1800;
-    filter.Q.value = 1.5;
-
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(ctx.destination);
-
-    // Tipos de beep según contexto
-    if (tipo === "error") {
-      // Beep de error — tono descendente doble
-      osc.type = "square";
-      osc.frequency.setValueAtTime(600, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.18);
-    } else if (tipo === "ok") {
-      // Beep de confirmación — tono ascendente doble
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.08);
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.18);
-    } else {
-      // Beep estándar de escáner — tono corto y nítido
-      osc.type = "square";
-      osc.frequency.setValueAtTime(1900, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(1700, ctx.currentTime + 0.08);
-      gain.gain.setValueAtTime(0.28, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.10);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.10);
-
-      // Segundo tono más agudo (hace el "bi-bip" del escáner)
-      setTimeout(function() {
-        try {
-          var ctx2  = new (window.AudioContext || window.webkitAudioContext)();
-          var osc2  = ctx2.createOscillator();
-          var gain2 = ctx2.createGain();
-          var filt2 = ctx2.createBiquadFilter();
-          filt2.type = "bandpass";
-          filt2.frequency.value = 2200;
-          filt2.Q.value = 1.5;
-          osc2.connect(filt2);
-          filt2.connect(gain2);
-          gain2.connect(ctx2.destination);
-          osc2.type = "square";
-          osc2.frequency.setValueAtTime(2100, ctx2.currentTime);
-          osc2.frequency.exponentialRampToValueAtTime(1900, ctx2.currentTime + 0.09);
-          gain2.gain.setValueAtTime(0.22, ctx2.currentTime);
-          gain2.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 0.11);
-          osc2.start(ctx2.currentTime);
-          osc2.stop(ctx2.currentTime + 0.11);
-          setTimeout(function(){ try { ctx2.close(); } catch(e){} }, 300);
-        } catch(e) {}
-      }, 110);
+    function tono(freq1, freq2, duracion, volumen, forma, delay) {
+      var osc  = ctx.createOscillator();
+      var gain = ctx.createGain();
+      // Compresor para que suene más fuerte sin distorsionar
+      var comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -6;
+      comp.knee.value      = 3;
+      comp.ratio.value     = 4;
+      comp.attack.value    = 0.001;
+      comp.release.value   = 0.1;
+      osc.connect(gain);
+      gain.connect(comp);
+      comp.connect(ctx.destination);
+      osc.type = forma || "square";
+      osc.frequency.setValueAtTime(freq1, t + delay);
+      if (freq2) osc.frequency.exponentialRampToValueAtTime(freq2, t + delay + duracion * 0.6);
+      // Envelope: ataque rápido, sustain fuerte, caída al final
+      gain.gain.setValueAtTime(0, t + delay);
+      gain.gain.linearRampToValueAtTime(volumen, t + delay + 0.008);
+      gain.gain.setValueAtTime(volumen, t + delay + duracion - 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + delay + duracion);
+      osc.start(t + delay);
+      osc.stop(t + delay + duracion);
     }
-    setTimeout(function(){ try { ctx.close(); } catch(e){} }, 400);
-  } catch(e) {
-    // Si el navegador no soporta Web Audio, silencio sin error
-  }
+
+    if (tipo === "error") {
+      // BUZZ descendente — dos tonos graves separados
+      tono(520, 260, 0.22, 0.9, "sawtooth", 0);
+      tono(420, 200, 0.22, 0.9, "sawtooth", 0.27);
+    } else if (tipo === "ok") {
+      // Melodía corta ascendente — Do Mi Sol
+      tono(523, null, 0.14, 0.85, "sine", 0);
+      tono(659, null, 0.14, 0.85, "sine", 0.15);
+      tono(784, null, 0.20, 0.85, "sine", 0.30);
+    } else {
+      // BEEP de escáner profesional — tono largo y nítido, característico Zebra/Honeywell
+      // Tono principal fuerte y sostenido
+      tono(1850, 1750, 0.28, 0.95, "square", 0);
+      // Armónico para darle cuerpo y presencia
+      tono(3700, 3500, 0.28, 0.35, "square", 0);
+      // Segundo pitido más corto y agudo después de una pausa (el "bip" clásico doble)
+      tono(2100, 2000, 0.20, 0.85, "square", 0.33);
+      tono(4200, 4000, 0.20, 0.28, "square", 0.33);
+    }
+
+    setTimeout(function(){ try { ctx.close(); } catch(e){} }, 1200);
+  } catch(e) {}
 }
 
 /* ============================================================
