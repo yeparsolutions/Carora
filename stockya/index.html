@@ -1429,26 +1429,45 @@ input[type="text"]::placeholder { text-transform: none; }
     </div>
     <form id="formInvitar">
       <div style="padding:0 24px">
-        <div class="form-group" style="margin-bottom:14px">
-          <label class="form-label">Nombre completo *</label>
-          <input id="invitarNombre" class="form-input" type="text" placeholder="Ej: María González">
-        </div>
-        <div class="form-group" style="margin-bottom:14px">
-          <label class="form-label">Usuario * <span style="font-weight:400;color:var(--muted)">(para iniciar sesión — sin espacios)</span></label>
-          <div style="position:relative">
-            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;font-family:monospace">@</span>
-            <input id="invitarUsername" class="form-input" type="text" placeholder="ej: maria_gonzalez"
-                   style="padding-left:26px;font-family:monospace"
-                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+
+        <!-- Nombre y Apellido en dos columnas -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Nombre *</label>
+            <input id="invitarNombre" class="form-input" type="text" placeholder="Ej: María"
+                   oninput="generarUsernameAuto()" autocomplete="off">
           </div>
-          <span class="settings-field-hint">Solo letras minúsculas, números y guión bajo ( _ )</span>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Apellido *</label>
+            <input id="invitarApellido" class="form-input" type="text" placeholder="Ej: Pérez"
+                   oninput="generarUsernameAuto()" autocomplete="off">
+          </div>
         </div>
+
+        <!-- Usuario generado automáticamente -->
         <div class="form-group" style="margin-bottom:14px">
-          <label class="form-label">Contraseña temporal * (mínimo 8 caracteres)</label>
+          <label class="form-label">
+            Usuario
+            <span style="font-weight:400;color:var(--muted);font-size:11px"> — generado automáticamente, puedes editarlo</span>
+          </label>
+          <div style="position:relative">
+            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;font-family:monospace;pointer-events:none">@</span>
+            <input id="invitarUsername" class="form-input" type="text"
+                   style="padding-left:26px;font-family:monospace;background:var(--bg3)"
+                   placeholder="nombre.apellido"
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                   oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9._]/g,'')">
+          </div>
+          <span class="settings-field-hint">Solo letras minúsculas, números, punto y guión bajo</span>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label">Contraseña temporal * <span style="font-weight:400;color:var(--muted)">(mínimo 8 caracteres)</span></label>
           <input id="invitarPassword" class="form-input" type="password" placeholder="Mínimo 8 caracteres"
                  autocomplete="new-password">
           <span class="settings-field-hint">Comparte esta contraseña con el colaborador — puede cambiarla después</span>
         </div>
+
         <div class="form-group" style="margin-bottom:20px">
           <label class="form-label">Rol *</label>
           <select id="invitarRol" class="form-input">
