@@ -929,6 +929,59 @@ input[type="text"]::placeholder { text-transform: none; }
         </div>
       </div>
 
+
+      <!-- PANEL COLABORADOR: configuración simplificada para operadores (oculto para admin) -->
+      <div id="configColaboradorPanel" style="display:none">
+        <div class="settings-section">
+          <div class="settings-section-title">🔒 Cambiar mi contraseña</div>
+          <div class="settings-card">
+            <div class="form-group" style="margin-bottom:14px">
+              <label class="form-label">Contraseña actual</label>
+              <div class="settings-input-wrap">
+                <input id="colabPassActual" class="form-input" type="password" placeholder="Tu contraseña actual" autocomplete="current-password">
+                <button class="settings-eye-btn">👁️</button>
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:14px">
+              <label class="form-label">Nueva contraseña</label>
+              <div class="settings-input-wrap">
+                <input id="colabPassNueva" class="form-input" type="password" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+                <button class="settings-eye-btn">👁️</button>
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:18px">
+              <label class="form-label">Confirmar nueva contraseña</label>
+              <div class="settings-input-wrap">
+                <input id="colabPassConfirm" class="form-input" type="password" placeholder="Repite la contraseña" autocomplete="new-password">
+                <button class="settings-eye-btn">👁️</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">🎨 Color de interfaz</div>
+          <div class="settings-card">
+            <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Personaliza el color principal de tu sesión</div>
+            <div style="display:flex;align-items:center;gap:14px">
+              <input id="colabColor" type="color" value="#00C77B"
+                     style="width:48px;height:48px;border:none;background:none;cursor:pointer;border-radius:8px"
+                     oninput="previsualizarColor(this.value)">
+              <span style="font-size:13px;color:var(--muted)">Haz clic para elegir un color</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-card" style="padding:18px 20px">
+            <button id="btnGuardarConfigColab" type="button" class="btn-primary" style="width:100%;justify-content:center"
+                    onclick="guardarConfigColaborador()">
+              Guardar cambios
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- SECCIÓN: Sonido del escáner -->
       <div class="settings-section">
         <div class="settings-section-title">🔊 Sonido del escáner</div>
@@ -1368,11 +1421,11 @@ input[type="text"]::placeholder { text-transform: none; }
 <div class="modal-overlay" id="modalInvitar">
   <div class="modal-box" style="max-width:440px">
     <div class="modal-header">
-      <div class="modal-title">👤 Invitar usuario al equipo</div>
+      <div class="modal-title">👤 Agregar colaborador</div>
       <button class="modal-close">✕</button>
     </div>
     <div style="padding:0 24px 8px;color:var(--muted);font-size:13px">
-      El usuario podrá acceder al inventario de <strong id="invitarEmpresaNombre">tu negocio</strong>.
+      El colaborador podrá acceder al inventario de <strong id="invitarEmpresaNombre">tu negocio</strong> con su usuario y contraseña.
     </div>
     <form id="formInvitar">
       <div style="padding:0 24px">
@@ -1381,14 +1434,20 @@ input[type="text"]::placeholder { text-transform: none; }
           <input id="invitarNombre" class="form-input" type="text" placeholder="Ej: María González">
         </div>
         <div class="form-group" style="margin-bottom:14px">
-          <label class="form-label">Correo electrónico *</label>
-          <input id="invitarEmail" class="form-input" type="email" placeholder="empleado@negocio.com">
+          <label class="form-label">Usuario * <span style="font-weight:400;color:var(--muted)">(para iniciar sesión — sin espacios)</span></label>
+          <div style="position:relative">
+            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;font-family:monospace">@</span>
+            <input id="invitarUsername" class="form-input" type="text" placeholder="ej: maria_gonzalez"
+                   style="padding-left:26px;font-family:monospace"
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+          <span class="settings-field-hint">Solo letras minúsculas, números y guión bajo ( _ )</span>
         </div>
         <div class="form-group" style="margin-bottom:14px">
           <label class="form-label">Contraseña temporal * (mínimo 8 caracteres)</label>
           <input id="invitarPassword" class="form-input" type="password" placeholder="Mínimo 8 caracteres"
                  autocomplete="new-password">
-          <span class="settings-field-hint">Comparte esta contraseña con el usuario — puede cambiarla después</span>
+          <span class="settings-field-hint">Comparte esta contraseña con el colaborador — puede cambiarla después</span>
         </div>
         <div class="form-group" style="margin-bottom:20px">
           <label class="form-label">Rol *</label>
@@ -1400,7 +1459,7 @@ input[type="text"]::placeholder { text-transform: none; }
       </div>
       <div class="form-actions">
         <button type="button" class="btn-secondary">Cancelar</button>
-        <button type="button" class="btn-primary">✓ Agregar al equipo</button>
+        <button type="button" class="btn-primary">✓ Agregar colaborador</button>
       </div>
     </form>
   </div>
