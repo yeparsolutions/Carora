@@ -3,7 +3,9 @@
 # Archivo: backend/routers/empresas.py
 # ============================================================
 
-from fastapi import APIRouter, Depends, HTTPException
+import fastapi
+from fastapi import APIRouter, Depends, HTTPException, Body
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sqlfunc
 from datetime import datetime, timedelta, timezone
@@ -215,6 +217,13 @@ def listar_usuarios_empresa(
 
 
 # ============================================================
+# Schema para invitar colaborador
+class InvitarSchema(BaseModel):
+    nombre:   str
+    username: str
+    password: str
+    rol:      str = "operador"
+
 # POST /empresa/invitar
 # ✅ ACTUALIZADO: opera con username en lugar de email
 #    El operador no necesita correo — solo nombre visible,
@@ -222,10 +231,7 @@ def listar_usuarios_empresa(
 # ============================================================
 @router.post("/invitar", status_code=201)
 def invitar_usuario(
-    nombre:   str,
-    username: str,
-    password: str,
-    rol:      str = "operador",
+    datos: InvitarSchema,
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
@@ -235,6 +241,11 @@ def invitar_usuario(
     y una clave — sin necesidad de su correo personal.
     """
     solo_admin(usuario_actual)
+
+    nombre   = datos.nombre
+    username = datos.username
+    password = datos.password
+    rol      = datos.rol
 
     empresa = db.query(models.Empresa).filter(
         models.Empresa.id == usuario_actual.empresa_id
@@ -361,7 +372,7 @@ def obtener_permisos(
 @router.put("/usuarios/{usuario_id}/permisos")
 def actualizar_permisos(
     usuario_id: int,
-    permisos:   dict,           # {"dashboard": true, "salidas": false, ...}
+    permisos:   dict = fastapi.Body(...),   # {"dashboard": true, "salidas": false, ...}
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
@@ -440,15 +451,18 @@ def mis_permisos(
 
 
 # ============================================================
+class MiConfigSchema(BaseModel):
+    password_actual: str = None
+    password_nuevo:  str = None
+    color_interfaz:  str = None
+    sonido_escaner:  str = None
+
 # PUT /empresa/mi-config  ✅ NUEVO
 # El operador puede cambiar su password, color de interfaz y sonido de escáner
 # ============================================================
 @router.put("/mi-config")
 def actualizar_config_colaborador(
-    password_actual:  str  = None,
-    password_nuevo:   str  = None,
-    color_interfaz:   str  = None,
-    sonido_escaner:   str  = None,
+    datos: MiConfigSchema,
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
@@ -458,6 +472,11 @@ def actualizar_config_colaborador(
     el tono de su timbre — sin tocar la caja registradora.
     """
     from auth import encriptar_password, verificar_password
+
+    password_actual = datos.password_actual
+    password_nuevo  = datos.password_nuevo
+    color_interfaz  = datos.color_interfaz
+    sonido_escaner  = datos.sonido_escaner
 
     if password_nuevo:
         if not password_actual:
