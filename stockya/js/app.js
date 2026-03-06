@@ -15,7 +15,29 @@ let usuarioActual = JSON.parse(localStorage.getItem("yeparstock_usuario") || "nu
    SONIDO DE ESCÁNER — Web Audio API, sin archivos externos
    Simula el beep electrónico de un lector de código de barras
    ============================================================ */
-function _beep(tipo) {
+/* ============================================================
+   SISTEMA DE SONIDOS — 5 tipos seleccionables por el usuario
+   ============================================================ */
+var _sonidoActivo = localStorage.getItem("yeparstock_sonido") || "scanner";
+
+function seleccionarSonido(tipo, el) {
+  _sonidoActivo = tipo;
+  localStorage.setItem("yeparstock_sonido", tipo);
+  document.querySelectorAll(".sound-option").forEach(function(o){ o.classList.remove("active"); });
+  if (el) el.closest(".sound-option").classList.add("active");
+}
+
+// Previsualización — toca el sonido sin cambiar la preferencia guardada
+function _beepPreview(tipo) {
+  _beepTono(tipo);
+}
+
+function _beep() {
+  if (_sonidoActivo === "none") return;
+  _beepTono(_sonidoActivo);
+}
+
+function _beepTono(tipo) {
   try {
     var ctx  = new (window.AudioContext || window.webkitAudioContext)();
     var t    = ctx.currentTime;
