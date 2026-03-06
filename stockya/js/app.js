@@ -3269,8 +3269,16 @@ function toggleTema() {
 function showToast(msg) {
   var toast = document.getElementById("toast");
   document.getElementById("toastMsg").textContent = msg;
+  // Reiniciar si ya había una animación en curso
+  toast.classList.remove("show", "hide");
+  void toast.offsetWidth; // forzar reflow
   toast.classList.add("show");
-  setTimeout(function(){ toast.classList.remove("show"); }, 2800);
+  clearTimeout(toast._hideTimer);
+  toast._hideTimer = setTimeout(function(){
+    toast.classList.remove("show");
+    toast.classList.add("hide");
+    setTimeout(function(){ toast.classList.remove("hide"); }, 220);
+  }, 2800);
 }
 
 async function filterMov(btn, type) {
