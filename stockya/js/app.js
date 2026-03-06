@@ -365,7 +365,7 @@ async function enterApp() {
   const email      = emailInput ? emailInput.value.trim() : "";
   const password   = passInput  ? passInput.value.trim()  : "";
 
-  if (!email || !password) { showToast("Ingresa tu correo y contrasena"); return; }
+  if (!email || !password) { showToast("Ingresa tu usuario/correo y contraseña"); return; }
 
   // [SEC-2] Rate limiting: máximo 5 intentos de login cada 5 minutos
   // Analogia: si te equivocas la contraseña 5 veces, la caja te bloquea 5 minutos
@@ -416,6 +416,13 @@ async function enterApp() {
       if (infoEmp.en_gracia) {
         mostrarAvisoCancelacion(infoEmp);
       }
+    } catch(e) {}
+
+    // Cargar permisos del usuario (admin tiene todo, operador lo asignado por el admin)
+    try {
+      var permisos = await api("/empresa/mis-permisos");
+      permisosActual = permisos;
+      aplicarPermisosUI();
     } catch(e) {}
 
     await cargarDashboard();
@@ -2392,7 +2399,33 @@ function _compFila(label, actual, anterior, variacion) {
 /* ============================================================
    NAVEGACION
    ============================================================ */
+// ✅ Oculta/muestra items del sidebar según permisos del operador
+function aplicarPermisosUI() {
+  var rol = usuarioActual ? usuarioActual.rol : "operador";
+  if (rol === "admin") return; // admin siempre ve todo
+  var mapa = {
+    "dashboard":   "nav-dashboard",
+    "productos":   "nav-productos",
+    "stock":       "nav-stock",
+    "movimientos": "nav-movimientos",
+    "salidas":     "nav-salidas",
+    "alertas":     "nav-alertas",
+    "reportes":    "nav-reportes",
+    "fiados":      "nav-fiados",
+  };
+  Object.keys(mapa).forEach(function(seccion) {
+    var navEl = document.getElementById(mapa[seccion]);
+    if (navEl) navEl.style.display = permisosActual[seccion] === false ? "none" : "";
+  });
+}
+
 async function showScreen(name) {
+  // Bloquear acceso a secciones sin permiso para operadores
+  var rol = usuarioActual ? usuarioActual.rol : "operador";
+  if (rol !== "admin" && permisosActual[name] === false) {
+    showToast("⛔ No tienes acceso a esta sección");
+    return;
+  }
   document.querySelectorAll(".screen").forEach(function(s){ s.classList.remove("active"); });
   var pantalla = document.getElementById("screen-" + name);
   if (pantalla) pantalla.classList.add("active");
@@ -3398,6 +3431,17 @@ async function cargarConfiguracion() {
     if (inputNombreUsuario) inputNombreUsuario.value = usuarioActual ? usuarioActual.nombre : "";
     if (inputEmail)         inputEmail.value         = usuarioActual ? usuarioActual.email  : "";
 
+    // ✅ Mostrar panel correcto según rol
+    var panelColab = document.getElementById("configColaboradorPanel");
+    if (panelColab) panelColab.style.display = esAdmin ? "none" : "block";
+
+    // Cargar color_interfaz personal del operador
+    if (!esAdmin && usuarioActual && usuarioActual.color_interfaz) {
+      var ci = document.getElementById("colabColor");
+      if (ci) ci.value = usuarioActual.color_interfaz;
+      previsualizarColor(usuarioActual.color_interfaz);
+    }
+
   } catch(e) {
     var inputNombreUsuario = document.getElementById("inputNombreUsuario");
     var inputEmail         = document.getElementById("inputEmail");
@@ -3475,6 +3519,10 @@ document.addEventListener("DOMContentLoaded", function(){
           document.getElementById("appMain").style.display   = "flex";
           actualizarUIUsuario();
           iniciarReloj();
+          api("/empresa/mis-permisos").then(function(p){
+            permisosActual = p;
+            aplicarPermisosUI();
+          }).catch(function(){});
           cargarDashboard();
         }
       })
@@ -3496,6 +3544,10 @@ document.addEventListener("DOMContentLoaded", function(){
           document.getElementById("appMain").style.display   = "flex";
           actualizarUIUsuario();
           iniciarReloj();
+          api("/empresa/mis-permisos").then(function(p){
+            permisosActual = p;
+            aplicarPermisosUI();
+          }).catch(function(){});
           cargarDashboard();
         }
       });
@@ -3508,8 +3560,9 @@ document.addEventListener("DOMContentLoaded", function(){
    puede contratar, cambiar roles y revocar accesos
    ============================================================ */
 
-let equipoData  = [];
-let empresaInfo = null;
+let equipoData     = [];
+let empresaInfo    = null;
+let permisosActual = {}; // permisos del usuario actual { dashboard: true, salidas: false, ... }
 
 // Actualiza el badge de plan en el sidebar
 // Analogia: la etiqueta del carnet — te dice si eres visitante o VIP
@@ -3785,7 +3838,11 @@ function renderEquipoTabla(usuarios) {
         ? "<button onclick='desactivarUsuario(" + u.id + ",\"" + _esc(u.nombre).replace(/"/g,"'") + "\")' style='background:none;border:1px solid rgba(255,80,80,0.3);border-radius:7px;padding:5px 10px;color:var(--rojo);font-size:12px;cursor:pointer'>Desactivar</button>"
         : "<button onclick='activarUsuario(" + u.id + ",\"" + _esc(u.nombre).replace(/"/g,"'") + "\")' style='background:none;border:1px solid rgba(0,199,123,0.3);border-radius:7px;padding:5px 10px;color:var(--verde);font-size:12px;cursor:pointer'>Activar</button>";
 
-      acciones = "<td style='text-align:center'><div style='display:flex;gap:6px;justify-content:center'>" + btnRol + btnEstado + "</div></td>";
+      var btnPermisos = u.rol === "operador"
+        ? "<button onclick='abrirModalPermisos(" + u.id + ",\"" + _esc(u.nombre).replace(/"/g,"'") + "\")' style='background:rgba(91,142,255,0.1);border:1px solid rgba(91,142,255,0.3);border-radius:7px;padding:5px 10px;color:var(--azul);font-size:12px;cursor:pointer'>🔑 Permisos</button>"
+        : "";
+
+      acciones = "<td style='text-align:center'><div style='display:flex;gap:6px;justify-content:center'>" + btnRol + btnPermisos + btnEstado + "</div></td>";
     } else if (esAdmin && u.es_yo) {
       acciones = "<td style='text-align:center'><span style='font-size:11px;color:var(--muted)'>Tú</span></td>";
     } else {
@@ -3801,7 +3858,11 @@ function renderEquipoTabla(usuarios) {
       +     "<div style='font-weight:600;font-size:14px'>" + _esc(u.nombre) + (u.es_yo ? " <span style='font-size:11px;color:var(--muted)'>(tú)</span>" : "") + "</div>"
       +   "</div>"
       + "</td>"
-      + "<td style='color:var(--muted);font-size:13px'>" + _esc(u.email) + "</td>"
+      + "<td style='color:var(--muted);font-size:13px'>"
+      + (u.username
+          ? "<span style='font-family:monospace;background:var(--bg3);padding:2px 7px;border-radius:5px;font-size:12px'>@" + _esc(u.username) + "</span>"
+          : _esc(u.email || "—"))
+      + "</td>"
       + "<td>" + rolBadge + "</td>"
       + "<td>" + estadoBadge + "</td>"
       + "<td style='color:var(--muted);font-size:12px'>" + _esc(fecha) + "</td>"
@@ -3829,30 +3890,27 @@ function cerrarModalInvitar() {
 }
 
 async function guardarInvitacion() {
+  // ✅ ACTUALIZADO: usa username en lugar de email
   var nombre   = document.getElementById("invitarNombre").value.trim();
-  var email    = document.getElementById("invitarEmail").value.trim();
+  var username = document.getElementById("invitarUsername").value.trim().toLowerCase().replace(/\s/g,"");
   var password = document.getElementById("invitarPassword").value.trim();
   var rol      = document.getElementById("invitarRol").value;
 
-  if (!nombre || !email || !password) { showToast("Completa todos los campos obligatorios"); return; }
-
-  // [SEC-3] Mínimo 8 caracteres también al invitar usuario
-  if (password.length < 8) { showToast("La contraseña debe tener al menos 8 caracteres"); return; }
+  if (!nombre || !username || !password) { showToast("Completa todos los campos obligatorios"); return; }
+  if (!/^[a-z0-9_]+$/.test(username))   { showToast("El usuario solo puede tener letras, números y guión bajo"); return; }
+  if (password.length < 8)              { showToast("La contraseña debe tener al menos 8 caracteres"); return; }
 
   var btn = document.querySelector("#modalInvitar .btn-primary");
   if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
 
   try {
-    // [SEC-4] Password en el body JSON, NO en query params de la URL
-    // Analogia: la contraseña va en un sobre cerrado (body),
-    // no escrita en el exterior del sobre (URL)
     await api("/empresa/invitar", "POST", {
       nombre:   nombre,
-      email:    email,
+      username: username,
       password: password,
       rol:      rol
     });
-    showToast("✅ " + _esc(nombre) + " agregado al equipo");
+    showToast("✅ " + _esc(nombre) + " agregado — usuario: @" + _esc(username));
     cerrarModalInvitar();
     await cargarEquipo();
   } catch (e) {
@@ -4024,4 +4082,171 @@ async function confirmarCambioPlan() {
 function cerrarModalUpgrade() {
   document.getElementById("modalUpgrade").classList.remove("open");
   planSeleccionado = null;
+}
+
+/* ============================================================
+   MODAL PERMISOS — El admin asigna qué secciones ve el operador
+   Analogia: el llavero del empleado — el dueño decide cuáles
+   llaves le entrega: bodega sí, caja no, etc.
+   ============================================================ */
+
+var _permisosEditandoId   = null;
+var _permisosEditandoNomb = "";
+var _permisosActualesEdit = {};
+
+var SECCIONES_PERMISOS = [
+  { key: "dashboard",   label: "🏠 Dashboard",             desc: "Ver resumen y estadísticas del negocio" },
+  { key: "stock",       label: "📦 Stock / Inventario",     desc: "Consultar stock actual de los productos" },
+  { key: "productos",   label: "🏷️ Productos",              desc: "Agregar y editar fichas de productos" },
+  { key: "movimientos", label: "📥 Movimientos / Ingresos", desc: "Registrar entradas de mercancía" },
+  { key: "salidas",     label: "🛒 Salidas / Ventas",       desc: "Registrar ventas, mermas y salidas" },
+  { key: "alertas",     label: "🔔 Alertas",                desc: "Ver alertas de stock bajo y vencimientos" },
+  { key: "reportes",    label: "📊 Reportes",               desc: "Ver reportes y estadísticas de ventas" },
+  { key: "fiados",      label: "📒 Deudores / Fiados",      desc: "Gestionar cuentas por cobrar" },
+];
+
+async function abrirModalPermisos(usuarioId, nombreUsuario) {
+  if (!esAdmin) return;
+  _permisosEditandoId   = usuarioId;
+  _permisosEditandoNomb = nombreUsuario;
+
+  try {
+    _permisosActualesEdit = await api("/empresa/usuarios/" + usuarioId + "/permisos");
+  } catch(e) {
+    _permisosActualesEdit = {};
+    SECCIONES_PERMISOS.forEach(function(s){ _permisosActualesEdit[s.key] = true; });
+  }
+
+  // Crear modal si no existe aún
+  if (!document.getElementById("modalPermisos")) {
+    var div = document.createElement("div");
+    div.id        = "modalPermisos";
+    div.className = "modal-overlay";
+    div.innerHTML =
+      '<div class="modal" style="max-width:500px">'
+      + '<div class="modal-header">'
+      +   '<h3 class="modal-title" id="permisosModalTitulo">Permisos del colaborador</h3>'
+      +   '<button class="modal-close" onclick="cerrarModalPermisos()">✕</button>'
+      + '</div>'
+      + '<div class="modal-body">'
+      +   '<p style="font-size:13px;color:var(--muted);margin:0 0 16px">Activa o desactiva el acceso a cada sección de la app para este colaborador.</p>'
+      +   '<div id="permisosLista" style="display:flex;flex-direction:column;gap:10px"></div>'
+      + '</div>'
+      + '<div class="form-actions" style="margin-top:16px">'
+      +   '<button type="button" class="btn-secondary" onclick="cerrarModalPermisos()">Cancelar</button>'
+      +   '<button type="button" class="btn-primary" onclick="guardarPermisos()">✓ Guardar permisos</button>'
+      + '</div>'
+      + '</div>';
+    document.body.appendChild(div);
+  }
+
+  // Titulo
+  var titulo = document.getElementById("permisosModalTitulo");
+  if (titulo) titulo.textContent = "🔑 Permisos de " + _permisosEditandoNomb;
+
+  // Renderizar toggles
+  var lista = document.getElementById("permisosLista");
+  if (lista) {
+    lista.innerHTML = SECCIONES_PERMISOS.map(function(s) {
+      var activo = _permisosActualesEdit[s.key] !== false;
+      var bgSlider  = activo ? "var(--verde)" : "var(--border)";
+      var posKnob   = activo ? "23px" : "3px";
+      return "<div style='display:flex;align-items:center;justify-content:space-between;"
+        + "background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px'>"
+        + "<div style='flex:1'>"
+        +   "<div style='font-size:14px;font-weight:600'>" + _esc(s.label) + "</div>"
+        +   "<div style='font-size:11px;color:var(--muted);margin-top:2px'>" + _esc(s.desc) + "</div>"
+        + "</div>"
+        + "<label style='position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;margin-left:12px;cursor:pointer'>"
+        +   "<input type='checkbox' " + (activo ? "checked" : "") + " style='opacity:0;width:0;height:0'"
+        +     " onchange='_togglePermiso(\"" + s.key + "\",this.checked)'>"
+        +   "<span id='permSlider_" + s.key + "' style='position:absolute;top:0;left:0;right:0;bottom:0;"
+        +     "background:" + bgSlider + ";border-radius:24px;transition:background 0.2s'>"
+        +     "<span style='position:absolute;height:18px;width:18px;left:" + posKnob + ";bottom:3px;"
+        +       "background:#fff;border-radius:50%;transition:left 0.2s'></span>"
+        +   "</span>"
+        + "</label>"
+        + "</div>";
+    }).join("");
+  }
+
+  document.getElementById("modalPermisos").classList.add("open");
+}
+
+function _togglePermiso(seccion, valor) {
+  _permisosActualesEdit[seccion] = valor;
+  var slider = document.getElementById("permSlider_" + seccion);
+  if (slider) {
+    slider.style.background = valor ? "var(--verde)" : "var(--border)";
+    var knob = slider.querySelector("span");
+    if (knob) knob.style.left = valor ? "23px" : "3px";
+  }
+}
+
+async function guardarPermisos() {
+  if (!_permisosEditandoId) return;
+  var btn = document.querySelector("#modalPermisos .btn-primary");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
+
+  try {
+    await api("/empresa/usuarios/" + _permisosEditandoId + "/permisos", "PUT", _permisosActualesEdit);
+    showToast("✅ Permisos de " + _esc(_permisosEditandoNomb) + " actualizados");
+    cerrarModalPermisos();
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = "✓ Guardar permisos"; }
+    showToast("❌ " + _esc(e.message || "Error al guardar permisos"));
+  }
+}
+
+function cerrarModalPermisos() {
+  var modal = document.getElementById("modalPermisos");
+  if (modal) modal.classList.remove("open");
+  _permisosEditandoId   = null;
+  _permisosEditandoNomb = "";
+}
+
+
+/* ============================================================
+   CONFIG COLABORADOR — panel simplificado (password + color + sonido)
+   Analogia: el empleado puede cambiar su uniforme de color y
+   el timbre — sin tocar la configuración del negocio
+   ============================================================ */
+
+async function guardarConfigColaborador() {
+  var passActual  = document.getElementById("colabPassActual")?.value  || "";
+  var passNueva   = document.getElementById("colabPassNueva")?.value   || "";
+  var passConfirm = document.getElementById("colabPassConfirm")?.value || "";
+  var colorIntf   = document.getElementById("colabColor")?.value       || null;
+  var sonido      = _sonidoActual || "scanner";
+
+  if (passNueva) {
+    if (!passActual)               { showToast("Ingresa tu contraseña actual"); return; }
+    if (passNueva !== passConfirm) { showToast("Las contraseñas nuevas no coinciden"); return; }
+    if (passNueva.length < 8)      { showToast("La contraseña debe tener al menos 8 caracteres"); return; }
+  }
+
+  var btn = document.getElementById("btnGuardarConfigColab");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
+
+  try {
+    await api("/empresa/mi-config", "PUT", {
+      password_actual: passActual || null,
+      password_nuevo:  passNueva  || null,
+      color_interfaz:  colorIntf  || null,
+      sonido_escaner:  sonido,
+    });
+
+    if (colorIntf) previsualizarColor(colorIntf);
+
+    var cp = document.getElementById("colabPassActual");  if (cp) cp.value = "";
+    var cn = document.getElementById("colabPassNueva");   if (cn) cn.value = "";
+    var cc = document.getElementById("colabPassConfirm"); if (cc) cc.value = "";
+    var pw = document.getElementById("passStrengthWrap"); if (pw) pw.style.display = "none";
+
+    showToast("✅ Configuración guardada");
+  } catch(e) {
+    showToast("❌ " + _esc(e.message || "Error al guardar"));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Guardar cambios"; }
+  }
 }
