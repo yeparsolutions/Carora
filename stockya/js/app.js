@@ -1963,6 +1963,8 @@ async function cargarReportesPro() {
 
   var planActual = empresaInfo ? (empresaInfo.plan || "basico") : "basico";
   var esPro      = planActual === "pro" && (empresaInfo && empresaInfo.plan_activo !== false);
+  var esGratis   = planActual === "gratis";
+  var esBasico   = planActual === "basico";
 
   // Si es Basico — mostrar candados directo sin llamar al backend
   if (!esPro) {
@@ -3654,29 +3656,28 @@ function renderPlanCard(info) {
   var prodsMax    = document.getElementById("equipoProdsMax");
   var btnUpgrade  = document.getElementById("btnUpgradePlan");
 
-  if (planNombre) planNombre.textContent = info.plan === "pro" ? "🔵 Pro" : "🟢 Básico";
+  if (planNombre) planNombre.textContent = info.plan === "pro" ? "🔵 Pro" : info.plan === "gratis" ? "🆓 Gratis" : "🟢 Básico";
 
   if (planDetalle) {
     var esFundador = info.plan_es_fundador ? " · Precio fundador 🎉" : "";
     var precio     = info.plan_precio > 0  ? " · $" + info.plan_precio.toLocaleString("es-CL") + "/mes" : "";
-    planDetalle.textContent = (info.plan === "pro"
-      ? "Hasta 3 usuarios · 1.500 productos · Reportes avanzados"
-      : "1 usuario · Hasta 200 productos · Reportes básicos")
-      + precio + esFundador;
+    planDetalle.textContent = (
+      info.plan === "pro"    ? "Usuarios ilimitados · Productos ilimitados · Multisucursales · Reportes avanzados" :
+      info.plan === "basico" ? "Usuarios ilimitados · Productos ilimitados · Reportes básicos" :
+                               "1 usuario · Hasta 30 productos · Sin reportes"
+    ) + precio + esFundador;
   }
 
   if (usersActual) usersActual.textContent = info.total_usuarios;
-  if (usersMax)    usersMax.textContent    = info.max_usuarios;
+  if (usersMax) usersMax.textContent = (info.plan === "gratis") ? "1" : "∞";
   if (prodsActual) prodsActual.textContent = info.total_productos;
-  if (prodsMax)    prodsMax.textContent    = info.max_productos > 0
-    ? " / " + info.max_productos
-    : " (ilimitados)";
+  if (prodsMax) prodsMax.textContent = (info.plan === "gratis") ? " / 30" : " / ∞";
 
   // Mostrar botón cambiar plan siempre para admins — tanto para subir como para bajar
   if (btnUpgrade) {
     if (esAdmin) {
       btnUpgrade.style.display = "flex";
-      btnUpgrade.textContent   = info.plan === "pro" ? "🔄 Cambiar Plan" : "⬆️ Mejorar a Pro";
+      btnUpgrade.textContent   = info.plan === "pro" ? "🔄 Cambiar Plan" : info.plan === "basico" ? "⬆️ Subir a Pro" : "⬆️ Mejorar Plan";
     } else {
       btnUpgrade.style.display = "none";
     }
@@ -3892,51 +3893,53 @@ function abrirModalUpgrade() {
 }
 
 function _resaltarPlanActual(plan) {
-  // Resaltar visualmente el plan actual con borde verde
+  var cardGratis = document.getElementById("cardPlanGratis");
   var cardBasico = document.getElementById("cardPlanBasico");
   var cardPro    = document.getElementById("cardPlanPro");
-  if (!cardBasico || !cardPro) return;
-
-  if (plan === "basico") {
+  // Reset todos
+  if (cardGratis) { cardGratis.style.border = "2px solid var(--border)"; cardGratis.style.background = ""; }
+  if (cardBasico) { cardBasico.style.border = "2px solid var(--border)"; cardBasico.style.background = ""; }
+  if (cardPro)    { cardPro.style.border    = "2px solid var(--border)"; cardPro.style.background    = ""; }
+  // Resaltar el actual
+  if (plan === "gratis" && cardGratis) {
+    cardGratis.style.border = "2px solid var(--muted)";
+    cardGratis.style.background = "rgba(255,255,255,0.03)";
+  } else if (plan === "basico" && cardBasico) {
     cardBasico.style.border = "2px solid var(--verde)";
     cardBasico.style.background = "rgba(0,199,123,0.05)";
-    cardPro.style.border = "2px solid var(--border)";
-    cardPro.style.background = "";
-  } else {
+  } else if (plan === "pro" && cardPro) {
     cardPro.style.border = "2px solid var(--azul)";
     cardPro.style.background = "rgba(91,142,255,0.04)";
-    cardBasico.style.border = "2px solid var(--border)";
-    cardBasico.style.background = "";
   }
 }
 
 function seleccionarPlan(plan) {
-  // Analogia: elegir una opción del menú — resalta la seleccionada
   var planActual = empresaInfo ? (empresaInfo.plan || "basico") : "basico";
   planSeleccionado = plan;
 
+  // Reset visual todos
+  _resaltarPlanActual("__ninguno__");
+
+  var cardGratis = document.getElementById("cardPlanGratis");
   var cardBasico = document.getElementById("cardPlanBasico");
   var cardPro    = document.getElementById("cardPlanPro");
   var btn        = document.getElementById("btnConfirmarPlan");
   var msg        = document.getElementById("upgradeMensaje");
 
-  // Resaltar la tarjeta seleccionada
-  if (plan === "basico") {
+  // Resaltar seleccionado con borde grueso
+  if (plan === "gratis" && cardGratis) {
+    cardGratis.style.border = "3px solid var(--muted)";
+    cardGratis.style.background = "rgba(255,255,255,0.05)";
+  } else if (plan === "basico" && cardBasico) {
     cardBasico.style.border = "3px solid var(--verde)";
     cardBasico.style.background = "rgba(0,199,123,0.08)";
-    cardPro.style.border = "2px solid var(--border)";
-    cardPro.style.background = "";
-  } else {
+  } else if (plan === "pro" && cardPro) {
     cardPro.style.border = "3px solid var(--azul)";
-    cardPro.style.background = "rgba(91,142,255,0.08)";
-    cardBasico.style.border = "2px solid var(--border)";
-    cardBasico.style.background = "";
+    cardPro.style.background = "rgba(91,142,255,0.10)";
   }
 
-  // Ocultar mensaje de error anterior
   if (msg) msg.style.display = "none";
 
-  // Actualizar botón
   if (btn) {
     if (plan === planActual) {
       btn.disabled = true;
@@ -3945,11 +3948,15 @@ function seleccionarPlan(plan) {
     } else if (plan === "pro") {
       btn.disabled = false;
       btn.style.opacity = "1";
-      btn.textContent = "⬆️ Subir a Plan Pro — $29.990/mes";
-    } else {
+      btn.textContent = "⬆️ Subir a Pro — $19.99/mes";
+    } else if (plan === "basico") {
       btn.disabled = false;
       btn.style.opacity = "1";
-      btn.textContent = "⬇️ Bajar a Plan Básico — $14.990/mes";
+      btn.textContent = planActual === "pro" ? "⬇️ Bajar a Básico — $9.99/mes" : "⬆️ Subir a Básico — $9.99/mes";
+    } else if (plan === "gratis") {
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      btn.textContent = "⬇️ Cambiar a Gratis — $0/mes";
     }
   }
 }
