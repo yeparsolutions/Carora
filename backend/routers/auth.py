@@ -1,7 +1,6 @@
 # ============================================================
 # YEPARSTOCK – Router de Autenticación
 # Archivo: backend/routers/auth.py
-# Descripción: Endpoints para login, registro, onboarding y perfil
 # ============================================================
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -19,11 +18,6 @@ router = APIRouter(prefix="/auth", tags=["Autenticación"])
 # ============================================================
 @router.post("/registro", response_model=schemas.TokenRespuesta, status_code=201)
 def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)):
-    """
-    Registra un usuario nuevo y envía código de verificación por email.
-    Analogia: abrir una cuenta bancaria — el banco crea tu expediente
-    y te envía un SMS con el código para confirmar que eres tú.
-    """
     existe = db.query(models.Usuario).filter(models.Usuario.email == datos.email).first()
     if existe:
         raise HTTPException(
@@ -31,7 +25,6 @@ def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)
             detail="Este correo ya está registrado"
         )
 
-    # Generar código de 6 dígitos
     codigo = str(random.randint(100000, 999999))
 
     nuevo_usuario = models.Usuario(
@@ -45,7 +38,6 @@ def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)
     db.commit()
     db.refresh(nuevo_usuario)
 
-    # Configuración inicial con onboarding pendiente
     config_inicial = models.Configuracion(
         usuario_id          = nuevo_usuario.id,
         nombre_negocio      = "Mi Negocio",
@@ -56,7 +48,6 @@ def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)
     db.add(config_inicial)
     db.commit()
 
-    # Enviar email con código de verificación
     try:
         from email_service import enviar_email
         html = _template_verificacion(datos.nombre, codigo)
@@ -79,28 +70,62 @@ def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)
 
 # ============================================================
 # POST /auth/login
+# ✅ ACTUALIZADO: acepta email (admin) o username (operador)
+#    El campo "email" del body puede recibir cualquiera de los dos.
+#    Analogia: la entrada del local tiene dos puertas —
+#    el dueño entra con su RUT (email), el empleado con
+#    su carnet interno (username).
 # ============================================================
 @router.post("/login", response_model=schemas.TokenRespuesta)
 def login(datos: schemas.LoginRequest, db: Session = Depends(get_db)):
     """
-    Inicia sesión con email y contraseña.
-    Analogia: la recepcionista que verifica tu carnet y te da el pase.
+    Login unificado:
+    - Si el valor recibido en `email` contiene '@' → busca por email (admin/dueño)
+    - Si no contiene '@' → busca por username dentro de la empresa correcta
+
+    Para operadores el campo `empresa_id` es opcional pero recomendado.
+    Si no se envía, busca el primer usuario con ese username activo.
     """
-    usuario = db.query(models.Usuario).filter(models.Usuario.email == datos.email).first()
+    login_valor = datos.email.strip().lower()
+    usuario = None
+
+    if "@" in login_valor:
+        # Login por email — modo admin/dueño
+        usuario = db.query(models.Usuario).filter(
+            models.Usuario.email == login_valor
+        ).first()
+    else:
+        # Login por username — modo operador
+        # Si el frontend envía empresa_id, úsalo para evitar colisiones
+        empresa_id = getattr(datos, "empresa_id", None)
+
+        if empresa_id:
+            usuario = db.query(models.Usuario).filter(
+                models.Usuario.username   == login_valor,
+                models.Usuario.empresa_id == empresa_id,
+            ).first()
+        else:
+            # Sin empresa_id: buscar username único activo
+            usuario = db.query(models.Usuario).filter(
+                models.Usuario.username == login_valor,
+                models.Usuario.activo   == True,
+            ).first()
 
     if not usuario or not verificar_password(datos.password, usuario.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Correo o contraseña incorrectos"
+            detail="Usuario o contraseña incorrectos"
         )
 
     if not usuario.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Esta cuenta está desactivada"
+            detail="Esta cuenta está desactivada. Contacta al administrador."
         )
 
-    token = crear_token({"sub": usuario.email})
+    # Para operadores (sin email), el token lleva el username como sub
+    sub = usuario.email if usuario.email else f"username:{usuario.username}:{usuario.empresa_id}"
+    token = crear_token({"sub": sub})
 
     return {
         "access_token": token,
@@ -117,17 +142,11 @@ def onboarding_status(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    """
-    Retorna si el usuario ya completó el onboarding.
-    El frontend llama esto al iniciar sesión para decidir
-    si muestra la app o la pantalla de bienvenida.
-    """
     config = db.query(models.Configuracion).filter(
         models.Configuracion.usuario_id == usuario_actual.id
     ).first()
 
     completo = config.onboarding_completo if config else False
-
     return {"onboarding_completo": completo}
 
 
@@ -140,19 +159,9 @@ def completar_onboarding(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    """
-    Guarda nombre de empresa, rubro, moneda, logo y nombre de usuario.
-    Crea la empresa si no existe y la asigna al usuario.
-    Analogia: el inquilino amobló su apartamento Y recibió el título
-    de propiedad — ahora el apartamento es oficialmente suyo.
-    """
-    # Actualizar nombre del usuario
     if datos.nombre_usuario:
         usuario_actual.nombre = datos.nombre_usuario
 
-    # ── Crear empresa si el usuario no tiene una asignada ──────
-    # Analogia: abrir el negocio en el registro de comercio —
-    # sin esto el dueño existe pero el negocio no tiene RUT
     if not usuario_actual.empresa_id:
         nombre_empresa = datos.nombre_negocio or "Mi Negocio"
         nueva_empresa  = models.Empresa(
@@ -163,15 +172,13 @@ def completar_onboarding(
             max_productos = 200,
         )
         db.add(nueva_empresa)
-        db.flush()  # obtener el id sin hacer commit aún
+        db.flush()
 
-        # Asignar empresa al usuario y hacerlo admin
         usuario_actual.empresa_id = nueva_empresa.id
         usuario_actual.rol        = "admin"
 
     db.add(usuario_actual)
 
-    # ── Buscar o crear configuración ───────────────────────────
     config = db.query(models.Configuracion).filter(
         models.Configuracion.usuario_id == usuario_actual.id
     ).first()
@@ -180,7 +187,6 @@ def completar_onboarding(
         config = models.Configuracion(usuario_id=usuario_actual.id)
         db.add(config)
 
-    # Guardar datos del onboarding
     if datos.nombre_negocio: config.nombre_negocio = datos.nombre_negocio
     if datos.rubro:          config.rubro          = datos.rubro
     if datos.moneda:         config.moneda         = datos.moneda
@@ -191,14 +197,11 @@ def completar_onboarding(
 
     db.commit()
     db.refresh(config)
-
     return {"ok": True, "mensaje": "Onboarding completado"}
 
 
 # ============================================================
 # PUT /auth/perfil
-# ✅ NUEVO: actualiza nombre, email y contraseña del usuario
-#    Lo llama guardarConfiguracion() en el frontend
 # ============================================================
 @router.put("/perfil", response_model=schemas.UsuarioRespuesta)
 def actualizar_perfil(
@@ -206,15 +209,9 @@ def actualizar_perfil(
     db: Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    """
-    Actualiza los datos personales del usuario autenticado.
-    Analogia: ir a la ventanilla del banco a cambiar tus datos.
-    """
-    # Actualizar nombre si fue enviado
     if datos.nombre:
         usuario_actual.nombre = datos.nombre
 
-    # Actualizar email si fue enviado y no está en uso
     if datos.email and datos.email != usuario_actual.email:
         en_uso = db.query(models.Usuario).filter(
             models.Usuario.email == datos.email,
@@ -227,7 +224,6 @@ def actualizar_perfil(
             )
         usuario_actual.email = datos.email
 
-    # Cambiar contraseña si fue enviada
     if datos.password_nuevo and datos.password_actual:
         if not verificar_password(datos.password_actual, usuario_actual.password_hash):
             raise HTTPException(
@@ -239,7 +235,6 @@ def actualizar_perfil(
     db.add(usuario_actual)
     db.commit()
     db.refresh(usuario_actual)
-
     return usuario_actual
 
 
@@ -248,12 +243,11 @@ def actualizar_perfil(
 # ============================================================
 @router.get("/yo", response_model=schemas.UsuarioRespuesta)
 def obtener_yo(usuario_actual: models.Usuario = Depends(get_usuario_actual)):
-    """Retorna los datos del usuario autenticado a partir del token JWT."""
     return usuario_actual
+
 
 # ============================================================
 # POST /auth/verificar-email
-# Recibe email + codigo, no requiere token (usuario aun no verificado)
 # ============================================================
 @router.post("/verificar-email")
 def verificar_email(
@@ -261,17 +255,11 @@ def verificar_email(
     codigo: str,
     db: Session = Depends(get_db),
 ):
-    """
-    Verifica el código de 6 dígitos por email.
-    Analogia: ingresar el PIN que el banco te mandó por SMS —
-    sin necesidad de estar logueado todavía.
-    """
     usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     if usuario.email_verificado:
-        # Ya verificado — retornar token para que pueda entrar
         token = crear_token({"sub": usuario.email})
         return {"ok": True, "access_token": token, "token_type": "bearer", "usuario": usuario}
 
@@ -281,30 +269,22 @@ def verificar_email(
     if usuario.codigo_verificacion.strip() != codigo.strip():
         raise HTTPException(status_code=400, detail="Código incorrecto. Revisa tu correo e intenta de nuevo")
 
-    # Marcar como verificado y limpiar el código
     usuario.email_verificado    = True
     usuario.codigo_verificacion = None
     db.commit()
 
-    # Retornar token igual que el login para que el frontend entre directo
     token = crear_token({"sub": usuario.email})
     return {"ok": True, "access_token": token, "token_type": "bearer", "usuario": usuario}
 
 
 # ============================================================
 # POST /auth/reenviar-codigo
-# Por si el usuario no recibió el correo
 # ============================================================
 @router.post("/reenviar-codigo")
 def reenviar_codigo(
     email: str,
     db: Session = Depends(get_db),
 ):
-    """
-    Genera un nuevo código y lo reenvía por email.
-    Analogia: pedir que el banco te mande otro SMS porque el
-    primero no llegó.
-    """
     usuario_actual = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     if not usuario_actual:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -312,7 +292,6 @@ def reenviar_codigo(
     if usuario_actual.email_verificado:
         raise HTTPException(status_code=400, detail="Tu correo ya está verificado")
 
-    # Generar nuevo código
     nuevo_codigo = str(random.randint(100000, 999999))
     usuario_actual.codigo_verificacion = nuevo_codigo
     db.commit()
@@ -336,72 +315,7 @@ def reenviar_codigo(
 
 
 # ============================================================
-# Template HTML para verificación de email
-# ============================================================
-def _template_verificacion(nombre: str, codigo: str) -> str:
-    return f"""
-<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 20px;">
-    <tr><td align="center">
-      <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
-
-        <!-- Header -->
-        <tr>
-          <td style="background:linear-gradient(135deg,#1e40af,#0ea5e9);padding:32px 40px;text-align:center;">
-            <div style="font-size:28px;margin-bottom:6px;">📦</div>
-            <div style="font-family:Georgia,serif;font-size:26px;font-weight:900;color:#fff;letter-spacing:-1px;">YeparStock</div>
-            <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px;">by YeparSolutions</div>
-          </td>
-        </tr>
-
-        <!-- Cuerpo -->
-        <tr>
-          <td style="padding:36px 40px;">
-            <h2 style="margin:0 0 8px;font-size:20px;color:#0f172a;">Hola, {nombre} 👋</h2>
-            <p style="margin:0 0 28px;font-size:14px;color:#475569;line-height:1.6;">
-              Gracias por registrarte en YeparStock. Ingresa el siguiente código para verificar tu correo y activar tu cuenta:
-            </p>
-
-            <!-- Código -->
-            <div style="background:#f0f9ff;border:2px dashed #0ea5e9;border-radius:14px;padding:28px;text-align:center;margin-bottom:28px;">
-              <div style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Tu código de verificación</div>
-              <div style="font-size:44px;font-weight:900;letter-spacing:12px;color:#1e40af;font-family:monospace;">{codigo}</div>
-              <div style="font-size:12px;color:#94a3b8;margin-top:10px;">Este código expira en 24 horas</div>
-            </div>
-
-            <div style="background:#fef3c7;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:24px;">
-              <span style="font-size:13px;color:#92400e;">⚠️ Si no creaste esta cuenta, ignora este correo.</span>
-            </div>
-
-            <p style="margin:0;font-size:13px;color:#94a3b8;">
-              ¿Necesitas ayuda? Escríbenos a
-              <a href="mailto:soporte@yeparsolutions.com" style="color:#1e40af;">soporte@yeparsolutions.com</a>
-            </p>
-          </td>
-        </tr>
-
-        <!-- Footer -->
-        <tr>
-          <td style="background:#f8fafc;padding:18px 40px;text-align:center;border-top:1px solid #e2e8f0;">
-            <p style="margin:0;font-size:11px;color:#94a3b8;">© 2025 YeparSolutions · Este correo fue enviado automáticamente.</p>
-          </td>
-        </tr>
-
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>
-"""
-
-# ============================================================
 # POST /auth/solicitar-reset
-# Genera contraseña temporal y la envía por email
-# Analogia: el banco te entrega una tarjeta provisional cuando
-# pierdes la tuya — válida 24h, luego debes cambiarla
 # ============================================================
 @router.post("/solicitar-reset")
 def solicitar_reset(
@@ -409,24 +323,19 @@ def solicitar_reset(
     db: Session = Depends(get_db),
 ):
     import string
-    from datetime import datetime, timedelta, timezone
 
     usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    # Respuesta genérica — no revelar si el email existe o no
     if not usuario:
         return {"ok": True, "mensaje": "Si el correo está registrado, recibirás las instrucciones"}
 
-    # Generar contraseña temporal legible (sin caracteres confusos)
-    chars    = string.ascii_letters + string.digits
-    chars    = chars.replace("l","").replace("I","").replace("O","").replace("0","")
+    chars         = string.ascii_letters + string.digits
+    chars         = chars.replace("l","").replace("I","").replace("O","").replace("0","")
     password_temp = "".join(random.choices(chars, k=10))
 
-    # Guardar solo el hash — la expiración va en el email, no en BD
     usuario.password_hash       = encriptar_password(password_temp)
-    usuario.codigo_verificacion = None  # limpiar código anterior si existia
+    usuario.codigo_verificacion = None
     db.commit()
 
-    # Enviar email con contraseña temporal
     try:
         from email_service import enviar_email
         html = _template_password_temporal(usuario.nombre, email, password_temp)
@@ -442,8 +351,57 @@ def solicitar_reset(
 
 
 # ============================================================
-# Template HTML para contraseña temporal
+# Templates HTML
 # ============================================================
+def _template_verificacion(nombre: str, codigo: str) -> str:
+    return f"""
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+        <tr>
+          <td style="background:linear-gradient(135deg,#1e40af,#0ea5e9);padding:32px 40px;text-align:center;">
+            <div style="font-size:28px;margin-bottom:6px;">📦</div>
+            <div style="font-family:Georgia,serif;font-size:26px;font-weight:900;color:#fff;letter-spacing:-1px;">YeparStock</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px;">by YeparSolutions</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:36px 40px;">
+            <h2 style="margin:0 0 8px;font-size:20px;color:#0f172a;">Hola, {nombre} 👋</h2>
+            <p style="margin:0 0 28px;font-size:14px;color:#475569;line-height:1.6;">
+              Gracias por registrarte en YeparStock. Ingresa el siguiente código para verificar tu correo y activar tu cuenta:
+            </p>
+            <div style="background:#f0f9ff;border:2px dashed #0ea5e9;border-radius:14px;padding:28px;text-align:center;margin-bottom:28px;">
+              <div style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Tu código de verificación</div>
+              <div style="font-size:44px;font-weight:900;letter-spacing:12px;color:#1e40af;font-family:monospace;">{codigo}</div>
+              <div style="font-size:12px;color:#94a3b8;margin-top:10px;">Este código expira en 24 horas</div>
+            </div>
+            <div style="background:#fef3c7;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:24px;">
+              <span style="font-size:13px;color:#92400e;">⚠️ Si no creaste esta cuenta, ignora este correo.</span>
+            </div>
+            <p style="margin:0;font-size:13px;color:#94a3b8;">
+              ¿Necesitas ayuda? Escríbenos a
+              <a href="mailto:soporte@yeparsolutions.com" style="color:#1e40af;">soporte@yeparsolutions.com</a>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8fafc;padding:18px 40px;text-align:center;border-top:1px solid #e2e8f0;">
+            <p style="margin:0;font-size:11px;color:#94a3b8;">© 2025 YeparSolutions · Este correo fue enviado automáticamente.</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+"""
+
+
 def _template_password_temporal(nombre: str, email: str, password_temp: str) -> str:
     return f"""
 <!DOCTYPE html>
@@ -453,8 +411,6 @@ def _template_password_temporal(nombre: str, email: str, password_temp: str) -> 
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 20px;">
     <tr><td align="center">
       <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
-
-        <!-- Header -->
         <tr>
           <td style="background:linear-gradient(135deg,#1e40af,#0ea5e9);padding:32px 40px;text-align:center;">
             <div style="font-size:28px;margin-bottom:6px;">📦</div>
@@ -462,16 +418,12 @@ def _template_password_temporal(nombre: str, email: str, password_temp: str) -> 
             <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px;">by YeparSolutions</div>
           </td>
         </tr>
-
-        <!-- Cuerpo -->
         <tr>
           <td style="padding:36px 40px;">
             <h2 style="margin:0 0 8px;font-size:20px;color:#0f172a;">Hola, {nombre} 👋</h2>
             <p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.6;">
               Recibimos una solicitud para restablecer tu contraseña. Usa las siguientes credenciales temporales para ingresar:
             </p>
-
-            <!-- Credenciales -->
             <div style="background:#f0f9ff;border:2px dashed #0ea5e9;border-radius:14px;padding:24px;margin-bottom:24px;">
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
@@ -487,33 +439,26 @@ def _template_password_temporal(nombre: str, email: str, password_temp: str) -> 
                 </tr>
               </table>
             </div>
-
-            <!-- Aviso expiración -->
             <div style="background:#fef3c7;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:24px;">
               <span style="font-size:13px;color:#92400e;">
                 ⏰ <strong>Esta contraseña expira en 24 horas.</strong><br>
                 Una vez que ingreses, ve a <strong>Configuración → Perfil</strong> y cámbiala por una contraseña segura.
               </span>
             </div>
-
             <div style="background:#fee2e2;border-left:4px solid #ef4444;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:24px;">
-              <span style="font-size:13px;color:#991b1b;">⚠️ Si no solicitaste este cambio, ignora este correo. Tu contraseña anterior sigue activa hasta que uses esta.</span>
+              <span style="font-size:13px;color:#991b1b;">⚠️ Si no solicitaste este cambio, ignora este correo.</span>
             </div>
-
             <p style="margin:0;font-size:13px;color:#94a3b8;">
               ¿Necesitas ayuda? Escríbenos a
               <a href="mailto:soporte@yeparsolutions.com" style="color:#1e40af;">soporte@yeparsolutions.com</a>
             </p>
           </td>
         </tr>
-
-        <!-- Footer -->
         <tr>
           <td style="background:#f8fafc;padding:18px 40px;text-align:center;border-top:1px solid #e2e8f0;">
             <p style="margin:0;font-size:11px;color:#94a3b8;">© 2025 YeparSolutions · Este correo fue enviado automáticamente.</p>
           </td>
         </tr>
-
       </table>
     </td></tr>
   </table>
