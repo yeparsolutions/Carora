@@ -1010,6 +1010,85 @@ input[type="text"]::placeholder { text-transform: none; }
           </div>
         </div>
       </div>
+      <!-- ── SECCIÓN: Sonido del escáner ─────────────────────── -->
+      <div class="settings-section">
+        <div class="settings-section-title">🔊 Sonido del escáner</div>
+        <div class="settings-card">
+          <div style="margin-bottom:18px;font-size:13px;color:var(--muted)">
+            Elige el sonido que se reproduce al escanear un código de barras
+          </div>
+
+          <div id="soundOptions" style="display:flex;flex-direction:column;gap:10px">
+
+            <label class="sound-option" data-sound="scanner" onclick="seleccionarSonido('scanner',this)">
+              <div class="sound-option-inner">
+                <div class="sound-radio" id="radio-scanner"></div>
+                <div class="sound-info">
+                  <div class="sound-name">🔫 Escáner profesional</div>
+                  <div class="sound-desc">Beep doble nítido — estilo Zebra / Honeywell</div>
+                </div>
+                <button class="sound-preview-btn" onclick="event.stopPropagation();_beep()">▶ Probar</button>
+              </div>
+            </label>
+
+            <label class="sound-option" data-sound="single" onclick="seleccionarSonido('single',this)">
+              <div class="sound-option-inner">
+                <div class="sound-radio" id="radio-single"></div>
+                <div class="sound-info">
+                  <div class="sound-name">📟 Beep simple</div>
+                  <div class="sound-desc">Un solo tono corto y limpio</div>
+                </div>
+                <button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('single')">▶ Probar</button>
+              </div>
+            </label>
+
+            <label class="sound-option" data-sound="soft" onclick="seleccionarSonido('soft',this)">
+              <div class="sound-option-inner">
+                <div class="sound-radio" id="radio-soft"></div>
+                <div class="sound-info">
+                  <div class="sound-name">🎵 Tono suave</div>
+                  <div class="sound-desc">Pitido suave y agradable, ideal para oficinas</div>
+                </div>
+                <button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('soft')">▶ Probar</button>
+              </div>
+            </label>
+
+            <label class="sound-option" data-sound="retro" onclick="seleccionarSonido('retro',this)">
+              <div class="sound-option-inner">
+                <div class="sound-radio" id="radio-retro"></div>
+                <div class="sound-info">
+                  <div class="sound-name">🕹️ Retro</div>
+                  <div class="sound-desc">Sonido de videojuego clásico 8-bit</div>
+                </div>
+                <button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('retro')">▶ Probar</button>
+              </div>
+            </label>
+
+            <label class="sound-option" data-sound="cash" onclick="seleccionarSonido('cash',this)">
+              <div class="sound-option-inner">
+                <div class="sound-radio" id="radio-cash"></div>
+                <div class="sound-info">
+                  <div class="sound-name">💰 Caja registradora</div>
+                  <div class="sound-desc">Ding metálico de caja registradora antigua</div>
+                </div>
+                <button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('cash')">▶ Probar</button>
+              </div>
+            </label>
+
+            <label class="sound-option" data-sound="none" onclick="seleccionarSonido('none',this)">
+              <div class="sound-option-inner">
+                <div class="sound-radio" id="radio-none"></div>
+                <div class="sound-info">
+                  <div class="sound-name">🔇 Sin sonido</div>
+                  <div class="sound-desc">Desactivar sonido del escáner</div>
+                </div>
+              </div>
+            </label>
+
+          </div>
+        </div>
+      </div>
+
       <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:8px;margin-bottom:32px">
         <button class="btn-secondary" onclick="descartarCambios()">Descartar cambios</button>
         <button class="btn-primary" onclick="guardarConfiguracion()">✓ Guardar todos los cambios</button>
