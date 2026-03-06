@@ -159,7 +159,6 @@ input[type="text"]::placeholder { text-transform: none; }
              múltiples comandos), usamos una función controlada en app.js.
              logoFallbackHandler() está definida en app.js y solo hace lo necesario. -->
         <img id="logoImg" src="img/IsotipoStock.png"
-             onerror="logoFallbackHandler()"
              style="width:72px;height:72px;object-fit:contain;margin-bottom:8px">
         <div id="logoFallback" style="display:none;width:72px;height:72px;align-items:center;justify-content:center;font-size:52px;margin-bottom:8px">📦</div>
         <div class="logo-text">Yepar<span>Stock</span></div>
@@ -177,10 +176,10 @@ input[type="text"]::placeholder { text-transform: none; }
           <input id="loginPassword" class="form-input" type="password" placeholder="••••••••"
                  autocomplete="current-password">
         </div>
-        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="enterApp()">Entrar al negocio →</button>
-        <p style="text-align:right;margin:8px 0 4px"><span onclick="mostrarOlvidePass()" style="font-size:12px;color:var(--azul);cursor:pointer;text-decoration:underline">¿Olvidaste tu contraseña?</span></p>
+        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px">Entrar al negocio →</button>
+        <p style="text-align:right;margin:8px 0 4px"><span style="font-size:12px;color:var(--azul);cursor:pointer;text-decoration:underline">¿Olvidaste tu contraseña?</span></p>
         <p class="divider-text">¿Primera vez?</p>
-        <button class="btn-secondary" style="width:100%;justify-content:center" onclick="mostrarRegistro()">Crear cuenta gratis — 30 días</button>
+        <button class="btn-secondary" style="width:100%;justify-content:center">Crear cuenta gratis — 30 días</button>
         <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:20px">Sin tarjeta de crédito · Cancela cuando quieras</p>
       </div>
       <div id="panelRegistro" style="display:none">
@@ -199,16 +198,15 @@ input[type="text"]::placeholder { text-transform: none; }
           <!-- [SEC-3] Placeholder y label consistentes con la validación real (8 caracteres) -->
           <label class="form-label">Contraseña * (mínimo 8 caracteres)</label>
           <input id="regPassword" class="form-input" type="password" placeholder="Mínimo 8 caracteres"
-                 autocomplete="new-password"
-                 oninput="evaluarFuerzaPassword(this.value)">
+                 autocomplete="new-password">
           <div class="pass-strength-wrap" id="regStrengthWrap" style="display:none;margin-top:6px">
             <div class="pass-strength-bar"><div class="pass-strength-fill" id="regStrengthFill"></div></div>
             <span class="pass-strength-label" id="regStrengthLabel"></span>
           </div>
         </div>
-        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="registrarUsuario()">Crear cuenta →</button>
+        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px">Crear cuenta →</button>
         <p class="divider-text">¿Ya tienes cuenta?</p>
-        <button class="btn-secondary" style="width:100%;justify-content:center" onclick="mostrarLogin()">← Volver al login</button>
+        <button class="btn-secondary" style="width:100%;justify-content:center">← Volver al login</button>
       </div>
 
       <!-- PANEL: verificación de email -->
@@ -219,17 +217,17 @@ input[type="text"]::placeholder { text-transform: none; }
           <p style="color:var(--muted);font-size:13px;margin:0">Enviamos un código de 6 dígitos a<br><strong id="verifiEmailMostrar"></strong></p>
         </div>
         <div style="display:flex;gap:8px;justify-content:center;margin-bottom:20px" id="codigoInputs">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,0)" autocomplete="one-time-code">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,1)">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,2)">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,3)">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,4)">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigo(this,5)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" autocomplete="one-time-code">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
         </div>
         <div id="verifiError" style="display:none;color:var(--rojo);font-size:13px;text-align:center;margin-bottom:12px"></div>
-        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="confirmarVerificacion()">✅ Verificar cuenta</button>
+        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px">✅ Verificar cuenta</button>
         <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:16px">
-          ¿No llegó? <span onclick="reenviarCodigo()" style="color:var(--azul);cursor:pointer;text-decoration:underline">Reenviar código</span>
+          ¿No llegó? <span style="color:var(--azul);cursor:pointer;text-decoration:underline">Reenviar código</span>
         </p>
       </div>
 
@@ -245,9 +243,9 @@ input[type="text"]::placeholder { text-transform: none; }
           <input id="resetEmail" class="form-input" type="email" placeholder="tu@negocio.com"
                  autocomplete="email">
         </div>
-        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="solicitarReset()">Enviar código →</button>
+        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px">Enviar código →</button>
         <p class="divider-text"></p>
-        <button class="btn-secondary" style="width:100%;justify-content:center" onclick="mostrarLogin()">← Volver al login</button>
+        <button class="btn-secondary" style="width:100%;justify-content:center">← Volver al login</button>
       </div>
 
       <!-- PANEL: olvidé mi contraseña - paso 2 código + nueva pass -->
@@ -258,12 +256,12 @@ input[type="text"]::placeholder { text-transform: none; }
           <p style="color:var(--muted);font-size:13px;margin:0">Revisa tu email e ingresa el código</p>
         </div>
         <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px" id="resetCodigoInputs">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,0)" autocomplete="one-time-code">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,1)">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,2)">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,3)">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,4)">
-          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" oninput="avanzarCodigoReset(this,5)">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" autocomplete="one-time-code">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
         </div>
         <div class="form-group" style="margin-bottom:20px">
           <!-- [SEC-3] Placeholder corregido — dice "6 caracteres" en el original, debe decir 8
@@ -273,9 +271,9 @@ input[type="text"]::placeholder { text-transform: none; }
                  autocomplete="new-password">
         </div>
         <div id="resetError" style="display:none;color:var(--rojo);font-size:13px;text-align:center;margin-bottom:12px"></div>
-        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px" onclick="confirmarReset()">🔐 Cambiar contraseña</button>
+        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px">🔐 Cambiar contraseña</button>
         <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:16px">
-          ¿No llegó? <span onclick="solicitarReset()" style="color:var(--azul);cursor:pointer;text-decoration:underline">Reenviar código</span>
+          ¿No llegó? <span style="color:var(--azul);cursor:pointer;text-decoration:underline">Reenviar código</span>
         </p>
       </div>
     </div>
@@ -293,13 +291,13 @@ input[type="text"]::placeholder { text-transform: none; }
 
     <!-- Logo opcional -->
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
-      <div id="onboardingLogoPreview" onclick="document.getElementById('onboardingLogoFile').click()"
+      <div id="onboardingLogoPreview"
            style="width:64px;height:64px;border-radius:14px;background:var(--bg3);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer;flex-shrink:0">📷</div>
-      <input id="onboardingLogoFile" type="file" accept="image/*" style="display:none" onchange="onboardingPreviewLogo(event)">
+      <input id="onboardingLogoFile" type="file" accept="image/*" style="display:none">
       <div>
         <div style="font-size:13px;font-weight:600;margin-bottom:2px">Logo del negocio</div>
         <div style="font-size:11px;color:var(--muted)">Opcional · PNG o JPG · máx 2MB</div>
-        <button type="button" onclick="document.getElementById('onboardingLogoFile').click()"
+        <button type="button"
                 style="background:none;border:1px solid var(--border);border-radius:7px;padding:4px 10px;color:var(--muted);font-size:12px;cursor:pointer;margin-top:4px">Subir logo</button>
       </div>
     </div>
@@ -341,7 +339,7 @@ input[type="text"]::placeholder { text-transform: none; }
              autocomplete="given-name">
     </div>
 
-    <button id="btnGuardarOnboarding" class="btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px" onclick="guardarOnboarding()">
+    <button id="btnGuardarOnboarding" class="btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px">
       ✓ Entrar a mi negocio
     </button>
     <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:12px">Tus datos son privados y solo tú los ves</div>
@@ -357,21 +355,20 @@ input[type="text"]::placeholder { text-transform: none; }
       Tu suscripción fue cancelada y el periodo de gracia ha terminado.<br>
       Reactiva tu plan para volver a acceder a tu inventario.
     </p>
-    <button onclick="reactivarSuscripcion()" class="btn-primary" style="width:100%;justify-content:center;padding:13px;margin-bottom:12px">🔄 Reactivar suscripción</button>
-    <button onclick="cerrarSesion()" class="btn-secondary" style="width:100%;justify-content:center">Cerrar sesión</button>
+    <button class="btn-primary" style="width:100%;justify-content:center;padding:13px;margin-bottom:12px">🔄 Reactivar suscripción</button>
+    <button class="btn-secondary" style="width:100%;justify-content:center">Cerrar sesión</button>
   </div>
 </div>
 
 <!-- APP PRINCIPAL -->
 <div id="appMain" style="display:none">
-  <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
-  <div class="sidebar-backdrop" id="backdrop" onclick="toggleSidebar()"></div>
+  <button class="mobile-menu-btn">☰</button>
+  <div class="sidebar-backdrop" id="backdrop"></div>
 
   <!-- SIDEBAR -->
   <nav class="sidebar" id="sidebar">
     <div class="logo-block">
       <img src="img/IsotipoStock.png"
-        onerror="this.style.display='none'"
         style="width:50px; height:50px; object-fit:contain">
       <div>
         <div class="logo-text" style="font-size:16px;">Yepar<span>Stock</span></div>
@@ -382,26 +379,26 @@ input[type="text"]::placeholder { text-transform: none; }
     </div>
 
     <span class="nav-label">Principal</span>
-    <button class="nav-item active" id="nav-dashboard"   onclick="showScreen('dashboard')">  <span class="nav-icon">🏠</span> Dashboard</button>
-    <button class="nav-item"        id="nav-productos"   onclick="showScreen('productos')">  <span class="nav-icon">📋</span> Productos</button>
-    <button class="nav-item"        id="nav-stock"       onclick="showScreen('stock')">      <span class="nav-icon">📦</span> Stock</button>
-    <button class="nav-item"        id="nav-movimientos" onclick="showScreen('movimientos')"><span class="nav-icon">🔄</span> Movimientos</button>
-    <button class="nav-item"        id="nav-salidas"     onclick="showScreen('salidas')">    <span class="nav-icon">📤</span> Salidas</button>
+    <button class="nav-item active" id="nav-dashboard">  <span class="nav-icon">🏠</span> Dashboard</button>
+    <button class="nav-item"        id="nav-productos">  <span class="nav-icon">📋</span> Productos</button>
+    <button class="nav-item"        id="nav-stock">      <span class="nav-icon">📦</span> Stock</button>
+    <button class="nav-item"        id="nav-movimientos"><span class="nav-icon">🔄</span> Movimientos</button>
+    <button class="nav-item"        id="nav-salidas">    <span class="nav-icon">📤</span> Salidas</button>
 
     <span class="nav-label">Análisis</span>
-    <button class="nav-item" id="nav-alertas"  onclick="showScreen('alertas')">  <span class="nav-icon">🔔</span> Alertas <span class="nav-badge" id="alertBadge" style="display:none">0</span></button>
-    <button class="nav-item" id="nav-reportes" onclick="showScreen('reportes')"> <span class="nav-icon">📊</span> Reportes</button>
-    <button class="nav-item" id="nav-fiados"   onclick="showScreen('fiados')">   <span class="nav-icon">📒</span> Deudores <span class="nav-badge" id="fiadosBadge" style="display:none;background:var(--amarillo);color:#000">0</span></button>
+    <button class="nav-item" id="nav-alertas">  <span class="nav-icon">🔔</span> Alertas <span class="nav-badge" id="alertBadge" style="display:none">0</span></button>
+    <button class="nav-item" id="nav-reportes"> <span class="nav-icon">📊</span> Reportes</button>
+    <button class="nav-item" id="nav-fiados">   <span class="nav-icon">📒</span> Deudores <span class="nav-badge" id="fiadosBadge" style="display:none;background:var(--amarillo);color:#000">0</span></button>
 
     <span class="nav-label">Sistema</span>
-    <button class="nav-item" id="nav-equipo"   onclick="showScreen('equipo')">   <span class="nav-icon">👥</span> Mi Equipo <span id="equipoBadge" style="display:none;background:var(--verde);color:#000;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:4px">Admin</span></button>
-    <button class="nav-item" id="nav-settings" onclick="showScreen('settings')"> <span class="nav-icon">⚙️</span> Configuración</button>
+    <button class="nav-item" id="nav-equipo">   <span class="nav-icon">👥</span> Mi Equipo <span id="equipoBadge" style="display:none;background:var(--verde);color:#000;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:4px">Admin</span></button>
+    <button class="nav-item" id="nav-settings"> <span class="nav-icon">⚙️</span> Configuración</button>
 
     <div class="sidebar-footer">
       <!-- RELOJ — se actualiza cada segundo desde iniciarReloj() en app.js -->
       <div id="sidebarReloj" style="text-align:center;font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--text);letter-spacing:2px;margin-bottom:4px;line-height:1;">--:--:--</div>
       <div id="sidebarFecha" style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:12px;text-transform:capitalize;">--</div>
-      <div class="theme-toggle-row" onclick="toggleTema()">
+      <div class="theme-toggle-row">
         <span class="theme-toggle-label" id="themeLabel">🌙 Tema oscuro</span>
         <div class="theme-toggle-switch" id="themeSwitch"><div class="theme-toggle-thumb" id="themeThumb"></div></div>
       </div>
@@ -411,7 +408,7 @@ input[type="text"]::placeholder { text-transform: none; }
           <div class="user-name"></div>
           <div id="sidebarPlanBadge" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:2px;background:rgba(0,199,123,0.15);color:var(--verde)">✦ Plan Activo</div>
         </div>
-        <button class="logout-btn" onclick="cerrarSesion()" title="Cerrar sesión">⏻</button>
+        <button class="logout-btn" title="Cerrar sesión">⏻</button>
       </div>
     </div>
   </nav>
@@ -426,8 +423,8 @@ input[type="text"]::placeholder { text-transform: none; }
           <div class="page-title" id="dashTitulo">Buen día 👋</div>
           <div class="page-subtitle" id="dashSubtitulo">Cargando...</div>
         </div>
-        <button class="btn-primary" onclick="abrirModalSalida('venta')" style="background:var(--azul)">🛒 Nueva venta</button>
-        <button class="btn-primary" onclick="openModalMovimiento()">+ Nuevo Ingreso</button>
+        <button class="btn-primary" style="background:var(--azul)">🛒 Nueva venta</button>
+        <button class="btn-primary">+ Nuevo Ingreso</button>
       </div>
       <div class="stats-grid">
         <div class="stat-card verde">
@@ -458,7 +455,7 @@ input[type="text"]::placeholder { text-transform: none; }
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
         <div class="card">
-          <div class="card-title">🚨 Requieren atención ahora <span style="font-size:12px;color:var(--muted);font-family:var(--font-body);font-weight:400;cursor:pointer" onclick="showScreen('alertas')">ver todas →</span></div>
+          <div class="card-title">🚨 Requieren atención ahora <span style="font-size:12px;color:var(--muted);font-family:var(--font-body);font-weight:400;cursor:pointer">ver todas →</span></div>
           <div class="alert-list" id="dashAlertasList">
             <div id="dashAlertasVacio" style="text-align:center;padding:24px;color:var(--muted);font-size:13px">✅ Todo en orden — sin alertas por ahora</div>
           </div>
@@ -497,17 +494,17 @@ input[type="text"]::placeholder { text-transform: none; }
     <div class="screen" id="screen-productos">
       <div class="page-header">
         <div><div class="page-title">Mis Productos</div><div class="page-subtitle" id="prodSubtitulo">Cargando...</div></div>
-        <button class="btn-primary" onclick="openModalMovimiento()">+ Nuevo Ingreso</button>
+        <button class="btn-primary">+ Nuevo Ingreso</button>
       </div>
       <div class="search-row">
-        <input id="prodBuscar" class="search-input" placeholder="🔍  Buscar por nombre, código o marca..." oninput="filtrarProductos()">
-        <select id="prodCategoria" class="filter-select" onchange="filtrarProductos()">
+        <input id="prodBuscar" class="search-input" placeholder="🔍  Buscar por nombre, código o marca...">
+        <select id="prodCategoria" class="filter-select">
           <option value="">Todas las categorías</option>
           <option>Lácteos</option><option>Bebestibles</option><option>Snacks</option><option>Limpieza</option>
           <option>Granos</option><option>Panadería</option><option>Congelados</option><option>Carnes</option>
           <option>Frutas y Verduras</option><option>Otro</option>
         </select>
-        <select id="prodEstado" class="filter-select" onchange="filtrarProductos()">
+        <select id="prodEstado" class="filter-select">
           <option value="">Todo el stock</option>
           <option value="critico">🔴 Crítico</option><option value="alerta">🟡 En alerta</option><option value="ok">🟢 Stock ok</option>
         </select>
@@ -526,17 +523,17 @@ input[type="text"]::placeholder { text-transform: none; }
     <div class="screen" id="screen-stock">
       <div class="page-header">
         <div><div class="page-title">Stock 📦</div><div class="page-subtitle" id="stockSubtitulo">Cargando...</div></div>
-        <button class="btn-primary" onclick="openModalMovimiento()">+ Nuevo Ingreso</button>
+        <button class="btn-primary">+ Nuevo Ingreso</button>
       </div>
       <div class="search-row">
-        <input id="stockBuscar" class="search-input" placeholder="🔍  Buscar producto..." oninput="filtrarStock()">
-        <select id="stockCategoria" class="filter-select" onchange="filtrarStock()">
+        <input id="stockBuscar" class="search-input" placeholder="🔍  Buscar producto...">
+        <select id="stockCategoria" class="filter-select">
           <option value="">Todas las categorías</option>
           <option>Lácteos</option><option>Bebestibles</option><option>Snacks</option><option>Granos</option>
           <option>Limpieza</option><option>Panadería</option><option>Congelados</option><option>Carnes</option>
           <option>Frutas y Verduras</option><option>Otro</option>
         </select>
-        <select id="stockEstado" class="filter-select" onchange="filtrarStock()">
+        <select id="stockEstado" class="filter-select">
           <option value="">Todo el stock</option>
           <option value="critico">🔴 Crítico</option><option value="alerta">🟡 En alerta</option><option value="ok">🟢 Stock ok</option>
         </select>
@@ -557,19 +554,19 @@ input[type="text"]::placeholder { text-transform: none; }
         <div><div class="page-title">Movimientos</div><div class="page-subtitle" id="movSubtitulo">Historial completo de entradas y salidas</div></div>
       </div>
       <div class="search-row" style="flex-wrap:wrap;gap:8px">
-        <input id="movBuscar"      class="search-input" placeholder="🔍  Buscar por nombre..." oninput="filtrarMovimientos()" style="min-width:160px;flex:1">
-        <input id="movBuscarCodigo" class="search-input" placeholder="📦  Código de producto..."  oninput="filtrarMovimientos()" style="min-width:160px;flex:1">
-        <select id="movFiltroTipo" class="filter-select" onchange="filtrarMovimientos()">
+        <input id="movBuscar"      class="search-input" placeholder="🔍  Buscar por nombre..." style="min-width:160px;flex:1">
+        <input id="movBuscarCodigo" class="search-input" placeholder="📦  Código de producto..." style="min-width:160px;flex:1">
+        <select id="movFiltroTipo" class="filter-select">
           <option value="">Entradas y salidas</option><option value="entrada">↑ Solo entradas</option><option value="salida">↓ Solo salidas</option>
         </select>
-        <select id="movFiltroCategoria" class="filter-select" onchange="filtrarMovimientos()">
+        <select id="movFiltroCategoria" class="filter-select">
           <option value="">Todas las categorías</option>
           <option>Lácteos</option><option>Bebestibles</option><option>Snacks</option><option>Granos</option>
           <option>Limpieza</option><option>Panadería</option><option>Congelados</option><option>Carnes</option>
           <option>Frutas y Verduras</option><option>Otro</option>
         </select>
-        <input id="movFiltroDesde" class="filter-select" type="date" onchange="filtrarMovimientos()" title="Desde">
-        <input id="movFiltroHasta" class="filter-select" type="date" onchange="filtrarMovimientos()" title="Hasta">
+        <input id="movFiltroDesde" class="filter-select" type="date" title="Desde">
+        <input id="movFiltroHasta" class="filter-select" type="date" title="Hasta">
       </div>
       <div class="card" style="padding:0;overflow:hidden">
         <div class="table-wrap">
@@ -589,8 +586,8 @@ input[type="text"]::placeholder { text-transform: none; }
           <div class="page-subtitle" id="salidaSubtitulo">Ventas · Mermas · Cuarentenas · Devoluciones</div>
         </div>
         <div style="display:flex;gap:8px">
-          <button class="btn-primary" onclick="abrirModalSalida('venta')" style="background:var(--azul)">🛒 Nueva venta</button>
-          <button class="btn-primary" onclick="abrirModalSalida('merma')" style="background:var(--rojo)">🗑️ Registrar merma</button>
+          <button class="btn-primary" style="background:var(--azul)">🛒 Nueva venta</button>
+          <button class="btn-primary" style="background:var(--rojo)">🗑️ Registrar merma</button>
         </div>
       </div>
       <div class="stats-grid" style="margin-bottom:20px">
@@ -600,15 +597,15 @@ input[type="text"]::placeholder { text-transform: none; }
         <div class="stat-card verde"><div class="stat-label">VALOR VENDIDO</div><div class="stat-value" id="salidaResValor">—</div><div class="stat-trend">total en ventas</div></div>
       </div>
       <div class="search-row" style="flex-wrap:wrap;gap:8px">
-        <input id="salidaBuscar" class="search-input" placeholder="🔍  Buscar por producto..." oninput="filtrarSalidas()" style="min-width:180px;flex:1">
-        <select id="salidaFiltroTipo" class="filter-select" onchange="filtrarSalidas()">
+        <input id="salidaBuscar" class="search-input" placeholder="🔍  Buscar por producto..." style="min-width:180px;flex:1">
+        <select id="salidaFiltroTipo" class="filter-select">
           <option value="">Todos los tipos</option>
           <option value="venta">Ventas</option>
           <option value="merma">Mermas</option>
           <option value="cuarentena">Cuarentenas</option>
           <option value="devolucion_proveedor">Dev. Proveedor</option>
         </select>
-        <select id="salidaFiltroEstado" class="filter-select" onchange="filtrarSalidas()">
+        <select id="salidaFiltroEstado" class="filter-select">
           <option value="">Todos los estados</option>
           <option value="activo">Confirmado</option>
           <option value="en_revision">En revisión</option>
@@ -616,8 +613,8 @@ input[type="text"]::placeholder { text-transform: none; }
           <option value="descartado">Descartado</option>
           <option value="enviado_proveedor">Enviado proveedor</option>
         </select>
-        <input id="salidaFiltroDesde" class="filter-select" type="date" onchange="filtrarSalidas()" title="Desde">
-        <input id="salidaFiltroHasta" class="filter-select" type="date" onchange="filtrarSalidas()" title="Hasta">
+        <input id="salidaFiltroDesde" class="filter-select" type="date" title="Desde">
+        <input id="salidaFiltroHasta" class="filter-select" type="date" title="Hasta">
       </div>
       <div class="card" style="padding:0;overflow:hidden">
         <div class="table-wrap">
@@ -643,7 +640,7 @@ input[type="text"]::placeholder { text-transform: none; }
           <div class="page-title">Centro de Alertas 🔔</div>
           <div class="page-subtitle" id="alertasSubtitulo">0 productos requieren atención</div>
         </div>
-        <button class="btn-secondary" onclick="showToast('✓ Marcadas como revisadas')">✓ Marcar todas como vistas</button>
+        <button class="btn-secondary">✓ Marcar todas como vistas</button>
       </div>
       <div class="stats-grid" style="margin-bottom:24px">
         <div class="stat-card rojo">
@@ -685,7 +682,7 @@ input[type="text"]::placeholder { text-transform: none; }
       <div class="page-header">
         <div><div class="page-title">📊 Reportes</div><div class="page-subtitle">Ventas, inventario y análisis del negocio</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <select class="filter-select" id="reportePeriodo" onchange="cargarReportes()">
+          <select class="filter-select" id="reportePeriodo">
             <option value="hoy">Hoy</option>
             <option value="semana">Últimos 7 días</option>
             <option value="mes" selected>Este mes</option>
@@ -695,13 +692,13 @@ input[type="text"]::placeholder { text-transform: none; }
           <div id="reporteRangoCustom" style="display:none;gap:6px">
             <input type="date" id="reporteDesde" class="filter-select">
             <input type="date" id="reporteHasta" class="filter-select">
-            <button onclick="cargarReportes()" style="background:var(--azul);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">Filtrar →</button>
+            <button style="background:var(--azul);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">Filtrar →</button>
           </div>
         </div>
         <div id="botonesExportPro" style="display:none;gap:8px;flex-wrap:wrap">
-          <button onclick="exportarExcel()" style="display:flex;align-items:center;gap:6px;background:#16a34a;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">📊 Descargar Excel</button>
-          <button onclick="exportarPDF()" style="display:flex;align-items:center;gap:6px;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">📄 Descargar PDF</button>
-          <button onclick="enviarReportePorEmail()" style="display:flex;align-items:center;gap:6px;background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">📧 Enviar por email</button>
+          <button style="display:flex;align-items:center;gap:6px;background:#16a34a;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">📊 Descargar Excel</button>
+          <button style="display:flex;align-items:center;gap:6px;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">📄 Descargar PDF</button>
+          <button style="display:flex;align-items:center;gap:6px;background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">📧 Enviar por email</button>
         </div>
       </div>
       <div class="stats-grid" style="margin-bottom:20px;grid-template-columns:repeat(3,1fr)">
@@ -737,7 +734,7 @@ input[type="text"]::placeholder { text-transform: none; }
               <div style="font-family:var(--font-head);font-size:20px;font-weight:800;color:#fff;margin-bottom:4px">Inteligencia y Crecimiento 🚀</div>
               <div style="font-size:13px;color:rgba(255,255,255,0.8)">Ganancia real · Top productos · Comparación de periodos · Rotación de inventario</div>
             </div>
-            <button onclick="showScreen('equipo')" style="background:#fff;color:#1e40af;border:none;border-radius:10px;padding:12px 24px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">⬆️ Ver planes →</button>
+            <button style="background:#fff;color:#1e40af;border:none;border-radius:10px;padding:12px 24px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">⬆️ Ver planes →</button>
           </div>
           <div class="report-grid">
             <div class="card" id="cardGananciaReal" style="position:relative"><div class="card-title">💰 Ganancia Real del Periodo</div><div id="reporteGananciaReal" style="padding:8px 0"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div></div><div id="lockGananciaReal" class="pro-lock-overlay" style="display:none"></div></div>
@@ -756,17 +753,17 @@ input[type="text"]::placeholder { text-transform: none; }
           <div class="page-title">📒 Deudores</div>
           <div class="page-subtitle" id="fiadosSubtitulo">Clientes con deuda pendiente</div>
         </div>
-        <input class="search-input" id="fiadosBuscar" placeholder="🔍 Buscar cliente..." oninput="filtrarFiados()" style="max-width:260px">
+        <input class="search-input" id="fiadosBuscar" placeholder="🔍 Buscar cliente..." style="max-width:260px">
       </div>
       <div class="stats-grid" style="margin-bottom:20px;grid-template-columns:repeat(2,1fr)">
         <div class="stat-card amarillo"><div class="stat-label">DEUDA TOTAL PENDIENTE</div><div class="stat-value" id="fiadosTotalDeuda">—</div><div class="stat-trend">Por cobrar</div></div>
         <div class="stat-card rojo"><div class="stat-label">CLIENTES CON DEUDA</div><div class="stat-value" id="fiadosTotalClientes">—</div><div class="stat-trend">Cuentas abiertas</div></div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:16px">
-        <button class="btn-secondary fiado-filtro active" data-estado="" onclick="setFiltroFiado(this,'')">Todos</button>
-        <button class="btn-secondary fiado-filtro" data-estado="pendiente" onclick="setFiltroFiado(this,'pendiente')">⏳ Pendiente</button>
-        <button class="btn-secondary fiado-filtro" data-estado="pagado_parcial" onclick="setFiltroFiado(this,'pagado_parcial')">🔄 Parcial</button>
-        <button class="btn-secondary fiado-filtro" data-estado="pagado" onclick="setFiltroFiado(this,'pagado')">✅ Pagado</button>
+        <button class="btn-secondary fiado-filtro active" data-estado="">Todos</button>
+        <button class="btn-secondary fiado-filtro" data-estado="pendiente">⏳ Pendiente</button>
+        <button class="btn-secondary fiado-filtro" data-estado="pagado_parcial">🔄 Parcial</button>
+        <button class="btn-secondary fiado-filtro" data-estado="pagado">✅ Pagado</button>
       </div>
       <div id="fiadosLista" class="card" style="padding:0;overflow:hidden">
         <div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Cargando deudores...</div>
@@ -780,7 +777,7 @@ input[type="text"]::placeholder { text-transform: none; }
           <div class="page-title">Mi Equipo 👥</div>
           <div class="page-subtitle" id="equipoSubtitulo">Gestiona los usuarios de tu negocio</div>
         </div>
-        <button class="btn-primary" id="btnInvitarUsuario" onclick="abrirModalInvitar()" style="display:none">+ Invitar usuario</button>
+        <button class="btn-primary" id="btnInvitarUsuario" style="display:none">+ Invitar usuario</button>
       </div>
       <div class="card" style="margin-bottom:20px" id="equipoPlanCard">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -804,7 +801,7 @@ input[type="text"]::placeholder { text-transform: none; }
               </div>
             </div>
             <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
-              <button id="btnUpgradePlan" onclick="abrirModalUpgrade()" style="display:none;background:linear-gradient(135deg,#5b8eff,#3b6fff);border:none;border-radius:10px;padding:8px 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">🔄 Cambiar Plan</button>
+              <button id="btnUpgradePlan" style="display:none;background:linear-gradient(135deg,#5b8eff,#3b6fff);border:none;border-radius:10px;padding:8px 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">🔄 Cambiar Plan</button>
               <div id="avisoCancelacion" style="display:none;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:8px 12px;font-size:12px;color:#f59e0b;max-width:280px"></div>
             </div>
           </div>
@@ -835,7 +832,7 @@ input[type="text"]::placeholder { text-transform: none; }
     <div class="screen" id="screen-settings">
       <div class="page-header">
         <div><div class="page-title">⚙️ Configuración</div><div class="page-subtitle">Personaliza tu negocio y cuenta</div></div>
-        <button class="btn-primary" onclick="guardarConfiguracion()">✓ Guardar cambios</button>
+        <button class="btn-primary">✓ Guardar cambios</button>
       </div>
       <div class="settings-section">
         <div class="settings-section-title">🏢 Datos del negocio</div>
@@ -849,19 +846,17 @@ input[type="text"]::placeholder { text-transform: none; }
               <div class="settings-logo-label">Logo del negocio</div>
               <div class="settings-logo-hint">PNG, JPG o SVG · Máximo 2MB · Recomendado 200×200px</div>
               <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
-                <input type="file" id="inputLogo" accept="image/*" style="display:none" onchange="previewLogo(event)">
-                <button class="btn-secondary" style="font-size:13px;padding:8px 16px" onclick="document.getElementById('inputLogo').click()">📁 Subir logo</button>
-                <button class="btn-secondary" style="font-size:13px;padding:8px 16px" onclick="toggleInputUrlLogo()">🔗 Pegar URL</button>
-                <button class="btn-secondary" style="font-size:13px;padding:8px 16px" onclick="quitarLogo()">🗑️ Quitar</button>
+                <input type="file" id="inputLogo" accept="image/*" style="display:none">
+                <button class="btn-secondary" style="font-size:13px;padding:8px 16px">📁 Subir logo</button>
+                <button class="btn-secondary" style="font-size:13px;padding:8px 16px">🔗 Pegar URL</button>
+                <button class="btn-secondary" style="font-size:13px;padding:8px 16px">🗑️ Quitar</button>
               </div>
               <div id="logoUrlWrap" style="display:none;margin-top:10px">
                 <div style="display:flex;gap:8px;align-items:center">
                   <input id="inputLogoUrl" class="form-input" type="url"
                     placeholder="https://ejemplo.com/logo.png"
-                    style="font-size:13px;padding:8px 12px;flex:1"
-                    oninput="previewLogoUrl(this.value)">
-                  <button class="btn-secondary" style="font-size:13px;padding:8px 12px;white-space:nowrap"
-                    onclick="aplicarLogoUrl()">✓ Aplicar</button>
+                    style="font-size:13px;padding:8px 12px;flex:1">
+                  <button class="btn-secondary" style="font-size:13px;padding:8px 12px;white-space:nowrap">✓ Aplicar</button>
                 </div>
                 <span class="settings-field-hint">PNG, JPG o SVG accesible públicamente</span>
               </div>
@@ -890,8 +885,8 @@ input[type="text"]::placeholder { text-transform: none; }
             <div class="form-group">
               <label class="form-label">Color principal</label>
               <div class="settings-color-row">
-                <input type="color" id="inputColor" value="#00C77B" class="settings-color-picker" oninput="previsualizarColor(this.value)">
-                <input id="inputColorHex" class="form-input" type="text" value="#00C77B" placeholder="#00C77B" maxlength="7" oninput="sincronizarColor(this.value)" style="font-family:monospace;letter-spacing:1px">
+                <input type="color" id="inputColor" value="#00C77B" class="settings-color-picker">
+                <input id="inputColorHex" class="form-input" type="text" value="#00C77B" placeholder="#00C77B" maxlength="7" style="font-family:monospace;letter-spacing:1px">
               </div>
             </div>
           </div>
@@ -915,16 +910,15 @@ input[type="text"]::placeholder { text-transform: none; }
               <div class="settings-pass-row">
                 <input id="inputPassActual" class="form-input" type="password" placeholder="Tu contraseña actual"
                        autocomplete="current-password">
-                <button class="settings-eye-btn" onclick="togglePass('inputPassActual',this)">👁️</button>
+                <button class="settings-eye-btn">👁️</button>
               </div>
             </div>
             <div class="form-group">
               <label class="form-label">Nueva contraseña (mínimo 8 caracteres)</label>
               <div class="settings-pass-row">
                 <input id="inputPassNueva" class="form-input" type="password" placeholder="Mínimo 8 caracteres"
-                       autocomplete="new-password"
-                       oninput="evaluarFuerzaPassword(this.value)">
-                <button class="settings-eye-btn" onclick="togglePass('inputPassNueva',this)">👁️</button>
+                       autocomplete="new-password">
+                <button class="settings-eye-btn">👁️</button>
               </div>
               <div class="pass-strength-wrap" id="passStrengthWrap" style="display:none">
                 <div class="pass-strength-bar"><div class="pass-strength-fill" id="passStrengthFill"></div></div>
@@ -936,7 +930,7 @@ input[type="text"]::placeholder { text-transform: none; }
               <div class="settings-pass-row">
                 <input id="inputPassConfirm" class="form-input" type="password" placeholder="Repite la nueva contraseña"
                        autocomplete="new-password">
-                <button class="settings-eye-btn" onclick="togglePass('inputPassConfirm',this)">👁️</button>
+                <button class="settings-eye-btn">👁️</button>
               </div>
             </div>
           </div>
@@ -951,22 +945,22 @@ input[type="text"]::placeholder { text-transform: none; }
             Elige el sonido que se reproduce al escanear un código de barras
           </div>
           <div id="soundOptions" style="display:flex;flex-direction:column;gap:10px">
-            <label class="sound-option" data-sound="scanner" onclick="seleccionarSonido('scanner',this)">
-              <div class="sound-option-inner"><div class="sound-radio" id="radio-scanner"></div><div class="sound-info"><div class="sound-name">🔫 Escáner profesional</div><div class="sound-desc">Beep doble nítido — estilo Zebra / Honeywell</div></div><button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('scanner')">▶ Probar</button></div>
+            <label class="sound-option" data-sound="scanner">
+              <div class="sound-option-inner"><div class="sound-radio" id="radio-scanner"></div><div class="sound-info"><div class="sound-name">🔫 Escáner profesional</div><div class="sound-desc">Beep doble nítido — estilo Zebra / Honeywell</div></div><button class="sound-preview-btn">▶ Probar</button></div>
             </label>
-            <label class="sound-option" data-sound="single" onclick="seleccionarSonido('single',this)">
-              <div class="sound-option-inner"><div class="sound-radio" id="radio-single"></div><div class="sound-info"><div class="sound-name">📟 Beep simple</div><div class="sound-desc">Un solo tono corto y limpio</div></div><button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('single')">▶ Probar</button></div>
+            <label class="sound-option" data-sound="single">
+              <div class="sound-option-inner"><div class="sound-radio" id="radio-single"></div><div class="sound-info"><div class="sound-name">📟 Beep simple</div><div class="sound-desc">Un solo tono corto y limpio</div></div><button class="sound-preview-btn">▶ Probar</button></div>
             </label>
-            <label class="sound-option" data-sound="soft" onclick="seleccionarSonido('soft',this)">
-              <div class="sound-option-inner"><div class="sound-radio" id="radio-soft"></div><div class="sound-info"><div class="sound-name">🎵 Tono suave</div><div class="sound-desc">Pitido suave y agradable, ideal para oficinas</div></div><button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('soft')">▶ Probar</button></div>
+            <label class="sound-option" data-sound="soft">
+              <div class="sound-option-inner"><div class="sound-radio" id="radio-soft"></div><div class="sound-info"><div class="sound-name">🎵 Tono suave</div><div class="sound-desc">Pitido suave y agradable, ideal para oficinas</div></div><button class="sound-preview-btn">▶ Probar</button></div>
             </label>
-            <label class="sound-option" data-sound="retro" onclick="seleccionarSonido('retro',this)">
-              <div class="sound-option-inner"><div class="sound-radio" id="radio-retro"></div><div class="sound-info"><div class="sound-name">🕹️ Retro</div><div class="sound-desc">Sonido de videojuego clásico 8-bit</div></div><button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('retro')">▶ Probar</button></div>
+            <label class="sound-option" data-sound="retro">
+              <div class="sound-option-inner"><div class="sound-radio" id="radio-retro"></div><div class="sound-info"><div class="sound-name">🕹️ Retro</div><div class="sound-desc">Sonido de videojuego clásico 8-bit</div></div><button class="sound-preview-btn">▶ Probar</button></div>
             </label>
-            <label class="sound-option" data-sound="cash" onclick="seleccionarSonido('cash',this)">
-              <div class="sound-option-inner"><div class="sound-radio" id="radio-cash"></div><div class="sound-info"><div class="sound-name">💰 Caja registradora</div><div class="sound-desc">Ding metálico de caja registradora antigua</div></div><button class="sound-preview-btn" onclick="event.stopPropagation();_beepPreview('cash')">▶ Probar</button></div>
+            <label class="sound-option" data-sound="cash">
+              <div class="sound-option-inner"><div class="sound-radio" id="radio-cash"></div><div class="sound-info"><div class="sound-name">💰 Caja registradora</div><div class="sound-desc">Ding metálico de caja registradora antigua</div></div><button class="sound-preview-btn">▶ Probar</button></div>
             </label>
-            <label class="sound-option" data-sound="none" onclick="seleccionarSonido('none',this)">
+            <label class="sound-option" data-sound="none">
               <div class="sound-option-inner"><div class="sound-radio" id="radio-none"></div><div class="sound-info"><div class="sound-name">🔇 Sin sonido</div><div class="sound-desc">Desactivar sonido del escáner</div></div></div>
             </label>
           </div>
@@ -974,8 +968,8 @@ input[type="text"]::placeholder { text-transform: none; }
       </div>
 
       <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:8px;margin-bottom:32px">
-        <button class="btn-secondary" onclick="descartarCambios()">Descartar cambios</button>
-        <button class="btn-primary" onclick="guardarConfiguracion()">✓ Guardar todos los cambios</button>
+        <button class="btn-secondary">Descartar cambios</button>
+        <button class="btn-primary">✓ Guardar todos los cambios</button>
       </div>
     </div>
 
@@ -988,7 +982,7 @@ input[type="text"]::placeholder { text-transform: none; }
   <div class="modal-box" style="max-width:460px">
     <div class="modal-header">
       <div class="modal-title">📦 Registrar producto nuevo</div>
-      <button class="modal-close" onclick="closeModal()">✕</button>
+      <button class="modal-close">✕</button>
     </div>
     <div style="padding:0 24px 4px;color:var(--muted);font-size:13px;line-height:1.5">
       El código no existe en tu inventario. Completa los datos básicos para registrarlo y seguir con el ingreso.
@@ -1030,8 +1024,8 @@ input[type="text"]::placeholder { text-transform: none; }
         <!-- [SEC-9] video de escáner movido fuera del form — evita stream embebido en form -->
       </div>
       <div class="form-actions">
-        <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
-        <button type="button" class="btn-primary" id="btnSaveProductoRapido" onclick="saveProductRapido()">✓ Registrar y agregar al ingreso</button>
+        <button type="button" class="btn-secondary">Cancelar</button>
+        <button type="button" class="btn-primary" id="btnSaveProductoRapido">✓ Registrar y agregar al ingreso</button>
       </div>
     </form>
   </div>
@@ -1044,7 +1038,7 @@ input[type="text"]::placeholder { text-transform: none; }
   <div class="modal-box" style="max-width:620px;display:flex;flex-direction:column;max-height:90vh">
     <div class="modal-header">
       <div class="modal-title">📥 Nuevo Ingreso</div>
-      <button class="modal-close" onclick="closeModalMovimiento()">✕</button>
+      <button class="modal-close">✕</button>
     </div>
     <div id="ingresoScrollArea" style="padding:16px 24px 0;overflow-y:auto;flex:1">
       <!-- VISOR CÁMARA -->
@@ -1053,7 +1047,7 @@ input[type="text"]::placeholder { text-transform: none; }
         <div style="position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center">
           <div style="width:220px;height:130px;border:3px solid rgba(0,199,123,0.95);border-radius:12px;box-shadow:0 0 0 2000px rgba(0,0,0,0.38)"></div>
         </div>
-        <button onclick="cerrarEscanerIngreso()"
+        <button
                 style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.6);border:none;border-radius:50%;width:36px;height:36px;color:#fff;font-size:18px;cursor:pointer;line-height:1;z-index:2">✕</button>
         <div style="position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,0.9);font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.9)">Apunta al código de barras</div>
       </div>
@@ -1063,10 +1057,8 @@ input[type="text"]::placeholder { text-transform: none; }
         <div style="display:flex;gap:8px;align-items:center">
           <input id="movCodigoBuscar" class="form-input"
                  style="background:none;border:none;font-size:15px;font-weight:600;padding:0;flex:1;outline:none"
-                 type="text" placeholder="Escanea el código o escribe el nombre..."
-                 oninput="buscarProductoIngreso(this.value, false)"
-                 onkeydown="if(event.key==='Enter'){event.preventDefault();agregarAlIngresoCarrito()}">
-          <button type="button" onclick="abrirEscanerIngreso()"
+                 type="text" placeholder="Escanea el código o escribe el nombre...">
+          <button type="button"
                   style="background:var(--verde);border:none;border-radius:10px;padding:8px 16px;color:#000;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap">📷 Cámara</button>
         </div>
         <div id="ingresoScanHint" style="font-size:12px;color:var(--muted);margin-top:6px">Escanea o escribe — Enter o "Agregar" para sumarlo al ingreso</div>
@@ -1080,30 +1072,30 @@ input[type="text"]::placeholder { text-transform: none; }
             <div id="ingresoChipDetalle" style="font-size:11px;color:var(--muted);margin-top:1px"></div>
           </div>
           <div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:9px;overflow:hidden;flex-shrink:0">
-            <button type="button" onclick="cambiarQtyIngreso(-1)" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">−</button>
+            <button type="button" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">−</button>
             <input id="movCantidad" type="number" value="1" min="1" style="width:42px;background:none;border:none;color:var(--text);font-family:var(--font-head);font-size:16px;font-weight:800;text-align:center;outline:none">
-            <button type="button" onclick="cambiarQtyIngreso(1)" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">+</button>
+            <button type="button" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">+</button>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <div style="flex:1;min-width:90px">
             <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px">PRECIO COMPRA</div>
-            <input id="movPrecioCompra" type="number" placeholder="$0" min="0" oninput="calcularPrecioVentaChip()" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:7px 10px;color:var(--text);font-size:13px;font-weight:700;outline:none">
+            <input id="movPrecioCompra" type="number" placeholder="$0" min="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:7px 10px;color:var(--text);font-size:13px;font-weight:700;outline:none">
           </div>
           <div style="flex:1;min-width:70px">
             <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px">% GANANCIA</div>
-            <input id="movPorcentajeChip" type="number" placeholder="0%" min="0" max="999" oninput="calcularPrecioVentaChip()" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:7px 10px;color:var(--text);font-size:13px;font-weight:700;outline:none">
+            <input id="movPorcentajeChip" type="number" placeholder="0%" min="0" max="999" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:7px 10px;color:var(--text);font-size:13px;font-weight:700;outline:none">
           </div>
           <div style="flex:1;min-width:90px">
             <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px">PRECIO VENTA</div>
             <input id="movPrecioVentaChip" type="number" placeholder="Calculado" min="0" style="width:100%;background:rgba(0,199,123,0.1);border:1px solid rgba(0,199,123,0.3);border-radius:9px;padding:7px 10px;color:var(--verde);font-size:13px;font-weight:800;outline:none">
           </div>
-          <button type="button" onclick="agregarAlIngresoCarrito()" style="background:var(--verde);border:none;border-radius:9px;padding:9px 16px;color:#000;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;align-self:flex-end">+ Agregar</button>
+          <button type="button" style="background:var(--verde);border:none;border-radius:9px;padding:9px 16px;color:#000;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;align-self:flex-end">+ Agregar</button>
         </div>
         <div id="chipPrecioHint" style="font-size:11px;color:var(--verde);margin-top:-4px;display:none"></div>
       </div>
       <div style="margin-bottom:12px">
-        <select id="movProductoId" class="form-input" onchange="onProductoIngresoSeleccionado()" style="font-size:13px">
+        <select id="movProductoId" class="form-input" style="font-size:13px">
           <option value="">— O selecciona de la lista —</option>
         </select>
       </div>
@@ -1139,8 +1131,8 @@ input[type="text"]::placeholder { text-transform: none; }
       </div>
     </div>
     <div class="form-actions" style="flex-shrink:0;border-top:1px solid var(--border);padding:16px 24px">
-      <button type="button" class="btn-secondary" onclick="closeModalMovimiento()">Cancelar</button>
-      <button type="button" class="btn-primary" id="btnConfirmarIngreso" onclick="guardarMovimiento()" disabled style="opacity:0.5">✔ Confirmar ingreso</button>
+      <button type="button" class="btn-secondary">Cancelar</button>
+      <button type="button" class="btn-primary" id="btnConfirmarIngreso" disabled style="opacity:0.5">✔ Confirmar ingreso</button>
     </div>
   </div>
 </div>
@@ -1148,7 +1140,7 @@ input[type="text"]::placeholder { text-transform: none; }
 <!-- MODAL: Editar producto -->
 <div class="modal-overlay" id="modalEditar">
   <div class="modal-box">
-    <div class="modal-header"><div class="modal-title">✏️ Editar producto</div><button class="modal-close" onclick="cerrarModalEditar()">✕</button></div>
+    <div class="modal-header"><div class="modal-title">✏️ Editar producto</div><button class="modal-close">✕</button></div>
     <input type="hidden" id="editId">
     <form id="formEditar">
       <div class="form-grid">
@@ -1159,16 +1151,16 @@ input[type="text"]::placeholder { text-transform: none; }
         <div class="form-group"><label class="form-label">Proveedor</label><input id="editProveedor" class="form-input" type="text"></div>
         <div class="form-group"><label class="form-label">Categoría</label><select id="editCategoria" class="form-input"><option value="">Sin categoría</option><option>Lácteos</option><option>Bebestibles</option><option>Snacks</option><option>Granos</option><option>Limpieza</option><option>Panadería</option><option>Congelados</option><option>Carnes</option><option>Frutas y Verduras</option><option>Otro</option></select></div>
         <div class="form-group"><label class="form-label">Stock mínimo 🔔</label><input id="editStockMin" class="form-input" type="number" min="0"></div>
-        <div class="form-group"><label class="form-label">Precio compra</label><input id="editPrecioCompra" class="form-input" type="number" min="0" oninput="calcularPrecioVentaEditar()"></div>
-        <div class="form-group"><label class="form-label">% Ganancia</label><input id="editPorcentaje" class="form-input" type="number" min="0" oninput="calcularPrecioVentaEditar()"></div>
+        <div class="form-group"><label class="form-label">Precio compra</label><input id="editPrecioCompra" class="form-input" type="number" min="0"></div>
+        <div class="form-group"><label class="form-label">% Ganancia</label><input id="editPorcentaje" class="form-input" type="number" min="0"></div>
         <div class="form-group"><label class="form-label">Precio venta</label><input id="editPrecioVenta" class="form-input" type="number" min="0"><span class="settings-field-hint" id="editPrecioHint" style="color:var(--verde)"></span></div>
         <div class="form-group"><label class="form-label">Número de lote</label><input id="editLote" class="form-input" type="text"></div>
         <div class="form-group"><label class="form-label">Fecha de vencimiento</label><input id="editFechaVenc" class="form-input" type="date"></div>
         <div class="form-group"><label class="form-label">Alertar X días antes</label><input id="editDiasAlerta" class="form-input" type="number" min="1"></div>
       </div>
       <div class="form-actions">
-        <button type="button" class="btn-secondary" onclick="cerrarModalEditar()">Cancelar</button>
-        <button type="button" class="btn-primary" onclick="guardarEdicion()">✓ Guardar cambios</button>
+        <button type="button" class="btn-secondary">Cancelar</button>
+        <button type="button" class="btn-primary">✓ Guardar cambios</button>
       </div>
     </form>
   </div>
@@ -1180,8 +1172,8 @@ input[type="text"]::placeholder { text-transform: none; }
     <div class="modal-header"><div class="modal-title" style="color:var(--rojo)">⚠️ Eliminar producto</div></div>
     <p style="color:var(--muted);font-size:14px;margin-bottom:24px" id="eliminarMsg">Esta acción no se puede deshacer.</p>
     <div class="form-actions">
-      <button type="button" class="btn-secondary" onclick="cerrarModalEliminar()">Cancelar</button>
-      <button type="button" class="btn-primary" style="background:var(--rojo)" onclick="confirmarEliminar()">🗑️ Eliminar permanentemente</button>
+      <button type="button" class="btn-secondary">Cancelar</button>
+      <button type="button" class="btn-primary" style="background:var(--rojo)">🗑️ Eliminar permanentemente</button>
     </div>
   </div>
 </div>
@@ -1191,7 +1183,7 @@ input[type="text"]::placeholder { text-transform: none; }
   <div class="modal-box" style="max-width:620px;display:flex;flex-direction:column;max-height:90vh">
     <div class="modal-header">
       <div class="modal-title" id="modalSalidaTitulo">🛒 Nueva venta</div>
-      <button class="modal-close" onclick="cerrarModalSalida()">✕</button>
+      <button class="modal-close">✕</button>
     </div>
     <div style="padding:16px 24px 0;overflow-y:auto;flex:1">
       <div id="scanBox" style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
@@ -1199,10 +1191,8 @@ input[type="text"]::placeholder { text-transform: none; }
         <div style="display:flex;gap:8px;align-items:center">
           <input id="salidaCodigoBarra" class="form-input"
                  style="background:none;border:none;font-size:15px;font-weight:600;padding:0;flex:1;outline:none"
-                 type="text" placeholder="Escanea el código o escribe el nombre..."
-                 oninput="buscarProductoSalida(this.value)"
-                 onkeydown="if(event.key==='Enter'){event.preventDefault();agregarAlCarrito()}">
-          <button type="button" onclick="abrirEscanerSalida()"
+                 type="text" placeholder="Escanea el código o escribe el nombre...">
+          <button type="button"
                   style="background:var(--bg4);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-size:16px;cursor:pointer">📷</button>
         </div>
         <div id="salidaScanHint" style="font-size:12px;color:var(--muted);margin-top:6px">Escanea o escribe — Enter o "Agregar" para sumarlo al carrito</div>
@@ -1215,15 +1205,15 @@ input[type="text"]::placeholder { text-transform: none; }
           <div id="chipDetalle" style="font-size:11px;color:var(--muted);margin-top:1px"></div>
         </div>
         <div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:9px;overflow:hidden;flex-shrink:0">
-          <button type="button" onclick="cambiarQtyVenta(-1)" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">−</button>
-          <input id="salidaCantidad" type="number" value="1" min="1" style="width:42px;background:none;border:none;color:var(--text);font-family:var(--font-head);font-size:16px;font-weight:800;text-align:center;outline:none" oninput="calcularTotalVenta()">
-          <button type="button" onclick="cambiarQtyVenta(1)" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">+</button>
+          <button type="button" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">−</button>
+          <input id="salidaCantidad" type="number" value="1" min="1" style="width:42px;background:none;border:none;color:var(--text);font-family:var(--font-head);font-size:16px;font-weight:800;text-align:center;outline:none">
+          <button type="button" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">+</button>
         </div>
-        <input id="salidaPrecioUnitario" type="number" placeholder="Precio" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px;color:var(--text);font-size:13px;font-weight:600;outline:none;flex-shrink:0" oninput="calcularTotalVenta()">
-        <button type="button" onclick="agregarAlCarrito()" style="background:var(--verde);border:none;border-radius:9px;padding:8px 14px;color:#000;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">+ Agregar</button>
+        <input id="salidaPrecioUnitario" type="number" placeholder="Precio" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px;color:var(--text);font-size:13px;font-weight:600;outline:none;flex-shrink:0">
+        <button type="button" style="background:var(--verde);border:none;border-radius:9px;padding:8px 14px;color:#000;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">+ Agregar</button>
       </div>
       <div style="margin-bottom:12px">
-        <select id="salidaProductoId" class="form-input" onchange="onProductoSeleccionado()" style="font-size:13px">
+        <select id="salidaProductoId" class="form-input" style="font-size:13px">
           <option value="">— O selecciona de la lista —</option>
         </select>
       </div>
@@ -1241,20 +1231,20 @@ input[type="text"]::placeholder { text-transform: none; }
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
         <div class="form-group form-full">
           <label class="form-label">Cliente</label>
-          <input id="salidaCliente" class="form-input" type="text" placeholder="Nombre del cliente (opcional)" oninput="onClienteInput()">
-          <div onclick="usarClienteGenerico()" style="display:flex;align-items:center;gap:6px;background:rgba(91,142,255,0.1);border:1px solid rgba(91,142,255,0.25);border-radius:8px;padding:7px 12px;margin-top:5px;cursor:pointer;font-size:12px;color:var(--azul);font-weight:600">👤 Cliente Genérico</div>
+          <input id="salidaCliente" class="form-input" type="text" placeholder="Nombre del cliente (opcional)">
+          <div style="display:flex;align-items:center;gap:6px;background:rgba(91,142,255,0.1);border:1px solid rgba(91,142,255,0.25);border-radius:8px;padding:7px 12px;margin-top:5px;cursor:pointer;font-size:12px;color:var(--azul);font-weight:600">👤 Cliente Genérico</div>
         </div>
         <div class="form-group"><label class="form-label">N° Documento</label><input id="salidaDocumento" class="form-input" type="text" placeholder="Boleta, factura..."></div>
         <div class="form-group form-full">
           <label class="form-label">Método de pago *</label>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px" id="metodoPagoGrid">
-            <button type="button" class="metodo-pago-btn active" data-metodo="efectivo"      onclick="seleccionarMetodoPago('efectivo')">💵 Efectivo</button>
-            <button type="button" class="metodo-pago-btn"        data-metodo="debito"        onclick="seleccionarMetodoPago('debito')">💳 Débito</button>
-            <button type="button" class="metodo-pago-btn"        data-metodo="credito"       onclick="seleccionarMetodoPago('credito')">💳 Crédito</button>
-            <button type="button" class="metodo-pago-btn"        data-metodo="transferencia" onclick="seleccionarMetodoPago('transferencia')">📱 Transferencia</button>
-            <button type="button" class="metodo-pago-btn"        data-metodo="cheque"        onclick="seleccionarMetodoPago('cheque')">📝 Cheque</button>
-            <button type="button" class="metodo-pago-btn fiado"  data-metodo="fiado"         onclick="seleccionarMetodoPago('fiado')">📒 Fiado</button>
-            <button type="button" class="metodo-pago-btn"        data-metodo="mixto"         onclick="seleccionarMetodoPago('mixto')" style="grid-column:1/-1">🔀 Pago Mixto (varios métodos)</button>
+            <button type="button" class="metodo-pago-btn active" data-metodo="efectivo">💵 Efectivo</button>
+            <button type="button" class="metodo-pago-btn"        data-metodo="debito">💳 Débito</button>
+            <button type="button" class="metodo-pago-btn"        data-metodo="credito">💳 Crédito</button>
+            <button type="button" class="metodo-pago-btn"        data-metodo="transferencia">📱 Transferencia</button>
+            <button type="button" class="metodo-pago-btn"        data-metodo="cheque">📝 Cheque</button>
+            <button type="button" class="metodo-pago-btn fiado"  data-metodo="fiado">📒 Fiado</button>
+            <button type="button" class="metodo-pago-btn"        data-metodo="mixto" style="grid-column:1/-1">🔀 Pago Mixto (varios métodos)</button>
           </div>
           <div id="pagoMixtoPanel" style="display:none;margin-top:12px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px">
             <div style="text-align:center;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
@@ -1262,10 +1252,10 @@ input[type="text"]::placeholder { text-transform: none; }
               <div id="mixtoTotalVenta" style="font-family:var(--font-head);font-size:28px;font-weight:900;color:var(--text)">$0</div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💵 Efectivo</label><input id="mixtoEfectivo" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()"></div>
-              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💳 Débito</label><input id="mixtoDebito" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()"></div>
-              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💳 Crédito</label><input id="mixtoCredito" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()"></div>
-              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">📱 Transferencia</label><input id="mixtoTransferencia" class="form-input" type="number" min="0" placeholder="0" oninput="calcularMixtoRestante()"></div>
+              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💵 Efectivo</label><input id="mixtoEfectivo" class="form-input" type="number" min="0" placeholder="0"></div>
+              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💳 Débito</label><input id="mixtoDebito" class="form-input" type="number" min="0" placeholder="0"></div>
+              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💳 Crédito</label><input id="mixtoCredito" class="form-input" type="number" min="0" placeholder="0"></div>
+              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">📱 Transferencia</label><input id="mixtoTransferencia" class="form-input" type="number" min="0" placeholder="0"></div>
             </div>
             <div style="margin-top:12px">
               <div style="height:6px;background:var(--bg2);border-radius:99px;overflow:hidden;margin-bottom:8px">
@@ -1288,8 +1278,8 @@ input[type="text"]::placeholder { text-transform: none; }
       </div>
     </div>
     <div class="form-actions" style="flex-shrink:0;border-top:1px solid var(--border);padding:16px 24px">
-      <button type="button" class="btn-secondary" onclick="cerrarModalSalida()">Cancelar</button>
-      <button type="button" class="btn-primary" id="btnConfirmarVenta" onclick="guardarSalida()" disabled style="opacity:0.5">✔ Confirmar venta</button>
+      <button type="button" class="btn-secondary">Cancelar</button>
+      <button type="button" class="btn-primary" id="btnConfirmarVenta" disabled style="opacity:0.5">✔ Confirmar venta</button>
     </div>
   </div>
 </div>
@@ -1297,7 +1287,7 @@ input[type="text"]::placeholder { text-transform: none; }
 <!-- MODAL: Resolver cuarentena -->
 <div class="modal-overlay" id="modalResolucion">
   <div class="modal-box" style="max-width:420px">
-    <div class="modal-header"><div class="modal-title">⚠️ Resolver cuarentena</div><button class="modal-close" onclick="cerrarModalResolucion()">✕</button></div>
+    <div class="modal-header"><div class="modal-title">⚠️ Resolver cuarentena</div><button class="modal-close">✕</button></div>
     <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Decide el destino final del producto en cuarentena.</p>
     <form id="formResolucion">
       <div class="form-grid">
@@ -1313,8 +1303,8 @@ input[type="text"]::placeholder { text-transform: none; }
         <div class="form-group form-full"><label class="form-label">Nota de resolución</label><input id="resolucionNota" class="form-input" type="text" placeholder="Ej: Inspección aprobada, lote retirado..."></div>
       </div>
       <div class="form-actions">
-        <button type="button" class="btn-secondary" onclick="cerrarModalResolucion()">Cancelar</button>
-        <button type="button" class="btn-primary" onclick="guardarResolucion()">✔ Confirmar resolución</button>
+        <button type="button" class="btn-secondary">Cancelar</button>
+        <button type="button" class="btn-primary">✔ Confirmar resolución</button>
       </div>
     </form>
   </div>
@@ -1328,11 +1318,11 @@ input[type="text"]::placeholder { text-transform: none; }
   <div class="modal-box" style="max-width:520px">
     <div class="modal-header">
       <div class="modal-title">🔄 Cambiar Plan</div>
-      <button class="modal-close" onclick="cerrarModalUpgrade()">✕</button>
+      <button class="modal-close">✕</button>
     </div>
     <div style="padding:0 24px 24px">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">
-        <div id="cardPlanGratis" style="border:2px solid var(--border);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s" onclick="seleccionarPlan('gratis')">
+        <div id="cardPlanGratis" style="border:2px solid var(--border);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s">
           <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">🆓 Gratis</div>
           <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:8px">$0<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
           <div style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:5px">
@@ -1341,7 +1331,7 @@ input[type="text"]::placeholder { text-transform: none; }
           </div>
           <div style="margin-top:10px;font-size:11px;color:var(--muted);background:var(--bg3);border-radius:8px;padding:6px 10px">🎯 Para probar YeparStock</div>
         </div>
-        <div id="cardPlanBasico" style="border:2px solid var(--verde);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s;background:rgba(0,199,123,0.03)" onclick="seleccionarPlan('basico')">
+        <div id="cardPlanBasico" style="border:2px solid var(--verde);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s;background:rgba(0,199,123,0.03)">
           <div style="font-size:11px;color:var(--verde);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">🟢 Básico</div>
           <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:8px">$9.99 + IVA<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
           <div style="font-size:11px;display:flex;flex-direction:column;gap:5px">
@@ -1351,7 +1341,7 @@ input[type="text"]::placeholder { text-transform: none; }
           </div>
           <div style="margin-top:10px;font-size:11px;color:var(--verde);background:rgba(0,199,123,0.08);border-radius:8px;padding:6px 10px">🎯 Comercios y tiendas</div>
         </div>
-        <div id="cardPlanPro" style="border:2px solid var(--azul);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s;background:rgba(91,142,255,0.04)" onclick="seleccionarPlan('pro')">
+        <div id="cardPlanPro" style="border:2px solid var(--azul);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s;background:rgba(91,142,255,0.04)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
             <div style="font-size:11px;color:var(--azul);text-transform:uppercase;letter-spacing:1px;font-weight:700">🔵 Pro</div>
             <div style="font-size:10px;background:var(--azul);color:#fff;border-radius:20px;padding:2px 8px;font-weight:700">POPULAR</div>
@@ -1369,12 +1359,12 @@ input[type="text"]::placeholder { text-transform: none; }
         🎉 <strong>Precio fundador:</strong> Primeros 50 negocios acceden a Pro por <strong>$14.99 + IVA/mes de por vida</strong>. ¡Pocos cupos disponibles!
       </div>
       <div id="upgradeMensaje" style="display:none;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px"></div>
-      <button id="btnConfirmarPlan" onclick="confirmarCambioPlan()" class="btn-primary" disabled style="width:100%;justify-content:center;padding:13px;font-size:15px;opacity:0.5">
+      <button id="btnConfirmarPlan" class="btn-primary" disabled style="width:100%;justify-content:center;padding:13px;font-size:15px;opacity:0.5">
         Selecciona un plan para continuar
       </button>
       <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:10px">El cambio es inmediato · Sin compromiso</p>
       <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;display:flex;justify-content:center">
-        <button id="btnCancelarSuscripcionModal" style="background:transparent;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline" onclick="cerrarModalUpgrade(); cancelarSuscripcion()">
+        <button id="btnCancelarSuscripcionModal" style="background:transparent;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline">
           ❌ Cancelar suscripción
         </button>
       </div>
@@ -1387,7 +1377,7 @@ input[type="text"]::placeholder { text-transform: none; }
   <div class="modal-box" style="max-width:440px">
     <div class="modal-header">
       <div class="modal-title">👤 Invitar usuario al equipo</div>
-      <button class="modal-close" onclick="cerrarModalInvitar()">✕</button>
+      <button class="modal-close">✕</button>
     </div>
     <div style="padding:0 24px 8px;color:var(--muted);font-size:13px">
       El usuario podrá acceder al inventario de <strong id="invitarEmpresaNombre">tu negocio</strong>.
@@ -1417,14 +1407,15 @@ input[type="text"]::placeholder { text-transform: none; }
         </div>
       </div>
       <div class="form-actions">
-        <button type="button" class="btn-secondary" onclick="cerrarModalInvitar()">Cancelar</button>
-        <button type="button" class="btn-primary" onclick="guardarInvitacion()">✓ Agregar al equipo</button>
+        <button type="button" class="btn-secondary">Cancelar</button>
+        <button type="button" class="btn-primary">✓ Agregar al equipo</button>
       </div>
     </form>
   </div>
 </div>
 
 <script src="js/app.js"></script>
+<script src="js/events.js"></script>
 
 <!-- ============================================================
      Registrar Service Worker — activa la PWA
