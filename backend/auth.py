@@ -2,9 +2,6 @@
 # YEPARSTOCK — Módulo de Autenticación
 # Archivo: backend/auth.py  ← va en la RAIZ del backend
 # Descripcion: Funciones core — hashing, tokens y guards
-#
-# Analogia: la caja fuerte del sistema — aqui viven las llaves
-# maestras que todos los routers necesitan para funcionar.
 # ============================================================
 
 import os
@@ -37,8 +34,6 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 # ============================================================
 # encriptar_password
-# Analogia: meter la llave en una caja sellada — nadie puede
-# sacar la llave original, solo verificar si coincide
 # ============================================================
 def encriptar_password(password: str) -> str:
     return pwd_context.hash(password)
@@ -53,8 +48,6 @@ def verificar_password(plain: str, hashed: str) -> bool:
 
 # ============================================================
 # crear_token — genera JWT firmado con expiración
-# Analogia: el pase temporal del edificio — tiene tu nombre
-# y una fecha de vencimiento impresa
 # ============================================================
 def crear_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     payload = data.copy()
@@ -67,7 +60,14 @@ def crear_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
 
 # ============================================================
 # get_usuario_actual — extrae y valida el usuario del JWT
-# Analogia: el portero que lee el pase y verifica que sea válido
+#
+# Soporta dos formatos de token (campo "sub"):
+#   1. Email:    "juan@empresa.com"         → admin/dueño
+#   2. Username: "username:juan:5"          → operador sin email
+#      donde 5 es el empresa_id
+#
+# Analogia: el portero ahora acepta dos tipos de pase —
+# el carnet corporativo (email) y el carnet interno (username)
 # ============================================================
 def get_usuario_actual(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
@@ -83,8 +83,8 @@ def get_usuario_actual(
 
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
+        sub: str = payload.get("sub")
+        if sub is None:
             raise HTTPException(status_code=401, detail="Token inválido — sin subject")
     except JWTError:
         raise HTTPException(
@@ -93,12 +93,37 @@ def get_usuario_actual(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    # ── Determinar tipo de token y buscar usuario ────────────
+    if sub.startswith("username:"):
+        # Formato: "username:<username>:<empresa_id>"
+        # Analogia: el carnet interno tiene el apodo y el número de sucursal
+        partes = sub.split(":")
+        if len(partes) != 3:
+            raise HTTPException(status_code=401, detail="Token inválido — formato de username incorrecto")
+
+        _, username, empresa_id_str = partes
+
+        try:
+            empresa_id = int(empresa_id_str)
+        except ValueError:
+            raise HTTPException(status_code=401, detail="Token inválido — empresa_id no es numérico")
+
+        usuario = db.query(models.Usuario).filter(
+            models.Usuario.username   == username,
+            models.Usuario.empresa_id == empresa_id,
+        ).first()
+
+    else:
+        # Formato clásico: email
+        usuario = db.query(models.Usuario).filter(
+            models.Usuario.email == sub
+        ).first()
+
     if not usuario:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
     if not usuario.activo:
-        raise HTTPException(status_code=403, detail="Esta cuenta está desactivada")
+        raise HTTPException(status_code=403, detail="Esta cuenta está desactivada. Contacta al administrador.")
 
     return usuario
 
@@ -118,8 +143,6 @@ def solo_admin(usuario: models.Usuario) -> models.Usuario:
 
 # ============================================================
 # solo_plan_pro — permite solo empresas con plan Pro
-# Analogia: la sala VIP del aeropuerto — solo entra quien
-# tiene el ticket de primera clase activo
 # ============================================================
 def solo_plan_pro(
     usuario: models.Usuario = Depends(get_usuario_actual),
