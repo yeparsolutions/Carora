@@ -3480,6 +3480,10 @@ document.addEventListener("DOMContentLoaded", function(){
   var btnInvC = document.getElementById("btnInvitarColaborador");
   if (btnInvC) btnInvC.addEventListener("click", abrirModalInvitar);
 
+  // Botones del carrito de ventas
+  var btnAgrCart = document.getElementById("btnAgregarCarrito");
+  if (btnAgrCart) btnAgrCart.addEventListener("click", agregarAlCarrito);
+
   // Generar username automático al escribir nombre o apellido del colaborador
   var elNombre   = document.getElementById("invitarNombre");
   var elApellido = document.getElementById("invitarApellido");
