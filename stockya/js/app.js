@@ -3387,7 +3387,7 @@ async function guardarConfiguracion() {
 async function cargarConfiguracion() {
   // ── Mostrar/ocultar secciones según rol ──────────────────
   // Admin ve todo. Operador solo ve: cambiar contraseña, color, sonido.
-  var soloAdmin = ["settingsAdminNegocio", "settingsAdminCuenta", "settingsAdminPass", "settingsAdminFooter", "btnGuardarSettingsAdmin", "btnGuardarSettingsFooter"];
+  var soloAdmin = ["settingsAdminNegocio", "settingsAdminCuenta", "settingsAdminPass", "btnGuardarSettingsAdmin"];
   soloAdmin.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.style.display = esAdmin ? "" : "none";
