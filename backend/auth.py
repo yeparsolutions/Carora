@@ -283,3 +283,121 @@ def solo_plan_pro(
         )
 
     return usuario
+
+
+# ============================================================
+# ALIASES y FUNCIONES COMPATIBLES
+# El router usa nombres distintos — estos aliases los unifican
+# ============================================================
+
+# Alias: get_current_user → get_usuario_actual
+get_current_user = get_usuario_actual
+
+# Alias: hashear_password → encriptar_password
+def hashear_password(password: str) -> str:
+    return encriptar_password(password)
+
+# Alias: crear_access_token / crear_refresh_token → crear_token
+def crear_access_token(data: dict) -> str:
+    return crear_token(data, timedelta(minutes=ACCESS_TOKEN_MINUTES))
+
+def crear_refresh_token(data: dict) -> str:
+    return crear_token(data, timedelta(days=7))
+
+def verificar_token(token: str) -> Optional[dict]:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
+# ── Generación de username ───────────────────────────────────
+import unicodedata
+import re
+
+def generar_username(nombre: str, apellido: str) -> str:
+    """nombre.apellido en minúsculas sin tildes ni espacios."""
+    def limpiar(s: str) -> str:
+        s = unicodedata.normalize("NFD", s)
+        s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+        s = re.sub(r"[^a-z0-9]", "", s.lower().strip())
+        return s
+    n = limpiar(nombre.split()[0] if nombre else "usuario")
+    a = limpiar(apellido.split()[0] if apellido else "")
+    return f"{n}.{a}" if a else n
+
+def username_unico(base: str, db) -> str:
+    """Detecta colisiones y agrega número si ya existe."""
+    from models import Usuario
+    if not db.query(Usuario).filter(Usuario.username == base).first():
+        return base
+    i = 1
+    while db.query(Usuario).filter(Usuario.username == f"{base}{i}").first():
+        i += 1
+    return f"{base}{i}"
+
+# ── Códigos de verificación (en memoria) ────────────────────
+import secrets
+from datetime import datetime, timezone, timedelta
+
+_codigos: dict = {}  # {usuario_id_tipo: (codigo, expira)}
+
+def generar_codigo_verificacion() -> str:
+    return str(secrets.randbelow(900000) + 100000)
+
+def guardar_codigo(usuario_id: int, codigo: str, db, tipo: str = "verificacion") -> None:
+    key = f"{usuario_id}_{tipo}"
+    expira = datetime.now(timezone.utc) + timedelta(minutes=15)
+    _codigos[key] = (codigo, expira)
+
+def verificar_codigo(usuario_id: int, codigo: str, db, tipo: str = "verificacion") -> bool:
+    key = f"{usuario_id}_{tipo}"
+    entry = _codigos.get(key)
+    if not entry:
+        return False
+    stored, expira = entry
+    if datetime.now(timezone.utc) > expira:
+        del _codigos[key]
+        return False
+    if stored != codigo:
+        return False
+    del _codigos[key]
+    return True
+
+# ── Envío de emails ──────────────────────────────────────────
+import smtplib, os
+from email.mime.text import MIMEText
+
+def _enviar_email(destinatario: str, asunto: str, cuerpo: str) -> None:
+    smtp_host = os.getenv("SMTP_HOST", "")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASS", "")
+    if not smtp_host or not smtp_user:
+        print(f"[AUTH] Email omitido (sin config SMTP). Código para {destinatario}: {cuerpo[:6]}")
+        return
+    try:
+        msg = MIMEText(cuerpo, "html")
+        msg["Subject"] = asunto
+        msg["From"]    = smtp_user
+        msg["To"]      = destinatario
+        with smtplib.SMTP(smtp_host, smtp_port) as s:
+            s.starttls()
+            s.login(smtp_user, smtp_pass)
+            s.sendmail(smtp_user, [destinatario], msg.as_string())
+    except Exception as e:
+        print(f"[AUTH] Error enviando email: {e}")
+
+def enviar_codigo_email(email: str, codigo: str, nombre: str) -> None:
+    _enviar_email(
+        email,
+        "Verifica tu cuenta YeparStock",
+        f"<p>Hola <b>{nombre}</b>, tu código de verificación es: <b style='font-size:24px'>{codigo}</b></p>"
+    )
+
+def enviar_codigo_reset(email: str, codigo: str, nombre: str) -> None:
+    _enviar_email(
+        email,
+        "Recupera tu contraseña YeparStock",
+        f"<p>Hola <b>{nombre}</b>, tu código para restablecer tu contraseña es: <b style='font-size:24px'>{codigo}</b></p>"
+    )
