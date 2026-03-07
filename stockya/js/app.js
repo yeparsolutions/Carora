@@ -428,7 +428,7 @@ async function enterApp() {
       aplicarPermisosUI();
     } catch(e) {}
     await cargarDashboard();
-    showScreen("dashboard");
+    irPrimeraPantallaVisible();
     showToast("Bienvenido, " + _esc(usuarioActual.nombre.split(" ")[0]));
 
     // Ocultar badge hasta tener el plan real del servidor
@@ -2445,6 +2445,20 @@ function aplicarPermisosUI() {
   });
 }
 
+/* Navega a la primera pantalla del sidebar que esté visible y permitida */
+function irPrimeraPantallaVisible() {
+  var orden = ["dashboard","productos","stock","movimientos","salidas","alertas","reportes","fiados"];
+  var rol = usuarioActual ? usuarioActual.rol : "operador";
+  for (var i = 0; i < orden.length; i++) {
+    var s = orden[i];
+    if (rol === "admin" || permisosActual[s] !== false) {
+      showScreen(s);
+      return;
+    }
+  }
+  showScreen("dashboard"); // fallback
+}
+
 async function showScreen(name) {
   var rol = usuarioActual ? usuarioActual.rol : "operador";
   if (rol !== "admin" && permisosActual[name] === false) {
@@ -3376,7 +3390,7 @@ async function guardarConfiguracion() {
     document.getElementById("passStrengthWrap").style.display = "none";
 
     showToast("Configuración guardada correctamente");
-    showScreen("stock");
+    irPrimeraPantallaVisible();
   } catch (error) { showToast("Error: " + _esc(error.message)); }
 }
 
@@ -4289,7 +4303,7 @@ async function guardarConfigColaborador() {
     var fields = ["colabPassActual","colabPassNueva","colabPassConfirm"];
     fields.forEach(function(id){ var el = document.getElementById(id); if(el) el.value=""; });
     showToast("✅ Configuración guardada");
-    showScreen("stock");
+    irPrimeraPantallaVisible();
   } catch(e) {
     showToast("❌ " + _esc(e.message || "Error al guardar"));
   } finally {
