@@ -27,9 +27,28 @@ def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)
 
     codigo = str(random.randint(100000, 999999))
 
+    # Generar username: nombre.apellido (sin tildes, minúsculas)
+    import unicodedata, re
+    def _slug(t):
+        t = unicodedata.normalize("NFD", t)
+        t = t.encode("ascii", "ignore").decode()
+        return re.sub(r"[^a-z0-9]", "", t.lower())
+
+    base_username = _slug(datos.nombre)
+    if datos.apellido:
+        base_username = _slug(datos.nombre) + "." + _slug(datos.apellido)
+
+    # Detectar colisiones globales (admin no tiene empresa_id aún)
+    username_final = base_username
+    contador = 1
+    while db.query(models.Usuario).filter(models.Usuario.username == username_final).first():
+        username_final = base_username + str(contador)
+        contador += 1
+
     nuevo_usuario = models.Usuario(
         nombre              = datos.nombre,
         email               = datos.email,
+        username            = username_final,
         password_hash       = encriptar_password(datos.password),
         email_verificado    = False,
         codigo_verificacion = codigo,
@@ -79,37 +98,19 @@ def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)
 @router.post("/login", response_model=schemas.TokenRespuesta)
 def login(datos: schemas.LoginRequest, db: Session = Depends(get_db)):
     """
-    Login unificado:
-    - Si el valor recibido en `email` contiene '@' → busca por email (admin/dueño)
-    - Si no contiene '@' → busca por username dentro de la empresa correcta
-
-    Para operadores el campo `empresa_id` es opcional pero recomendado.
-    Si no se envía, busca el primer usuario con ese username activo.
+    Login unificado por username (nombre.apellido).
+    Todos los usuarios — admin y operadores — ingresan con username.
+    El email solo se usa para recuperar contraseña.
     """
-    login_valor = datos.email.strip().lower()
+    login_valor = datos.username.strip().lower()
     usuario = None
 
-    if "@" in login_valor:
-        # Login por email — modo admin/dueño
-        usuario = db.query(models.Usuario).filter(
-            models.Usuario.email == login_valor
-        ).first()
-    else:
-        # Login por username — modo operador
-        # Si el frontend envía empresa_id, úsalo para evitar colisiones
-        empresa_id = getattr(datos, "empresa_id", None)
-
-        if empresa_id:
-            usuario = db.query(models.Usuario).filter(
-                models.Usuario.username   == login_valor,
-                models.Usuario.empresa_id == empresa_id,
-            ).first()
-        else:
-            # Sin empresa_id: buscar username único activo
-            usuario = db.query(models.Usuario).filter(
-                models.Usuario.username == login_valor,
-                models.Usuario.activo   == True,
-            ).first()
+    # Buscar por username activo (único en toda la tabla para admins,
+    # puede repetirse entre empresas distintas para operadores)
+    usuario = db.query(models.Usuario).filter(
+        models.Usuario.username == login_valor,
+        models.Usuario.activo   == True,
+    ).first()
 
     if not usuario or not verificar_password(datos.password, usuario.password_hash):
         raise HTTPException(
@@ -123,8 +124,8 @@ def login(datos: schemas.LoginRequest, db: Session = Depends(get_db)):
             detail="Esta cuenta está desactivada. Contacta al administrador."
         )
 
-    # Para operadores (sin email), el token lleva el username como sub
-    sub = usuario.email if usuario.email else f"username:{usuario.username}:{usuario.empresa_id}"
+    # Token siempre con username como sub
+    sub = f"username:{usuario.username}:{usuario.empresa_id}" if usuario.empresa_id else f"username:{usuario.username}:0"
     token = crear_token({"sub": sub})
 
     return {
