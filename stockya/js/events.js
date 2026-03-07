@@ -371,13 +371,13 @@ document.addEventListener('DOMContentLoaded', function () {
   // CONFIGURACIÓN
   // ============================================================
 
-  // Botones guardar/descartar (header y footer)
+  // Botón guardar (footer único, admin y colaborador)
   var settingsBtns = document.querySelectorAll('#screen-settings .btn-primary');
   settingsBtns.forEach(function (btn) {
-    btn.addEventListener('click', function () { guardarConfiguracion(); });
+    if (btn.id !== 'btnProbarSonido') {
+      btn.addEventListener('click', function () { guardarConfiguracion(); });
+    }
   });
-  var btnDescartar = document.querySelector('#screen-settings .btn-secondary');
-  if (btnDescartar) btnDescartar.addEventListener('click', function () { descartarCambios(); });
 
   // Logo — subir, pegar URL, quitar
   var inputLogo    = el('inputLogo');
@@ -423,23 +423,20 @@ document.addEventListener('DOMContentLoaded', function () {
     evaluarFuerzaPassword(this.value);
   });
 
-  // Sonidos del escáner — labels con data-sound
-  var soundOptions = document.querySelectorAll('.sound-option');
-  soundOptions.forEach(function (label) {
-    var sound = label.getAttribute('data-sound');
-    // Clic en el label → seleccionar sonido
-    label.addEventListener('click', function () {
-      seleccionarSonido(sound, this);
+  // Sonido del escáner — dropdown select
+  var soundSelect = el('soundSelect');
+  if (soundSelect) {
+    soundSelect.addEventListener('change', function () {
+      seleccionarSonido(this.value, null);
     });
-    // Botón "▶ Probar" dentro del label
-    var previewBtn = label.querySelector('.sound-preview-btn');
-    if (previewBtn) {
-      previewBtn.addEventListener('click', function (e) {
-        e.stopPropagation(); // no disparar el click del label
-        _beepPreview(sound);
-      });
-    }
-  });
+  }
+  var btnProbarSonido = el('btnProbarSonido');
+  if (btnProbarSonido) {
+    btnProbarSonido.addEventListener('click', function () {
+      var sel = document.getElementById('soundSelect');
+      _beepPreview(sel ? sel.value : 'scanner');
+    });
+  }
 
   // ============================================================
   // MODAL: Agregar producto rápido
