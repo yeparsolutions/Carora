@@ -360,12 +360,12 @@ async function guardarOnboarding() {
    AUTENTICACION
    ============================================================ */
 async function enterApp() {
-  const emailInput = document.getElementById("loginEmail");
-  const passInput  = document.getElementById("loginPassword");
-  const email      = emailInput ? emailInput.value.trim() : "";
-  const password   = passInput  ? passInput.value.trim()  : "";
+  const usernameInput = document.getElementById("loginUsername");
+  const passInput     = document.getElementById("loginPassword");
+  const username      = usernameInput ? usernameInput.value.trim().toLowerCase() : "";
+  const password      = passInput     ? passInput.value.trim()  : "";
 
-  if (!email || !password) { showToast("Ingresa tu correo y contrasena"); return; }
+  if (!username || !password) { showToast("Ingresa tu usuario y contraseña"); return; }
 
   // [SEC-2] Rate limiting: máximo 5 intentos de login cada 5 minutos
   // Analogia: si te equivocas la contraseña 5 veces, la caja te bloquea 5 minutos
@@ -376,7 +376,7 @@ async function enterApp() {
   }
 
   try {
-    const data    = await api("/auth/login", "POST", { email, password });
+    const data    = await api("/auth/login", "POST", { username, password });
     authToken     = data.access_token;
     usuarioActual = data.usuario;
     localStorage.setItem("yeparstock_token",   authToken);
@@ -447,6 +447,7 @@ var _emailPendiente = "";
 
 async function registrarUsuario() {
   const nombre   = document.getElementById("regNombre").value.trim();
+  const apellido = document.getElementById("regApellido") ? document.getElementById("regApellido").value.trim() : "";
   const email    = document.getElementById("regEmail").value.trim();
   const password = document.getElementById("regPassword").value.trim();
   if (!nombre || !email || !password) { showToast("Completa todos los campos"); return; }
@@ -463,7 +464,7 @@ async function registrarUsuario() {
   }
 
   try {
-    const data = await api("/auth/registro", "POST", { nombre, email, password });
+    const data = await api("/auth/registro", "POST", { nombre, apellido, email, password });
     _emailPendiente = email;
     _mostrarPanel("panelVerificacion");
     document.getElementById("verifiEmailMostrar").textContent = email; // textContent es seguro
