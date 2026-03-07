@@ -12,7 +12,7 @@
    [SEC-5] Sanitización HTML: función _esc() + textContent para prevenir XSS
    ============================================================ */
 
-// Detecta automáticamente si estás en la PC (localhost) o en otro dispositivo (celular)
+// Detecta automáticamente si estás  la PC (localhost) o en otro dispositivo (celular)
 // Analogia: si estás en casa usas "mi habitación", si vienes de afuera usas la dirección completa
 const API_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
   ? "http://localhost:8000"
