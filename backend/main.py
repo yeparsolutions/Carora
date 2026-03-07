@@ -84,6 +84,9 @@ def ejecutar_migraciones():
 
         # 2e. max_sucursales en empresas (1 por defecto, 3 para Pro)
         "ALTER TABLE empresas ADD COLUMN IF NOT EXISTS max_sucursales INTEGER DEFAULT 1",
+        "ALTER TABLE empresas ADD COLUMN IF NOT EXISTS activa BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE empresas ADD COLUMN IF NOT EXISTS bloqueado BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE empresas ADD COLUMN IF NOT EXISTS en_gracia BOOLEAN DEFAULT FALSE",
 
         # 2f. sucursal_id en productos, movimientos y salidas para trazabilidad
         "ALTER TABLE productos    ADD COLUMN IF NOT EXISTS sucursal_id INTEGER REFERENCES sucursales(id) ON DELETE SET NULL",
