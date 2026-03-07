@@ -25,6 +25,22 @@ class LoginRequest(BaseModel):
     username: str      # siempre username (nombre.apellido) — el email solo se usa para recuperar contraseña
     password: str
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+class RegistroRequest(BaseModel):
+    nombre:   str
+    apellido: Optional[str] = None
+    email:    EmailStr
+    password: str
+
+class OnboardingRequest(BaseModel):
+    nombre_negocio: Optional[str] = None
+    rubro:          Optional[str] = None
+    moneda:         Optional[str] = "CLP"
+    logo_base64:    Optional[str] = None
+    nombre_usuario: Optional[str] = None
+
 class UsuarioRespuesta(BaseModel):
     id:         int
     nombre:     str
