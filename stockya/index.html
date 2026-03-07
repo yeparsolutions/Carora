@@ -159,8 +159,8 @@ input[type="text"]::placeholder { text-transform: none; }
       <div id="panelLogin">
         <p class="login-tagline">Sabe qué se está acabando<br>antes de quedarte sin stock.</p>
         <div class="form-group" style="margin-bottom:12px">
-          <label class="form-label">Correo electrónico</label>
-          <input id="loginEmail" class="form-input" type="email" placeholder="tu@negocio.com"
+          <label class="form-label">Usuario</label>
+          <input id="loginUsername" class="form-input" type="text" placeholder="nombre.apellido"
                  autocomplete="username">
         </div>
         <div class="form-group" style="margin-bottom:20px">
@@ -186,6 +186,10 @@ input[type="text"]::placeholder { text-transform: none; }
           <input id="regEmail" class="form-input" type="email" placeholder="tu@negocio.com"
                  autocomplete="email">
         </div>
+              <div class="form-group">
+                <label for="regApellido">Apellido</label>
+                <input id="regApellido" type="text" placeholder="Pérez" autocomplete="family-name">
+              </div>
         <div class="form-group" style="margin-bottom:20px">
           <!-- [SEC-3] Placeholder y label consistentes con la validación real (8 caracteres) -->
           <label class="form-label">Contraseña * (mínimo 8 caracteres)</label>
