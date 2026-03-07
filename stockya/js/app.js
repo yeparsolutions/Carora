@@ -83,8 +83,12 @@ var _sonidoActivo = localStorage.getItem("yeparstock_sonido") || "scanner";
 function seleccionarSonido(tipo, el) {
   _sonidoActivo = tipo;
   localStorage.setItem("yeparstock_sonido", tipo);
+  // compatibilidad con labels de radio (si quedaran)
   document.querySelectorAll(".sound-option").forEach(function(o){ o.classList.remove("active"); });
   if (el) el.closest(".sound-option").classList.add("active");
+  // actualizar select dropdown
+  var sel = document.getElementById("soundSelect");
+  if (sel) sel.value = tipo;
 }
 
 // Previsualización — toca el sonido sin cambiar la preferencia guardada
@@ -3372,6 +3376,7 @@ async function guardarConfiguracion() {
     document.getElementById("passStrengthWrap").style.display = "none";
 
     showToast("Configuración guardada correctamente");
+    showScreen("stock");
   } catch (error) { showToast("Error: " + _esc(error.message)); }
 }
 
@@ -3382,7 +3387,7 @@ async function guardarConfiguracion() {
 async function cargarConfiguracion() {
   // ── Mostrar/ocultar secciones según rol ──────────────────
   // Admin ve todo. Operador solo ve: cambiar contraseña, color, sonido.
-  var soloAdmin = ["settingsAdminNegocio", "settingsAdminCuenta", "settingsAdminPass", "settingsAdminFooter", "btnGuardarSettingsAdmin"];
+  var soloAdmin = ["settingsAdminNegocio", "settingsAdminCuenta", "settingsAdminPass", "settingsAdminFooter", "btnGuardarSettingsAdmin", "btnGuardarSettingsFooter"];
   soloAdmin.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.style.display = esAdmin ? "" : "none";
@@ -3432,9 +3437,8 @@ async function cargarConfiguracion() {
       _sonidoActivo = config.sonido_escaner;
       localStorage.setItem("yeparstock_sonido", config.sonido_escaner);
     }
-    document.querySelectorAll(".sound-option").forEach(function(o){ o.classList.remove("active"); });
-    var optActiva = document.querySelector('.sound-option[data-sound="' + _esc(_sonidoActivo) + '"]');
-    if (optActiva) optActiva.classList.add("active");
+    var soundSel = document.getElementById("soundSelect");
+    if (soundSel) soundSel.value = _sonidoActivo;
 
     // Color del colaborador
     if (!esAdmin && config.color_principal) {
@@ -4285,6 +4289,7 @@ async function guardarConfigColaborador() {
     var fields = ["colabPassActual","colabPassNueva","colabPassConfirm"];
     fields.forEach(function(id){ var el = document.getElementById(id); if(el) el.value=""; });
     showToast("✅ Configuración guardada");
+    showScreen("stock");
   } catch(e) {
     showToast("❌ " + _esc(e.message || "Error al guardar"));
   } finally {
