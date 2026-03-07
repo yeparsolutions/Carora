@@ -411,9 +411,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var colabColor = el('colabColor');
   if (colabColor) colabColor.addEventListener('input', function () { previsualizarColor(this.value); });
 
-  // Botón guardar colaborador
-  var btnGuardarConfigColab = el('btnGuardarConfigColab');
-  if (btnGuardarConfigColab) btnGuardarConfigColab.addEventListener('click', function () { guardarConfiguracion(); });
+  // Botón guardar colaborador — usa el footer único #btnGuardarSettingsFooter
 
   // Contraseñas — botones "ojo"
   var eyeBtns = document.querySelectorAll('.settings-eye-btn');
