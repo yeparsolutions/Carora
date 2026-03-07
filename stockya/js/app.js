@@ -376,7 +376,7 @@ async function enterApp() {
   }
 
   try {
-    const data    = await api("/auth/login", "POST", { username, password });
+    const data    = await api("/auth/login", "POST", { username: username.toLowerCase(), password });
     authToken     = data.access_token;
     usuarioActual = data.usuario;
     localStorage.setItem("yeparstock_token",   authToken);
