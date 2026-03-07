@@ -565,7 +565,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (salidaPrecioUnitario) salidaPrecioUnitario.addEventListener('input', function () { calcularTotalVenta(); });
 
   // Botón "+ Agregar" en chip venta
-  var btnAgregarAlCarrito = document.querySelector('#productoChip button[type="button"]:last-of-type');
+  var btnAgregarAlCarrito = document.getElementById('btnAgregarCarrito');
   if (btnAgregarAlCarrito) btnAgregarAlCarrito.addEventListener('click', function () { agregarAlCarrito(); });
 
   // Select producto salida
