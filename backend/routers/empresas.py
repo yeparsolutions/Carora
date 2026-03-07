@@ -1,539 +1,281 @@
 # ============================================================
-# STOCKYA — Router de Empresas
-# Archivo: backend/routers/empresas.py
-# ============================================================
-# CAMBIOS v2 — Multi-sucursal:
-#   ✅ cambiar-plan: al subir a Pro → max_sucursales = 3
-#      y crea "Sucursal Principal" si la empresa no tiene ninguna
-#   ✅ info: devuelve sucursales disponibles y usadas
+# YEPARSTOCK — backend/routers/empresas.py
+# Gestión de empresa: info, plan, usuarios, permisos
+#
+# CAMBIO v1.3.1:
+#   puede_crear_sucursal ahora depende de:
+#     - plan == "pro"  Y
+#     - total_sucursales < max_sucursales (max = 3)
+#
+#   En gratis y basico, puede_crear_sucursal = False siempre.
+#   El frontend usa este campo para mostrar/ocultar el botón
+#   "Nueva Sucursal".
 # ============================================================
 
-from fastapi import APIRouter, Depends, HTTPException, Body
-from pydantic import BaseModel
-from typing import Optional
+from fastapi        import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func as sqlfunc
-from datetime import datetime, timedelta, timezone
-from database import get_db
-from auth import get_usuario_actual, solo_admin
-import models
+from models         import Usuario, Empresa, Sucursal, Producto
+from database       import get_db
+import auth as auth_utils
 
-router = APIRouter(prefix="/empresa", tags=["Empresa"])
-
-# ── Schemas Pydantic ──────────────────────────────────────────
-class InvitarSchema(BaseModel):
-    nombre:   str
-    username: str
-    password: str
-    rol:      str = "operador"
-
-class MiConfigSchema(BaseModel):
-    password_actual: Optional[str] = None
-    password_nuevo:  Optional[str] = None
-    color_interfaz:  Optional[str] = None
-    sonido_escaner:  Optional[str] = None
-
-SECCIONES_VALIDAS = {
-    "dashboard", "productos", "stock", "movimientos",
-    "salidas", "alertas", "reportes", "fiados"
-}
+router = APIRouter(prefix="/empresa", tags=["empresa"])
 
 
-# ============================================================
-# GET /empresa/info
-# ✅ CAMBIO: ahora incluye datos de sucursales en la respuesta
-# El frontend puede saber cuántas sucursales tiene y cuántas
-# le quedan disponibles según su plan
-# ============================================================
+# ── INFO EMPRESA ─────────────────────────────────────────────
 @router.get("/info")
-def obtener_info_empresa(
-    db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+async def info_empresa(
+    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
+    db:             Session = Depends(get_db)
 ):
-    empresa = db.query(models.Empresa).filter(
-        models.Empresa.id == usuario_actual.empresa_id
+    """
+    Devuelve estado completo de la empresa: plan, sucursales,
+    productos, límites y si puede crear más sucursales.
+
+    puede_crear_sucursal:
+      True  → solo si plan Pro Y total < max (3)
+      False → gratis, basico, o Pro que ya llegó al límite
+    """
+    empresa = db.query(Empresa).filter(
+        Empresa.id == usuario_actual.empresa_id
     ).first()
 
     if not empresa:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
 
-    total_usuarios  = db.query(sqlfunc.count(models.Usuario.id)).filter(
-        models.Usuario.empresa_id == empresa.id,
-        models.Usuario.activo     == True
-    ).scalar() or 0
+    # Contar sucursales y productos actuales
+    total_sucursales = db.query(Sucursal).filter(
+        Sucursal.empresa_id == empresa.id,
+        Sucursal.activa     == True
+    ).count()
 
-    total_productos = db.query(sqlfunc.count(models.Producto.id)).filter(
-        models.Producto.empresa_id == empresa.id,
-        models.Producto.activo     == True
-    ).scalar() or 0
+    total_productos = db.query(Producto).filter(
+        Producto.empresa_id == empresa.id
+    ).count()
 
-    # ✅ NUEVO: contar sucursales activas
-    total_sucursales = db.query(sqlfunc.count(models.Sucursal.id)).filter(
-        models.Sucursal.empresa_id == empresa.id,
-        models.Sucursal.activa     == True
-    ).scalar() or 0
+    total_usuarios = db.query(Usuario).filter(
+        Usuario.empresa_id == empresa.id,
+        Usuario.activo     == True
+    ).count()
 
-    # ✅ NUEVO: max_sucursales según el plan (con fallback seguro)
-    max_sucursales = getattr(empresa, "max_sucursales", 1) or 1
-
-    ahora          = datetime.now(timezone.utc)
-    esta_cancelado = empresa.cancelado_en is not None
-    en_gracia      = esta_cancelado and empresa.gracia_hasta and ahora < empresa.gracia_hasta
-    bloqueado      = esta_cancelado and (not empresa.gracia_hasta or ahora >= empresa.gracia_hasta)
+    # ─── REGLA CENTRAL ───────────────────────────────────────
+    # Solo el plan Pro puede crear sucursales adicionales,
+    # y solo si no llegó al límite de 3.
+    # Gratis y Basico tienen max_sucursales = 1 (solo la principal).
+    puede_crear_sucursal = (
+        empresa.plan == "pro" and
+        total_sucursales < empresa.max_sucursales
+    )
+    # ─────────────────────────────────────────────────────────
 
     return {
         "id":                  empresa.id,
         "nombre":              empresa.nombre,
-        "plan":                empresa.plan.value if hasattr(empresa.plan, "value") else empresa.plan,
-        "plan_precio":         empresa.plan_precio,
-        "plan_es_fundador":    empresa.plan_es_fundador,
-        "plan_activo":         empresa.plan_activo,
-        "plan_expira":         empresa.plan_expira,
-        "max_usuarios":        empresa.max_usuarios,
-        "max_productos":       empresa.max_productos,
-        "total_usuarios":      total_usuarios,
-        "total_productos":     total_productos,
-        "cancelado_en":        empresa.cancelado_en,
-        "gracia_hasta":        empresa.gracia_hasta,
-        "esta_cancelado":      esta_cancelado,
-        "en_gracia":           en_gracia,
-        "bloqueado":           bloqueado,
-        # ✅ NUEVO: datos de sucursales para el frontend
-        "max_sucursales":      max_sucursales,
+        "rubro":               empresa.rubro,
+        "moneda":              empresa.moneda,
+        "logo_base64":         empresa.logo_base64,
+        "plan":                empresa.plan,
+        "activa":              empresa.activa,
+
+        # Suscripción
+        "bloqueado":           getattr(empresa, "bloqueado",    False),
+        "en_gracia":           getattr(empresa, "en_gracia",    False),
+        "gracia_hasta":        getattr(empresa, "gracia_hasta", None),
+
+        # Sucursales
+        "max_sucursales":      empresa.max_sucursales,
         "total_sucursales":    total_sucursales,
-        "puede_crear_sucursal": total_sucursales < max_sucursales,
+        "puede_crear_sucursal": puede_crear_sucursal,
+
+        # Otros límites
+        "max_productos":       getattr(empresa, "max_productos",  None),
+        "total_productos":     total_productos,
+        "total_usuarios":      total_usuarios,
     }
 
 
-# ============================================================
-# PATCH /empresa/cambiar-plan
-# ✅ CAMBIOS:
-#   1. Al subir a Pro → max_sucursales = 3
-#   2. Si la empresa no tiene ninguna sucursal → crea "Sucursal Principal"
-#      (caso de empresas que existían antes de la migración)
-#   3. Al bajar a Básico → max_sucursales = 1 (no borra las sucursales,
-#      solo las congela — el admin decide cuál conservar)
-# ============================================================
-@router.patch("/cambiar-plan")
-def cambiar_plan(
-    nuevo_plan: str,
-    db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+# ── MIS PERMISOS ─────────────────────────────────────────────
+@router.get("/mis-permisos")
+async def mis_permisos(
+    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
+    db:             Session = Depends(get_db)
 ):
-    solo_admin(usuario_actual)
+    """
+    Devuelve los permisos del usuario actual.
+    Admin y Líder tienen acceso total a su ámbito.
+    """
+    rol = usuario_actual.rol
 
-    empresa = db.query(models.Empresa).filter(
-        models.Empresa.id == usuario_actual.empresa_id
-    ).first()
-
-    if not empresa:
-        raise HTTPException(status_code=404, detail="Empresa no encontrada")
-
-    plan_actual = empresa.plan.value if hasattr(empresa.plan, "value") else empresa.plan
-
-    if nuevo_plan not in ("basico", "pro"):
-        raise HTTPException(status_code=400, detail="Plan inválido. Debe ser 'basico' o 'pro'")
-
-    if nuevo_plan == plan_actual:
-        raise HTTPException(status_code=400, detail="Ya estás en ese plan")
-
-    if nuevo_plan == "basico":
-        total_usuarios = db.query(sqlfunc.count(models.Usuario.id)).filter(
-            models.Usuario.empresa_id == empresa.id,
-            models.Usuario.activo     == True
-        ).scalar() or 0
-
-        total_productos = db.query(sqlfunc.count(models.Producto.id)).filter(
-            models.Producto.empresa_id == empresa.id,
-            models.Producto.activo     == True
-        ).scalar() or 0
-
-        if total_usuarios > 1:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Tienes {total_usuarios} usuarios activos. Desactiva {total_usuarios - 1} antes de bajar a Básico."
-            )
-        if total_productos > 200:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Tienes {total_productos} productos. Elimina {total_productos - 200} antes de bajar a Básico."
-            )
-
-    if nuevo_plan == "pro":
-        empresa.plan           = "pro"
-        empresa.plan_precio    = 29990
-        empresa.max_usuarios   = 3
-        empresa.max_productos  = 1500
-        empresa.max_sucursales = 3   # ✅ NUEVO: Pro permite hasta 3 sucursales
-
-        # ✅ NUEVO: si la empresa no tiene ninguna sucursal, crear la Principal
-        # Analogía: al abrir la cuenta Pro, el banco te entrega la tarjeta
-        # de la cuenta principal automáticamente
-        total_sucursales = db.query(sqlfunc.count(models.Sucursal.id)).filter(
-            models.Sucursal.empresa_id == empresa.id
-        ).scalar() or 0
-
-        if total_sucursales == 0:
-            sucursal_principal = models.Sucursal(
-                empresa_id = empresa.id,
-                nombre     = "Sucursal Principal",
-                activa     = True,
-            )
-            db.add(sucursal_principal)
-            db.flush()
-
-            # Asignar el admin a la sucursal principal si aún no tiene una
-            if not usuario_actual.sucursal_id:
-                usuario_actual.sucursal_id = sucursal_principal.id
-                db.add(usuario_actual)
-
-    else:
-        # Bajando a básico
-        empresa.plan           = "basico"
-        empresa.plan_precio    = 14990
-        empresa.max_usuarios   = 1
-        empresa.max_productos  = 200
-        empresa.max_sucursales = 1   # ✅ NUEVO: básico vuelve a 1 sucursal
-
-    empresa.cancelado_en = None
-    empresa.gracia_hasta = None
-    empresa.plan_activo  = True
-
-    db.commit()
-    db.refresh(empresa)
-    return {"ok": True, "plan": nuevo_plan}
-
-
-# ============================================================
-# POST /empresa/cancelar-suscripcion — sin cambios
-# ============================================================
-@router.post("/cancelar-suscripcion")
-def cancelar_suscripcion(
-    db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
-):
-    empresa = db.query(models.Empresa).filter(
-        models.Empresa.id == usuario_actual.empresa_id
-    ).first()
-
-    if not empresa:
-        raise HTTPException(status_code=404, detail="Empresa no encontrada")
-
-    if empresa.cancelado_en:
-        raise HTTPException(status_code=400, detail="La suscripción ya está cancelada")
-
-    ahora = datetime.now(timezone.utc)
-
-    if empresa.plan_expira and empresa.plan_expira > ahora:
-        gracia = empresa.plan_expira + timedelta(days=7)
-    else:
-        gracia = ahora + timedelta(days=7)
-
-    empresa.cancelado_en = ahora
-    empresa.gracia_hasta = gracia
-    empresa.plan_activo  = False
-    db.commit()
+    # Admin y líder tienen acceso completo (en su sucursal)
+    acceso_total = rol in ("admin", "lider")
 
     return {
-        "ok":           True,
-        "cancelado_en": empresa.cancelado_en,
-        "gracia_hasta": empresa.gracia_hasta,
-        "mensaje":      f"Suscripción cancelada. Podrás ver reportes y dashboard hasta el {gracia.strftime('%d/%m/%Y')}."
+        "rol":          rol,
+        "acceso_total": acceso_total,
+        "puede_ver_reportes":    acceso_total,
+        "puede_editar_config":   rol == "admin",
+        "puede_invitar_usuarios": acceso_total,
+        "puede_ver_equipo":      acceso_total,
+        "puede_crear_sucursales": rol == "admin",  # solo admin gestiona sucursales
     }
 
 
-# ============================================================
-# POST /empresa/reactivar — sin cambios
-# ============================================================
-@router.post("/reactivar")
-def reactivar_suscripcion(
-    db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
-):
-    empresa = db.query(models.Empresa).filter(
-        models.Empresa.id == usuario_actual.empresa_id
-    ).first()
-
-    if not empresa:
-        raise HTTPException(status_code=404, detail="Empresa no encontrada")
-
-    empresa.cancelado_en = None
-    empresa.gracia_hasta = None
-    empresa.plan_activo  = True
-    db.commit()
-
-    return {"ok": True, "mensaje": "Suscripción reactivada correctamente"}
-
-
-# ============================================================
-# GET /empresa/usuarios — sin cambios
-# ============================================================
+# ── USUARIOS DE LA EMPRESA ───────────────────────────────────
 @router.get("/usuarios")
-def listar_usuarios_empresa(
-    db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+async def listar_usuarios(
+    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
+    db:             Session = Depends(get_db)
 ):
-    usuarios = db.query(models.Usuario).filter(
-        models.Usuario.empresa_id == usuario_actual.empresa_id
+    """Lista todos los usuarios activos de la empresa."""
+    usuarios = db.query(Usuario).filter(
+        Usuario.empresa_id == usuario_actual.empresa_id,
+        Usuario.activo     == True
     ).all()
 
     return [_usuario_dict(u) for u in usuarios]
 
 
-# ============================================================
-# POST /empresa/invitar — sin cambios
-# ============================================================
-@router.post("/invitar")
-def invitar_colaborador(
-    datos: InvitarSchema,
-    db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
+# ── CAMBIAR PLAN ─────────────────────────────────────────────
+@router.post("/cambiar-plan")
+async def cambiar_plan(
+    datos:          dict,
+    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
+    db:             Session = Depends(get_db)
 ):
-    from auth import encriptar_password
+    """
+    Cambia el plan de la empresa.
 
-    solo_admin(usuario_actual)
+    Al subir a Pro:
+      - max_sucursales = 3
+      - crea Sucursal Principal si por alguna razón no existe
 
-    empresa = db.query(models.Empresa).filter(
-        models.Empresa.id == usuario_actual.empresa_id
-    ).first()
+    Al bajar a basico/gratis:
+      - max_sucursales = 1
+      - puede_crear_sucursal = False automáticamente (lo calcula /info)
+    """
+    if usuario_actual.rol != "admin":
+        raise HTTPException(status_code=403, detail="Solo el admin puede cambiar el plan")
 
+    nuevo_plan = datos.get("plan", "").lower()
+    if nuevo_plan not in ("gratis", "basico", "pro"):
+        raise HTTPException(status_code=400, detail="Plan inválido")
+
+    empresa = db.query(Empresa).filter(Empresa.id == usuario_actual.empresa_id).first()
     if not empresa:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
 
-    total_activos = db.query(sqlfunc.count(models.Usuario.id)).filter(
-        models.Usuario.empresa_id == empresa.id,
-        models.Usuario.activo     == True
-    ).scalar() or 0
+    empresa.plan = nuevo_plan
 
-    if empresa.max_usuarios > 0 and total_activos >= empresa.max_usuarios:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Límite de {empresa.max_usuarios} usuarios alcanzado. Sube tu plan para agregar más."
-        )
+    if nuevo_plan == "pro":
+        # Pro puede tener hasta 3 sucursales
+        empresa.max_sucursales = 3
 
-    username_lower = datos.username.strip().lower()
-    existe = db.query(models.Usuario).filter(
-        models.Usuario.empresa_id == usuario_actual.empresa_id,
-        models.Usuario.username   == username_lower,
-    ).first()
+        # Seguridad: si por algún motivo no tiene Sucursal Principal, crearla
+        tiene_sucursal = db.query(Sucursal).filter(
+            Sucursal.empresa_id == empresa.id
+        ).first()
 
-    if existe:
-        raise HTTPException(status_code=400, detail=f"El username '{username_lower}' ya está en uso en tu empresa")
+        if not tiene_sucursal:
+            suc = Sucursal(
+                empresa_id = empresa.id,
+                nombre     = "Sucursal Principal",
+                activa     = True,
+            )
+            db.add(suc)
+            # Asignar al admin si no tiene sucursal
+            if not usuario_actual.sucursal_id:
+                db.flush()
+                usuario_actual.sucursal_id = suc.id
 
-    rol_valido = datos.rol if datos.rol in ("operador", "lider") else "operador"
-
-    nuevo = models.Usuario(
-        empresa_id    = usuario_actual.empresa_id,
-        nombre        = datos.nombre,
-        username      = username_lower,
-        password_hash = encriptar_password(datos.password),
-        rol           = rol_valido,
-        activo        = True,
-        email_verificado = True,
-    )
-    db.add(nuevo)
-    db.flush()
-
-    for seccion in SECCIONES_VALIDAS:
-        permiso = models.PermisoUsuario(
-            usuario_id = nuevo.id,
-            seccion    = seccion,
-            permitido  = True,
-        )
-        db.add(permiso)
+    else:
+        # Gratis y básico solo pueden tener 1 sucursal
+        empresa.max_sucursales = 1
 
     db.commit()
-    db.refresh(nuevo)
-
-    return _usuario_dict(nuevo)
-
-
-# ============================================================
-# PATCH /empresa/usuarios/{id}/rol — sin cambios
-# ============================================================
-@router.patch("/usuarios/{usuario_id}/rol")
-def cambiar_rol(
-    usuario_id: int,
-    rol:        str,
-    db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
-):
-    solo_admin(usuario_actual)
-    u = _get_usuario_empresa(usuario_id, usuario_actual.empresa_id, db)
-    u.rol = rol
-    db.commit()
-    return _usuario_dict(u)
-
-
-# ============================================================
-# PATCH /empresa/usuarios/{id}/estado — sin cambios
-# ============================================================
-@router.patch("/usuarios/{usuario_id}/estado")
-def cambiar_estado_usuario(
-    usuario_id: int,
-    activo:     bool,
-    db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
-):
-    solo_admin(usuario_actual)
-    u = _get_usuario_empresa(usuario_id, usuario_actual.empresa_id, db)
-
-    if u.id == usuario_actual.id:
-        raise HTTPException(status_code=400, detail="No puedes desactivarte a ti mismo")
-
-    u.activo = activo
-    db.commit()
-    return _usuario_dict(u)
-
-
-# ============================================================
-# GET /empresa/usuarios/{id}/permisos — sin cambios
-# ============================================================
-@router.get("/usuarios/{usuario_id}/permisos")
-def obtener_permisos(
-    usuario_id: int,
-    db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
-):
-    solo_admin(usuario_actual)
-    _get_usuario_empresa(usuario_id, usuario_actual.empresa_id, db)
-
-    permisos = db.query(models.PermisoUsuario).filter(
-        models.PermisoUsuario.usuario_id == usuario_id
-    ).all()
-
-    if not permisos:
-        return {s: True for s in SECCIONES_VALIDAS}
-
-    return {p.seccion: p.permitido for p in permisos}
-
-
-# ============================================================
-# PUT /empresa/usuarios/{id}/permisos — sin cambios
-# ============================================================
-@router.put("/usuarios/{usuario_id}/permisos")
-def actualizar_permisos(
-    usuario_id: int,
-    permisos:   dict = Body(...),
-    db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
-):
-    solo_admin(usuario_actual)
-    u = _get_usuario_empresa(usuario_id, usuario_actual.empresa_id, db)
-
-    if u.rol == "admin":
-        raise HTTPException(status_code=400, detail="Los administradores tienen acceso total y no requieren permisos granulares")
-
-    secciones_invalidas = set(permisos.keys()) - SECCIONES_VALIDAS
-    if secciones_invalidas:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Secciones inválidas: {', '.join(secciones_invalidas)}. Válidas: {', '.join(SECCIONES_VALIDAS)}"
-        )
-
-    db.query(models.PermisoUsuario).filter(
-        models.PermisoUsuario.usuario_id == usuario_id
-    ).delete()
-
-    for seccion, permitido in permisos.items():
-        db.add(models.PermisoUsuario(
-            usuario_id = usuario_id,
-            seccion    = seccion,
-            permitido  = bool(permitido),
-        ))
-
-    secciones_recibidas = set(permisos.keys())
-    for seccion in SECCIONES_VALIDAS - secciones_recibidas:
-        db.add(models.PermisoUsuario(
-            usuario_id = usuario_id,
-            seccion    = seccion,
-            permitido  = False,
-        ))
-
-    db.commit()
-    return {"ok": True, "permisos": permisos}
-
-
-# ============================================================
-# GET /empresa/mis-permisos — sin cambios
-# ============================================================
-@router.get("/mis-permisos")
-def mis_permisos(
-    db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
-):
-    rol = usuario_actual.rol.value if hasattr(usuario_actual.rol, "value") else usuario_actual.rol
-
-    if rol in ("admin", "lider"):
-        return {s: True for s in SECCIONES_VALIDAS}
-
-    permisos = db.query(models.PermisoUsuario).filter(
-        models.PermisoUsuario.usuario_id == usuario_actual.id
-    ).all()
-
-    if not permisos:
-        return {s: True for s in SECCIONES_VALIDAS}
-
-    return {p.seccion: p.permitido for p in permisos}
-
-
-# ============================================================
-# PUT /empresa/mi-config — sin cambios
-# ============================================================
-@router.put("/mi-config")
-def actualizar_config_colaborador(
-    datos: MiConfigSchema,
-    db: Session = Depends(get_db),
-    usuario_actual: models.Usuario = Depends(get_usuario_actual)
-):
-    from auth import encriptar_password, verificar_password
-
-    if datos.password_nuevo:
-        if not datos.password_actual:
-            raise HTTPException(status_code=400, detail="Debes ingresar tu contraseña actual para cambiarla")
-        if not verificar_password(datos.password_actual, usuario_actual.password_hash):
-            raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
-        usuario_actual.password_hash = encriptar_password(datos.password_nuevo)
-
-    if datos.color_interfaz is not None:
-        usuario_actual.color_interfaz = datos.color_interfaz
-
-    if datos.sonido_escaner is not None:
-        usuario_actual.sonido_escaner = datos.sonido_escaner
-
-    db.add(usuario_actual)
-    db.commit()
-    db.refresh(usuario_actual)
 
     return {
-        "ok":             True,
-        "color_interfaz": usuario_actual.color_interfaz,
-        "sonido_escaner": usuario_actual.sonido_escaner,
+        "mensaje":         f"Plan cambiado a {nuevo_plan}",
+        "plan":            nuevo_plan,
+        "max_sucursales":  empresa.max_sucursales,
     }
 
 
-# ============================================================
-# Helpers privados
-# ============================================================
-def _get_usuario_empresa(usuario_id: int, empresa_id: int, db: Session) -> models.Usuario:
-    u = db.query(models.Usuario).filter(
-        models.Usuario.id         == usuario_id,
-        models.Usuario.empresa_id == empresa_id
-    ).first()
-    if not u:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return u
+# ── CANCELAR SUSCRIPCIÓN ─────────────────────────────────────
+@router.post("/cancelar-suscripcion")
+async def cancelar_suscripcion(
+    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
+    db:             Session = Depends(get_db)
+):
+    if usuario_actual.rol != "admin":
+        raise HTTPException(status_code=403, detail="Solo el admin puede cancelar")
+
+    empresa = db.query(Empresa).filter(Empresa.id == usuario_actual.empresa_id).first()
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+    # Marcar en gracia (7 días de acceso solo lectura)
+    from datetime import datetime, timedelta
+    empresa.en_gracia    = True
+    empresa.gracia_hasta = datetime.utcnow() + timedelta(days=7)
+    db.commit()
+
+    return {"mensaje": "Suscripción cancelada. Tienes 7 días de acceso de solo lectura."}
 
 
-def _usuario_dict(u) -> dict:
+# ── REACTIVAR SUSCRIPCIÓN ────────────────────────────────────
+@router.post("/reactivar")
+async def reactivar_suscripcion(
+    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
+    db:             Session = Depends(get_db)
+):
+    if usuario_actual.rol != "admin":
+        raise HTTPException(status_code=403, detail="Solo el admin puede reactivar")
+
+    empresa = db.query(Empresa).filter(Empresa.id == usuario_actual.empresa_id).first()
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+    empresa.en_gracia    = False
+    empresa.gracia_hasta = None
+    empresa.bloqueado    = False
+    db.commit()
+
+    return {"mensaje": "Suscripción reactivada correctamente"}
+
+
+# ── ACTUALIZAR EMPRESA ───────────────────────────────────────
+@router.put("/actualizar")
+async def actualizar_empresa(
+    datos:          dict,
+    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
+    db:             Session = Depends(get_db)
+):
+    """Actualiza nombre, rubro, moneda y logo de la empresa."""
+    if usuario_actual.rol != "admin":
+        raise HTTPException(status_code=403, detail="Solo el admin puede editar la empresa")
+
+    empresa = db.query(Empresa).filter(Empresa.id == usuario_actual.empresa_id).first()
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+    if "nombre"   in datos: empresa.nombre      = datos["nombre"]
+    if "rubro"    in datos: empresa.rubro        = datos["rubro"]
+    if "moneda"   in datos: empresa.moneda       = datos["moneda"]
+    if "logo_base64" in datos: empresa.logo_base64 = datos["logo_base64"]
+
+    db.commit()
+    return {"mensaje": "Empresa actualizada correctamente"}
+
+
+# ── HELPER INTERNO ───────────────────────────────────────────
+def _usuario_dict(u: Usuario) -> dict:
+    """Convierte un objeto Usuario en dict para la API."""
     return {
-        "id":             u.id,
-        "nombre":         u.nombre,
-        "email":          u.email,
-        "username":       u.username,
-        "rol":            u.rol.value if hasattr(u.rol, "value") else u.rol,
-        "activo":         u.activo,
-        "sucursal_id":    u.sucursal_id,   # ✅ NUEVO: incluir sucursal en respuesta
-        "color_interfaz": u.color_interfaz,
-        "sonido_escaner": u.sonido_escaner,
+        "id":          u.id,
+        "nombre":      u.nombre,
+        "apellido":    u.apellido or "",
+        "username":    u.username,
+        "email":       u.email or "",
+        "rol":         u.rol,
+        "activo":      u.activo,
+        "sucursal_id": u.sucursal_id,  # incluido para el frontend
     }
