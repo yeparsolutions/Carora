@@ -47,9 +47,9 @@ document.addEventListener('DOMContentLoaded', function () {
   if (btnCrearCuenta) btnCrearCuenta.addEventListener('click', function () { mostrarRegistro(); });
 
   // ── Login con Enter en campos de email/password ──
-  var loginEmail = el('loginEmail');
+  var loginUsername = el('loginUsername');
   var loginPassword = el('loginPassword');
-  if (loginEmail) loginEmail.addEventListener('keydown', function (e) {
+  if (loginUsername) loginUsername.addEventListener('keydown', function (e) {
     if (e.key === 'Enter') enterApp();
   });
   if (loginPassword) loginPassword.addEventListener('keydown', function (e) {
@@ -361,8 +361,8 @@ document.addEventListener('DOMContentLoaded', function () {
   // EQUIPO
   // ============================================================
 
-  var btnInvitarUsuario = el('btnInvitarUsuario');
-  if (btnInvitarUsuario) btnInvitarUsuario.addEventListener('click', function () { abrirModalInvitar(); });
+  var btnInvitarColaborador = el('btnInvitarColaborador');
+  if (btnInvitarColaborador) btnInvitarColaborador.addEventListener('click', function () { abrirModalInvitar(); });
 
   var btnUpgradePlan = el('btnUpgradePlan');
   if (btnUpgradePlan) btnUpgradePlan.addEventListener('click', function () { abrirModalUpgrade(); });
@@ -565,7 +565,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (salidaPrecioUnitario) salidaPrecioUnitario.addEventListener('input', function () { calcularTotalVenta(); });
 
   // Botón "+ Agregar" en chip venta
-  var btnAgregarAlCarrito = document.querySelector('#productoChip button[type="button"]:last-of-type');
+  var btnAgregarAlCarrito = document.getElementById('btnAgregarCarrito');
   if (btnAgregarAlCarrito) btnAgregarAlCarrito.addEventListener('click', function () { agregarAlCarrito(); });
 
   // Select producto salida
