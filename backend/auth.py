@@ -1,7 +1,12 @@
 # ============================================================
 # YEPARSTOCK — Módulo de Autenticación
-# Archivo: backend/auth.py  ← va en la RAIZ del backend
-# Descripcion: Funciones core — hashing, tokens y guards
+# Archivo: backend/auth.py
+# ============================================================
+# CAMBIOS v2 — Multi-sucursal Plan Pro:
+#   ✅ solo_lider()         → permite solo rol "lider"
+#   ✅ admin_o_lider()      → permite admin O lider
+#   ✅ verificar_acceso_sucursal() → valida que el lider
+#      solo toque su propia sucursal
 # ============================================================
 
 import os
@@ -30,6 +35,14 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # ── Extractor de Bearer token ────────────────────────────────
 bearer_scheme = HTTPBearer(auto_error=False)
+
+# Límites de sucursales por plan
+# Analogía: el contrato de franquicia que firma cada dueño
+LIMITE_SUCURSALES = {
+    "gratis": 1,
+    "basico": 1,
+    "pro":    3,
+}
 
 
 # ============================================================
@@ -63,11 +76,8 @@ def crear_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
 #
 # Soporta dos formatos de token (campo "sub"):
 #   1. Email:    "juan@empresa.com"         → admin/dueño
-#   2. Username: "username:juan:5"          → operador sin email
+#   2. Username: "username:juan:5"          → operador/lider sin email
 #      donde 5 es el empresa_id
-#
-# Analogia: el portero ahora acepta dos tipos de pase —
-# el carnet corporativo (email) y el carnet interno (username)
 # ============================================================
 def get_usuario_actual(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
@@ -96,7 +106,6 @@ def get_usuario_actual(
     # ── Determinar tipo de token y buscar usuario ────────────
     if sub.startswith("username:"):
         # Formato: "username:<username>:<empresa_id>"
-        # Analogia: el carnet interno tiene el apodo y el número de sucursal
         partes = sub.split(":")
         if len(partes) != 3:
             raise HTTPException(status_code=401, detail="Token inválido — formato de username incorrecto")
@@ -109,7 +118,6 @@ def get_usuario_actual(
             raise HTTPException(status_code=401, detail="Token inválido — empresa_id no es numérico")
 
         if empresa_id == 0:
-            # Admin recién registrado — aún no tiene empresa_id asignado
             usuario = db.query(models.Usuario).filter(
                 models.Usuario.username == username,
             ).first()
@@ -136,6 +144,7 @@ def get_usuario_actual(
 
 # ============================================================
 # solo_admin — permite solo usuarios con rol admin
+# Sin cambios respecto a v1
 # ============================================================
 def solo_admin(usuario: models.Usuario) -> models.Usuario:
     rol = usuario.rol.value if hasattr(usuario.rol, "value") else usuario.rol
@@ -148,7 +157,106 @@ def solo_admin(usuario: models.Usuario) -> models.Usuario:
 
 
 # ============================================================
-# solo_plan_pro — permite solo empresas con plan Pro
+# solo_lider — ✅ NUEVO
+# Permite solo usuarios con rol "lider" (gerente de sucursal)
+# Analogía: puerta que solo abre con el carnet de gerente de piso
+# ============================================================
+def solo_lider(usuario: models.Usuario) -> models.Usuario:
+    rol = usuario.rol.value if hasattr(usuario.rol, "value") else usuario.rol
+    if rol != "lider":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo los líderes de sucursal pueden realizar esta acción",
+        )
+    return usuario
+
+
+# ============================================================
+# admin_o_lider — ✅ NUEVO
+# Permite admin O lider — cada uno con su alcance de datos.
+# El filtro de sucursal se aplica en los routers según el rol.
+#
+# Analogía: la sala de reuniones acepta tanto al dueño del hotel
+# como al gerente de piso, pero cada uno solo habla de su área.
+# ============================================================
+def admin_o_lider(usuario: models.Usuario) -> models.Usuario:
+    rol = usuario.rol.value if hasattr(usuario.rol, "value") else usuario.rol
+    if rol not in ("admin", "lider"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requiere rol de administrador o líder de sucursal",
+        )
+    return usuario
+
+
+# ============================================================
+# verificar_acceso_sucursal — ✅ NUEVO
+# Valida que un líder solo acceda a SU sucursal.
+# Si es admin, pasa siempre.
+#
+# Uso en routers:
+#   verificar_acceso_sucursal(usuario, sucursal_id_del_recurso)
+#
+# Analogía: la llave del gerente abre su piso, no los demás.
+# ============================================================
+def verificar_acceso_sucursal(usuario: models.Usuario, sucursal_id: int) -> None:
+    rol = usuario.rol.value if hasattr(usuario.rol, "value") else usuario.rol
+
+    # El admin siempre puede — tiene el llavero maestro
+    if rol == "admin":
+        return
+
+    # El lider solo puede si esa sucursal es la suya
+    if rol == "lider":
+        if usuario.sucursal_id != sucursal_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes acceso a esta sucursal",
+            )
+        return
+
+    # Cualquier otro rol (operador) no tiene acceso a gestión de sucursales
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="No tienes permisos para esta acción",
+    )
+
+
+# ============================================================
+# verificar_limite_sucursales — ✅ NUEVO
+# Valida que la empresa no supere su límite según el plan.
+# Llamar ANTES de crear una nueva sucursal.
+#
+# Analogía: el portero cuenta cuántos locales ya tienes antes
+# de firmarte el contrato del nuevo local.
+# ============================================================
+def verificar_limite_sucursales(empresa: models.Empresa, db: Session) -> None:
+    plan = empresa.plan.value if hasattr(empresa.plan, "value") else empresa.plan
+
+    # Cuántas sucursales activas tiene esta empresa
+    total_activas = db.query(models.Sucursal).filter(
+        models.Sucursal.empresa_id == empresa.id,
+        models.Sucursal.activa     == True
+    ).count()
+
+    limite = LIMITE_SUCURSALES.get(plan, 1)
+
+    if total_activas >= limite:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "tipo":            "limite_sucursales",
+                "mensaje":         f"Tu plan '{plan}' permite máximo {limite} sucursal(es) activa(s).",
+                "sucursales_usadas": total_activas,
+                "limite":          limite,
+                "plan_actual":     plan,
+                "upgrade_url":     "/planes",
+            }
+        )
+
+
+# ============================================================
+# solo_plan_pro — sin cambios respecto a v1
 # ============================================================
 def solo_plan_pro(
     usuario: models.Usuario = Depends(get_usuario_actual),
