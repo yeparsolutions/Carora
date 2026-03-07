@@ -82,6 +82,7 @@ class Usuario(Base):
     id                  = Column(Integer, primary_key=True, index=True)
     empresa_id          = Column(Integer, ForeignKey("empresas.id"), nullable=False, index=True)
     nombre              = Column(String(100), nullable=False)
+    apellido            = Column(String(100), nullable=True)                            # ✅ NUEVO: para generar username
     email               = Column(String(150), unique=True, nullable=True, index=True)  # nullable para operadores
     username            = Column(String(50),  nullable=True, index=True)               # ✅ NUEVO: login sin email
     password_hash       = Column(String(255), nullable=False)
