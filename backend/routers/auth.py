@@ -2,6 +2,10 @@
 # YEPARSTOCK – Router de Autenticación
 # Archivo: backend/routers/auth.py
 # ============================================================
+# CAMBIOS v2 — Multi-sucursal:
+#   ✅ completar_onboarding: crea "Sucursal Principal" automáticamente
+#      al momento en que el admin termina de configurar su negocio
+# ============================================================
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -14,7 +18,7 @@ router = APIRouter(prefix="/auth", tags=["Autenticación"])
 
 
 # ============================================================
-# POST /auth/registro
+# POST /auth/registro — sin cambios
 # ============================================================
 @router.post("/registro", response_model=schemas.TokenRespuesta, status_code=201)
 def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)):
@@ -27,7 +31,6 @@ def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)
 
     codigo = str(random.randint(100000, 999999))
 
-    # Generar username: nombre.apellido (sin tildes, minúsculas)
     import unicodedata, re
     def _slug(t):
         t = unicodedata.normalize("NFD", t)
@@ -38,7 +41,6 @@ def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)
     if datos.apellido:
         base_username = _slug(datos.nombre) + "." + _slug(datos.apellido)
 
-    # Detectar colisiones globales (admin no tiene empresa_id aún)
     username_final = base_username
     contador = 1
     while db.query(models.Usuario).filter(models.Usuario.username == username_final).first():
@@ -88,25 +90,12 @@ def registrar_usuario(datos: schemas.UsuarioCrear, db: Session = Depends(get_db)
 
 
 # ============================================================
-# POST /auth/login
-# ✅ ACTUALIZADO: acepta email (admin) o username (operador)
-#    El campo "email" del body puede recibir cualquiera de los dos.
-#    Analogia: la entrada del local tiene dos puertas —
-#    el dueño entra con su RUT (email), el empleado con
-#    su carnet interno (username).
+# POST /auth/login — sin cambios
 # ============================================================
 @router.post("/login", response_model=schemas.TokenRespuesta)
 def login(datos: schemas.LoginRequest, db: Session = Depends(get_db)):
-    """
-    Login unificado por username (nombre.apellido).
-    Todos los usuarios — admin y operadores — ingresan con username.
-    El email solo se usa para recuperar contraseña.
-    """
     login_valor = datos.username.strip().lower()
-    usuario = None
 
-    # Buscar por username activo (único en toda la tabla para admins,
-    # puede repetirse entre empresas distintas para operadores)
     usuario = db.query(models.Usuario).filter(
         models.Usuario.username == login_valor,
         models.Usuario.activo   == True,
@@ -124,8 +113,6 @@ def login(datos: schemas.LoginRequest, db: Session = Depends(get_db)):
             detail="Esta cuenta está desactivada. Contacta al administrador."
         )
 
-    # Admin usa email como sub (puede tener empresa_id tardío)
-    # Operador usa username:empresa_id
     rol = usuario.rol.value if hasattr(usuario.rol, "value") else usuario.rol
     if rol == "admin" and usuario.email:
         sub = usuario.email
@@ -141,7 +128,7 @@ def login(datos: schemas.LoginRequest, db: Session = Depends(get_db)):
 
 
 # ============================================================
-# GET /auth/onboarding-status
+# GET /auth/onboarding-status — sin cambios
 # ============================================================
 @router.get("/onboarding-status")
 def onboarding_status(
@@ -158,6 +145,12 @@ def onboarding_status(
 
 # ============================================================
 # POST /auth/completar-onboarding
+# ✅ CAMBIO: después de crear la empresa, se crea automáticamente
+#    la "Sucursal Principal" y se asigna el admin a ella.
+#
+# Analogía: cuando firmas el contrato del local, el banco
+# te abre automáticamente la cuenta principal — no tienes
+# que pedirla por separado.
 # ============================================================
 @router.post("/completar-onboarding")
 def completar_onboarding(
@@ -171,17 +164,32 @@ def completar_onboarding(
     if not usuario_actual.empresa_id:
         nombre_empresa = datos.nombre_negocio or "Mi Negocio"
         nueva_empresa  = models.Empresa(
-            nombre        = nombre_empresa,
-            plan          = "basico",
-            plan_activo   = True,
-            max_usuarios  = 1,
-            max_productos = 200,
+            nombre         = nombre_empresa,
+            plan           = "basico",
+            plan_activo    = True,
+            max_usuarios   = 1,
+            max_productos  = 200,
+            max_sucursales = 1,   # basico comienza con 1
         )
         db.add(nueva_empresa)
-        db.flush()
+        db.flush()  # obtener el ID sin hacer commit todavía
 
         usuario_actual.empresa_id = nueva_empresa.id
         usuario_actual.rol        = "admin"
+
+        # ✅ NUEVO: crear "Sucursal Principal" automáticamente
+        # Analogía: el primer local siempre se llama "Casa Matriz"
+        sucursal_principal = models.Sucursal(
+            empresa_id = nueva_empresa.id,
+            nombre     = "Sucursal Principal",
+            activa     = True,
+        )
+        db.add(sucursal_principal)
+        db.flush()  # obtener el ID de la sucursal
+
+        # ✅ NUEVO: asignar el admin a la sucursal principal
+        # El admin puede ver todas, pero queda "anclado" a la principal
+        usuario_actual.sucursal_id = sucursal_principal.id
 
     db.add(usuario_actual)
 
@@ -207,7 +215,7 @@ def completar_onboarding(
 
 
 # ============================================================
-# PUT /auth/perfil
+# PUT /auth/perfil — sin cambios
 # ============================================================
 @router.put("/perfil", response_model=schemas.UsuarioRespuesta)
 def actualizar_perfil(
@@ -245,7 +253,7 @@ def actualizar_perfil(
 
 
 # ============================================================
-# GET /auth/yo
+# GET /auth/yo — sin cambios
 # ============================================================
 @router.get("/yo", response_model=schemas.UsuarioRespuesta)
 def obtener_yo(usuario_actual: models.Usuario = Depends(get_usuario_actual)):
@@ -253,7 +261,7 @@ def obtener_yo(usuario_actual: models.Usuario = Depends(get_usuario_actual)):
 
 
 # ============================================================
-# POST /auth/verificar-email
+# POST /auth/verificar-email — sin cambios
 # ============================================================
 @router.post("/verificar-email")
 def verificar_email(
@@ -284,7 +292,7 @@ def verificar_email(
 
 
 # ============================================================
-# POST /auth/reenviar-codigo
+# POST /auth/reenviar-codigo — sin cambios
 # ============================================================
 @router.post("/reenviar-codigo")
 def reenviar_codigo(
@@ -321,7 +329,7 @@ def reenviar_codigo(
 
 
 # ============================================================
-# POST /auth/solicitar-reset
+# POST /auth/solicitar-reset — sin cambios
 # ============================================================
 @router.post("/solicitar-reset")
 def solicitar_reset(
@@ -357,7 +365,7 @@ def solicitar_reset(
 
 
 # ============================================================
-# Templates HTML
+# Templates HTML — sin cambios
 # ============================================================
 def _template_verificacion(nombre: str, codigo: str) -> str:
     return f"""
