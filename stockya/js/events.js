@@ -565,7 +565,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (salidaPrecioUnitario) salidaPrecioUnitario.addEventListener('input', function () { calcularTotalVenta(); });
 
   // Botón "+ Agregar" en chip venta
-  var btnAgregarAlCarrito = document.getElementById('btnAgregarCarrito');
+  var btnAgregarAlCarrito = document.querySelector('#productoChip button[type="button"]:last-of-type');
   if (btnAgregarAlCarrito) btnAgregarAlCarrito.addEventListener('click', function () { agregarAlCarrito(); });
 
   // Select producto salida
@@ -586,11 +586,18 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
-  // Botones método de pago (usan data-metodo)
-  var metodoPagoBtns = document.querySelectorAll('.metodo-pago-btn');
+  // Botones método de pago principales
+  var metodoPagoBtns = document.querySelectorAll('#metodoPagoGrid .metodo-pago-btn');
   metodoPagoBtns.forEach(function (btn) {
     var metodo = btn.getAttribute('data-metodo');
     btn.addEventListener('click', function () { seleccionarMetodoPago(metodo); });
+  });
+
+  // Sub-botones de tarjeta (débito / crédito)
+  var tarjetaBtns = document.querySelectorAll('#tarjetaSubModal .metodo-pago-btn');
+  tarjetaBtns.forEach(function (btn) {
+    var subtipo = btn.getAttribute('data-subtipo');
+    btn.addEventListener('click', function () { seleccionarMetodoPago('tarjeta', subtipo); });
   });
 
   // Inputs pago mixto
