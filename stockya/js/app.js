@@ -3351,47 +3351,54 @@ async function guardarConfiguracion() {
    Analogia: cuando abres tu ficha en el banco, ves TUS datos
    ============================================================ */
 async function cargarConfiguracion() {
-  var campos = ["inputNegocio","inputNombreUsuario","inputEmail","inputPassActual","inputPassNueva","inputPassConfirm"];
-  campos.forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ""; });
+  // ── Mostrar/ocultar secciones según rol ──────────────────
+  // Admin ve todo. Operador solo ve: cambiar contraseña, color, sonido.
+  var soloAdmin = ["settingsAdminNegocio", "settingsAdminCuenta", "settingsAdminPass", "settingsAdminFooter", "btnGuardarSettingsAdmin"];
+  soloAdmin.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = esAdmin ? "" : "none";
+  });
+  var panelColab = document.getElementById("configColaboradorPanel");
+  if (panelColab) panelColab.style.display = esAdmin ? "none" : "block";
 
-  // Bloquear campos de empresa para operadores
-  var seccionEmpresa = document.querySelector(".settings-section");
-  if (seccionEmpresa) {
-    var inputsEmpresa = seccionEmpresa.querySelectorAll("input, select, button:not(.settings-eye-btn)");
-    inputsEmpresa.forEach(function(el) {
-      if (esAdmin) {
-        el.removeAttribute("disabled");
-        el.style.opacity = "";
-        el.style.cursor  = "";
-      } else {
-        el.setAttribute("disabled", "true");
-        el.style.opacity = "0.5";
-        el.style.cursor  = "not-allowed";
-      }
-    });
-    var avisoAdmin = document.getElementById("avisoSoloAdmin");
-    if (!avisoAdmin) {
-      avisoAdmin = document.createElement("div");
-      avisoAdmin.id = "avisoSoloAdmin";
-      avisoAdmin.style.cssText = "font-size:12px;color:var(--muted);margin-top:8px;padding:8px 12px;background:var(--bg3);border-radius:8px;";
-      // [SEC-5] textContent para mensaje de solo lectura
-      avisoAdmin.textContent = "🔒 Solo el administrador puede modificar los datos del negocio.";
-      var logoInfo = document.querySelector(".settings-logo-info");
-      if (logoInfo) logoInfo.appendChild(avisoAdmin);
-    }
-    avisoAdmin.style.display = esAdmin ? "none" : "block";
-  }
+  // Limpiar campos
+  var campos = ["inputNegocio","inputNombreUsuario","inputEmail","inputPassActual","inputPassNueva","inputPassConfirm","colabPassActual","colabPassNueva","colabPassConfirm"];
+  campos.forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ""; });
 
   try {
     var config = await api("/configuracion/");
 
-    var inputNegocio = document.getElementById("inputNegocio");
-    var inputMoneda  = document.getElementById("inputMoneda");
-    if (inputNegocio) inputNegocio.value = config.nombre_negocio || "";
-    if (inputMoneda)  inputMoneda.value  = config.moneda         || "CLP";
+    if (esAdmin) {
+      var inputNegocio = document.getElementById("inputNegocio");
+      var inputMoneda  = document.getElementById("inputMoneda");
+      if (inputNegocio) inputNegocio.value = config.nombre_negocio || "";
+      if (inputMoneda)  inputMoneda.value  = config.moneda         || "CLP";
+      if (config.color_principal) previsualizarColor(config.color_principal);
 
-    if (config.color_principal) previsualizarColor(config.color_principal);
+      var img = document.getElementById("logoImg");
+      var ini = document.getElementById("logoInitials");
+      if (config.logo_base64) {
+        configTemporal.logoData = config.logo_base64;
+        if (img) { img.src = config.logo_base64; img.style.display = "block"; }
+        if (ini) ini.style.display = "none";
+      } else {
+        configTemporal.logoData = null;
+        if (img) { img.src = ""; img.style.display = "none"; }
+        if (ini) {
+          var nombre = usuarioActual ? usuarioActual.nombre : "";
+          var partes = nombre.split(" ");
+          ini.textContent = partes.length >= 2 ? (partes[0][0]+partes[1][0]).toUpperCase() : nombre.slice(0,2).toUpperCase();
+          ini.style.display = "flex";
+        }
+      }
 
+      var inputNombreUsuario = document.getElementById("inputNombreUsuario");
+      var inputEmail         = document.getElementById("inputEmail");
+      if (inputNombreUsuario) inputNombreUsuario.value = usuarioActual ? usuarioActual.nombre : "";
+      if (inputEmail)         inputEmail.value         = usuarioActual ? (usuarioActual.email || "") : "";
+    }
+
+    // Sonido — visible para todos
     if (config.sonido_escaner) {
       _sonidoActivo = config.sonido_escaner;
       localStorage.setItem("yeparstock_sonido", config.sonido_escaner);
@@ -3400,37 +3407,19 @@ async function cargarConfiguracion() {
     var optActiva = document.querySelector('.sound-option[data-sound="' + _esc(_sonidoActivo) + '"]');
     if (optActiva) optActiva.classList.add("active");
 
-    var img = document.getElementById("logoImg");
-    var ini = document.getElementById("logoInitials");
-    if (config.logo_base64) {
-      configTemporal.logoData = config.logo_base64;
-      if (img) { img.src = config.logo_base64; img.style.display = "block"; }
-      if (ini) ini.style.display = "none";
-    } else {
-      configTemporal.logoData = null;
-      if (img) { img.src = ""; img.style.display = "none"; }
-      if (ini) {
-        var nombre = usuarioActual ? usuarioActual.nombre : "";
-        var partes = nombre.split(" ");
-        // [SEC-5] textContent para iniciales
-        ini.textContent = partes.length >= 2 ? (partes[0][0]+partes[1][0]).toUpperCase() : nombre.slice(0,2).toUpperCase();
-        ini.style.display = "flex";
-      }
+    // Color del colaborador
+    if (!esAdmin && config.color_principal) {
+      var colabColorInput = document.getElementById("colabColor");
+      if (colabColorInput) colabColorInput.value = config.color_principal;
     }
 
-    var inputNombreUsuario = document.getElementById("inputNombreUsuario");
-    var inputEmail         = document.getElementById("inputEmail");
-    if (inputNombreUsuario) inputNombreUsuario.value = usuarioActual ? usuarioActual.nombre : "";
-    if (inputEmail)         inputEmail.value         = usuarioActual ? usuarioActual.email  : "";
-
-    var panelColab = document.getElementById("configColaboradorPanel");
-    if (panelColab) panelColab.style.display = esAdmin ? "none" : "block";
-
   } catch(e) {
-    var inputNombreUsuario = document.getElementById("inputNombreUsuario");
-    var inputEmail         = document.getElementById("inputEmail");
-    if (inputNombreUsuario) inputNombreUsuario.value = usuarioActual ? usuarioActual.nombre : "";
-    if (inputEmail)         inputEmail.value         = usuarioActual ? usuarioActual.email  : "";
+    if (esAdmin) {
+      var inputNombreUsuario = document.getElementById("inputNombreUsuario");
+      var inputEmail         = document.getElementById("inputEmail");
+      if (inputNombreUsuario) inputNombreUsuario.value = usuarioActual ? usuarioActual.nombre : "";
+      if (inputEmail)         inputEmail.value         = usuarioActual ? (usuarioActual.email || "") : "";
+    }
   }
 }
 
