@@ -124,8 +124,13 @@ def login(datos: schemas.LoginRequest, db: Session = Depends(get_db)):
             detail="Esta cuenta está desactivada. Contacta al administrador."
         )
 
-    # Token siempre con username como sub
-    sub = f"username:{usuario.username}:{usuario.empresa_id}" if usuario.empresa_id else f"username:{usuario.username}:0"
+    # Admin usa email como sub (puede tener empresa_id tardío)
+    # Operador usa username:empresa_id
+    rol = usuario.rol.value if hasattr(usuario.rol, "value") else usuario.rol
+    if rol == "admin" and usuario.email:
+        sub = usuario.email
+    else:
+        sub = f"username:{usuario.username}:{usuario.empresa_id}"
     token = crear_token({"sub": sub})
 
     return {
