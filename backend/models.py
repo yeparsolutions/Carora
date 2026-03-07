@@ -2,6 +2,12 @@
 # YEPARSTOCK - Modelos de base de datos
 # Archivo: backend/models.py
 # ============================================================
+# CAMBIOS v2 — Multi-sucursal Plan Pro:
+#   ✅ Nuevo enum: RolUsuario agrega "lider"
+#   ✅ Nueva tabla: Sucursal (máx 3 por empresa en plan Pro)
+#   ✅ Usuario ahora tiene sucursal_id (FK opcional)
+#   ✅ Empresa tiene max_sucursales según plan
+# ============================================================
 
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
@@ -34,6 +40,7 @@ class PlanEmpresa(str, enum.Enum):
 
 class RolUsuario(str, enum.Enum):
     admin    = "admin"
+    lider    = "lider"      # ✅ NUEVO: gerente de sucursal
     operador = "operador"
 
 
@@ -61,6 +68,10 @@ class Empresa(Base):
 
     max_usuarios       = Column(Integer, default=1)
     max_productos      = Column(Integer, default=500)
+    # ✅ NUEVO: límite de sucursales según plan
+    # Analogía: el contrato de franquicia dice cuántos locales puedes abrir
+    #   gratis/basico = 1 sucursal | pro = hasta 3
+    max_sucursales     = Column(Integer, default=1)
 
     onboarding_completo = Column(Boolean, default=False)
     created_at         = Column(DateTime(timezone=True), server_default=func.now())
@@ -70,54 +81,95 @@ class Empresa(Base):
     productos   = relationship("Producto",   back_populates="empresa")
     movimientos = relationship("Movimiento", back_populates="empresa")
     salidas     = relationship("Salida",     back_populates="empresa", foreign_keys="Salida.empresa_id")
+    # ✅ NUEVO: relación con sucursales
+    sucursales  = relationship("Sucursal",   back_populates="empresa", cascade="all, delete-orphan")
+
+
+# ============================================================
+# TABLA: sucursales  ✅ NUEVA
+# Cada empresa Pro puede tener hasta 3 sucursales activas.
+# Analogía: cada "piso" del hotel con su propio gerente (lider)
+# ============================================================
+class Sucursal(Base):
+    __tablename__ = "sucursales"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    empresa_id = Column(Integer, ForeignKey("empresas.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    nombre     = Column(String(150), nullable=False)      # Ej: "Sucursal Centro", "Local Norte"
+    direccion  = Column(String(255), nullable=True)       # Dirección física
+    telefono   = Column(String(50),  nullable=True)       # Teléfono local
+    activa     = Column(Boolean, default=True)            # Para desactivar sin borrar
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relaciones
+    empresa  = relationship("Empresa",  back_populates="sucursales")
+    usuarios = relationship("Usuario",  back_populates="sucursal")     # colaboradores de esta sucursal
+
+    __table_args__ = (
+        # No puede haber dos sucursales con el mismo nombre dentro de la misma empresa
+        UniqueConstraint("empresa_id", "nombre", name="uq_sucursal_empresa_nombre"),
+    )
 
 
 # ============================================================
 # TABLA: usuarios
-# ✅ NUEVO: columna username para login de operadores sin email
+# ✅ CAMBIOS:
+#   - rol agrega "lider"
+#   - sucursal_id: FK a sucursales (null = ve toda la empresa = admin)
 # ============================================================
 class Usuario(Base):
     __tablename__ = "usuarios"
 
     id                  = Column(Integer, primary_key=True, index=True)
     empresa_id          = Column(Integer, ForeignKey("empresas.id"), nullable=False, index=True)
+
+    # ✅ NUEVO: a qué sucursal pertenece este usuario
+    # Si es None → es admin y ve TODA la empresa
+    # Si tiene valor → solo ve y opera en ESA sucursal
+    # Analogía: el carnet del empleado dice en qué piso trabaja
+    sucursal_id         = Column(Integer, ForeignKey("sucursales.id", ondelete="SET NULL"), nullable=True, index=True)
+
     nombre              = Column(String(100), nullable=False)
-    apellido            = Column(String(100), nullable=True)                            # ✅ NUEVO: para generar username
-    email               = Column(String(150), unique=True, nullable=True, index=True)  # nullable para operadores
-    username            = Column(String(50),  nullable=True, index=True)               # ✅ NUEVO: login sin email
+    apellido            = Column(String(100), nullable=True)
+    email               = Column(String(150), unique=True, nullable=True, index=True)
+    username            = Column(String(50),  nullable=True, index=True)
     password_hash       = Column(String(255), nullable=False)
-    rol                 = Column(Enum(RolUsuario, name="rol_usuario_enum"), default=RolUsuario.admin)
+
+    # ✅ CAMBIO: rol ahora incluye "lider"
+    rol                 = Column(Enum(RolUsuario, name="rol_usuario_enum"), default=RolUsuario.operador)
+
     activo              = Column(Boolean, default=True)
     email_verificado    = Column(Boolean, default=False)
     codigo_verificacion = Column(String(10), nullable=True)
-    # Preferencias personales del operador
-    color_interfaz      = Column(String(10), nullable=True)   # ✅ NUEVO: color personalizado
-    sonido_escaner      = Column(String(20), nullable=True)   # ✅ NUEVO: sonido preferido
+    color_interfaz      = Column(String(10), nullable=True)
+    sonido_escaner      = Column(String(20), nullable=True)
     created_at          = Column(DateTime(timezone=True), server_default=func.now())
 
-    empresa     = relationship("Empresa",         back_populates="usuarios")
-    movimientos = relationship("Movimiento",       back_populates="usuario")
-    salidas     = relationship("Salida",           back_populates="usuario", foreign_keys="Salida.usuario_id")
-    permisos    = relationship("PermisoUsuario",   back_populates="usuario", cascade="all, delete-orphan")  # ✅ NUEVO
+    # Relaciones
+    empresa     = relationship("Empresa",       back_populates="usuarios")
+    sucursal    = relationship("Sucursal",       back_populates="usuarios")   # ✅ NUEVO
+    movimientos = relationship("Movimiento",     back_populates="usuario")
+    salidas     = relationship("Salida",         back_populates="usuario", foreign_keys="Salida.usuario_id")
+    permisos    = relationship("PermisoUsuario", back_populates="usuario", cascade="all, delete-orphan")
 
     __table_args__ = (
-        # username único por empresa (dos empresas pueden tener un "juan")
         UniqueConstraint("empresa_id", "username", name="uq_usuario_empresa_username"),
     )
 
 
 # ============================================================
-# TABLA: permisos_usuario  ✅ NUEVA
-# Guarda qué secciones puede ver/usar cada operador
-# Analogia: las llaves del negocio — el admin decide cuáles
-# le da a cada empleado: bodega sí, caja no, etc.
+# TABLA: permisos_usuario
+# Sin cambios — ya funciona bien por sección
 # ============================================================
 class PermisoUsuario(Base):
     __tablename__ = "permisos_usuario"
 
     id         = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
-    seccion    = Column(String(50), nullable=False)   # dashboard, productos, stock, movimientos, salidas, alertas, reportes, fiados
+    seccion    = Column(String(50), nullable=False)
     permitido  = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -130,6 +182,7 @@ class PermisoUsuario(Base):
 
 # ============================================================
 # TABLA: productos
+# ✅ CAMBIO: agrega sucursal_id para inventario por sucursal
 # ============================================================
 class Producto(Base):
     __tablename__ = "productos"
@@ -137,6 +190,12 @@ class Producto(Base):
     id                  = Column(Integer, primary_key=True, index=True)
     empresa_id          = Column(Integer, ForeignKey("empresas.id"), nullable=False, index=True)
     usuario_id          = Column(Integer, ForeignKey("usuarios.id"), nullable=True,  index=True)
+
+    # ✅ NUEVO: productos pueden ser de una sucursal específica
+    # Si es None → producto compartido entre todas las sucursales
+    # Si tiene valor → stock exclusivo de esa sucursal
+    sucursal_id         = Column(Integer, ForeignKey("sucursales.id", ondelete="SET NULL"), nullable=True, index=True)
+
     nombre              = Column(String(200), nullable=False)
     codigo_barra        = Column(String(100), nullable=True, index=True)
     codigo              = Column(String(50),  nullable=True)
@@ -161,12 +220,14 @@ class Producto(Base):
 
     empresa     = relationship("Empresa",    back_populates="productos")
     usuario     = relationship("Usuario")
+    sucursal    = relationship("Sucursal")                                # ✅ NUEVO
     movimientos = relationship("Movimiento", back_populates="producto")
     salidas     = relationship("Salida",     back_populates="producto", foreign_keys="Salida.producto_id")
 
 
 # ============================================================
 # TABLA: movimientos
+# ✅ CAMBIO: agrega sucursal_id para trazabilidad por local
 # ============================================================
 class Movimiento(Base):
     __tablename__ = "movimientos"
@@ -175,6 +236,8 @@ class Movimiento(Base):
     empresa_id     = Column(Integer, ForeignKey("empresas.id"), nullable=False, index=True)
     producto_id    = Column(Integer, ForeignKey("productos.id", ondelete="SET NULL"), nullable=True)
     usuario_id     = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    # ✅ NUEVO: en qué sucursal ocurrió este movimiento
+    sucursal_id    = Column(Integer, ForeignKey("sucursales.id", ondelete="SET NULL"), nullable=True, index=True)
     tipo           = Column(String(10),  nullable=False)
     cantidad       = Column(Integer,     nullable=False)
     stock_anterior = Column(Integer,     nullable=False)
@@ -187,10 +250,12 @@ class Movimiento(Base):
     empresa  = relationship("Empresa",  back_populates="movimientos")
     producto = relationship("Producto", back_populates="movimientos")
     usuario  = relationship("Usuario",  back_populates="movimientos")
+    sucursal = relationship("Sucursal")                                   # ✅ NUEVO
 
 
 # ============================================================
 # TABLA: salidas
+# ✅ CAMBIO: agrega sucursal_id para ventas por local
 # ============================================================
 class Salida(Base):
     __tablename__ = "salidas"
@@ -200,6 +265,8 @@ class Salida(Base):
     producto_id           = Column(Integer, ForeignKey("productos.id", ondelete="SET NULL"), nullable=True)
     usuario_id            = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     resolucion_usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    # ✅ NUEVO: en qué sucursal se realizó esta salida/venta
+    sucursal_id           = Column(Integer, ForeignKey("sucursales.id", ondelete="SET NULL"), nullable=True, index=True)
     cantidad              = Column(Integer, nullable=False)
     stock_anterior        = Column(Integer, nullable=False)
     stock_nuevo           = Column(Integer, nullable=False)
@@ -224,10 +291,11 @@ class Salida(Base):
     producto           = relationship("Producto", back_populates="salidas",  foreign_keys=[producto_id])
     usuario            = relationship("Usuario",  back_populates="salidas",  foreign_keys=[usuario_id])
     resolucion_usuario = relationship("Usuario",  foreign_keys=[resolucion_usuario_id])
+    sucursal           = relationship("Sucursal")                             # ✅ NUEVO
 
 
 # ============================================================
-# TABLA: configuracion
+# TABLA: configuracion — sin cambios
 # ============================================================
 class Configuracion(Base):
     __tablename__ = "configuracion"
@@ -248,7 +316,7 @@ class Configuracion(Base):
 
 
 # ============================================================
-# TABLA: fiados
+# TABLA: fiados — sin cambios en estructura
 # ============================================================
 class Fiado(Base):
     __tablename__ = "fiados"
