@@ -1453,8 +1453,13 @@ function cerrarModalSalida() {
   });
   var mp = document.getElementById("pagoMixtoPanel");
   if (mp) mp.style.display = "none";
-  document.querySelectorAll(".metodo-pago-btn").forEach(function(b){ b.classList.remove("active"); });
-  var btnEfectivo = document.querySelector("[data-metodo='efectivo']");
+  var tp = document.getElementById("tarjetaSubModal");
+  if (tp) {
+    tp.style.display = "none";
+    tp.querySelectorAll(".metodo-pago-btn").forEach(function(b){ b.classList.remove("active"); });
+  }
+  document.querySelectorAll("#metodoPagoGrid .metodo-pago-btn").forEach(function(b){ b.classList.remove("active"); });
+  var btnEfectivo = document.querySelector("#metodoPagoGrid [data-metodo='efectivo']");
   if (btnEfectivo) btnEfectivo.classList.add("active");
   var aviso = document.getElementById("fiadoAviso");
   if (aviso) aviso.style.display = "none";
@@ -1543,13 +1548,39 @@ function calcularTotalVenta() {
 }
 
 /* Seleccionar método de pago en la caja */
-function seleccionarMetodoPago(metodo) {
-  _metodoPagoActual = metodo;
-  document.querySelectorAll(".metodo-pago-btn").forEach(function(b){
-    b.classList.remove("active");
-  });
-  var btn = document.querySelector("[data-metodo='" + metodo + "']");
-  if (btn) btn.classList.add("active");
+function seleccionarMetodoPago(metodo, subtipo) {
+  // Si es tarjeta sin subtipo → mostrar sub-modal y esperar
+  var tarjetaPanel = document.getElementById("tarjetaSubModal");
+  if (metodo === "tarjeta" && !subtipo) {
+    // Marcar botón tarjeta activo, mostrar sub-modal
+    document.querySelectorAll(".metodo-pago-btn").forEach(function(b){ b.classList.remove("active"); });
+    var btnTarj = document.querySelector("[data-metodo='tarjeta']");
+    if (btnTarj) btnTarj.classList.add("active");
+    if (tarjetaPanel) tarjetaPanel.style.display = "block";
+    // No fijar _metodoPagoActual aún — esperar que elija débito/crédito
+    return;
+  }
+
+  // Si eligió subtipo de tarjeta
+  if (metodo === "tarjeta" && subtipo) {
+    _metodoPagoActual = subtipo; // guardar "debito" o "credito"
+    if (tarjetaPanel) {
+      // Marcar botón del subtipo
+      tarjetaPanel.querySelectorAll(".metodo-pago-btn").forEach(function(b){ b.classList.remove("active"); });
+      var btnSub = tarjetaPanel.querySelector("[data-subtipo='" + subtipo + "']");
+      if (btnSub) btnSub.classList.add("active");
+    }
+  } else {
+    _metodoPagoActual = metodo;
+    // Ocultar sub-modal si no es tarjeta
+    if (tarjetaPanel) {
+      tarjetaPanel.style.display = "none";
+      tarjetaPanel.querySelectorAll(".metodo-pago-btn").forEach(function(b){ b.classList.remove("active"); });
+    }
+    document.querySelectorAll("#metodoPagoGrid .metodo-pago-btn").forEach(function(b){ b.classList.remove("active"); });
+    var btn = document.querySelector("#metodoPagoGrid [data-metodo='" + metodo + "']");
+    if (btn) btn.classList.add("active");
+  }
 
   var aviso = document.getElementById("fiadoAviso");
   if (aviso) aviso.style.display = metodo === "fiado" ? "block" : "none";
@@ -1557,9 +1588,7 @@ function seleccionarMetodoPago(metodo) {
   var mixtoPanel = document.getElementById("pagoMixtoPanel");
   if (mixtoPanel) {
     mixtoPanel.style.display = metodo === "mixto" ? "block" : "none";
-    if (metodo === "mixto") {
-      calcularMixtoRestante();
-    }
+    if (metodo === "mixto") calcularMixtoRestante();
   }
 }
 
@@ -1729,7 +1758,7 @@ async function guardarSalida() {
     var msg = esMerma
       ? "🗑️ Merma registrada — " + totalItems + " unidades"
       : "✅ Venta confirmada — " + totalItems + " unidades · $" + totalPesos.toLocaleString("es-CL")
-        + (metodoPago === "fiado" ? " · Fiado a " + _esc(cliente) : "");
+        + (metodoPago === "fiado" ? " · Crédito a " + _esc(cliente) : "");
 
     cerrarModalSalida();
     showToast(msg);
@@ -1915,8 +1944,8 @@ async function cargarReportes() {
     try { topProd = await api("/reportes/top-productos" + getReporteFiltros() + "&limite=100"); } catch(e) { topProd = []; }
     var salidasDetalle = await api("/salidas/?tipo_salida=venta&limit=1000");
     var metodosMap  = {};
-    var iconMetodo  = { efectivo:"💵", debito:"💳", credito:"💳", transferencia:"📱", cheque:"📝", fiado:"📒" };
-    var labelMetodo = { efectivo:"Efectivo", debito:"Débito", credito:"Crédito", transferencia:"Transferencia", cheque:"Cheque", fiado:"Fiado" };
+    var iconMetodo  = { efectivo:"💵", debito:"💳", credito:"💳", transferencia:"📱", cheque:"📝", fiado:"📒", tarjeta:"💳", mixto:"🔀" };
+    var labelMetodo = { efectivo:"Efectivo", debito:"Débito", credito:"Crédito", transferencia:"Transferencia", cheque:"Cheque", fiado:"Crédito (fiado)", tarjeta:"Tarjeta", mixto:"Pago Mixto" };
     salidasDetalle.forEach(function(s) {
       var m = s.metodo_pago || "efectivo";
       if (!metodosMap[m]) metodosMap[m] = { monto: 0, cant: 0 };
