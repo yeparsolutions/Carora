@@ -74,6 +74,9 @@ class Empresa(Base):
     max_sucursales     = Column(Integer, default=1)
 
     onboarding_completo = Column(Boolean, default=False)
+    activa             = Column(Boolean, default=True)
+    bloqueado          = Column(Boolean, default=False)
+    en_gracia          = Column(Boolean, default=False)
     created_at         = Column(DateTime(timezone=True), server_default=func.now())
     updated_at         = Column(DateTime(timezone=True), onupdate=func.now())
 
