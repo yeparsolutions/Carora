@@ -79,7 +79,7 @@ function _checkRateLimit(accion, limite, ventanaMs) {
    ============================================================ */
 var _sonidoActivo = localStorage.getItem("yeparstock_sonido") || "scanner";
 
-// Permite al usuario elegir el tipo de sonido del escáner
+// Permite al colaborador elegir el tipo de sonido del escáner
 function seleccionarSonido(tipo, el) {
   _sonidoActivo = tipo;
   localStorage.setItem("yeparstock_sonido", tipo);
@@ -92,7 +92,7 @@ function _beepPreview(tipo) {
   _beepTono(tipo);
 }
 
-// Toca el sonido activo configurado por el usuario
+// Toca el sonido activo configurado por el colaborador
 function _beep() {
   if (_sonidoActivo === "none") return;
   _beepTono(_sonidoActivo);
@@ -1460,7 +1460,7 @@ function cerrarModalSalida() {
   if (aviso) aviso.style.display = "none";
 }
 
-/* Cuando el usuario selecciona un producto del dropdown */
+/* Cuando el colaborador selecciona un producto del dropdown */
 function onProductoSeleccionado() {
   var sel = document.getElementById("salidaProductoId");
   var opt = sel.options[sel.selectedIndex];
@@ -2010,7 +2010,7 @@ function _dCard(icon, label, val, color) {
 
 /* ============================================================
    REPORTES PRO — carga separada, maneja 403 con candado
-   Analogia: vitrina iluminada — el usuario Basico VE los
+   Analogia: vitrina iluminada — el colaborador Basico VE los
    reportes Pro pero no puede interactuar con ellos.
    ============================================================ */
 async function cargarReportesPro() {
@@ -3692,7 +3692,7 @@ async function cargarEquipo() {
     renderPlanCard(infoEmpresa);
     renderEquipoTabla(listaEquipo);
 
-    var btnInvitar = document.getElementById("btnInvitarUsuario");
+    var btnInvitar = document.getElementById("btnInvitarColaborador");
     if (btnInvitar) btnInvitar.style.display = esAdmin ? "flex" : "none";
 
     var colAcciones = document.getElementById("equipoColAcciones");
@@ -3791,7 +3791,7 @@ function renderEquipoTabla(usuarios) {
     return;
   }
 
-  // [SEC-5] _esc() en todos los datos del usuario que van al HTML
+  // [SEC-5] _esc() en todos los datos del colaborador que van al HTML
   tbody.innerHTML = usuarios.map(function(u) {
     var rolBadge = u.rol === "admin"
       ? "<span style='background:rgba(91,142,255,0.15);color:var(--azul);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px'>🔑 Admin</span>"
@@ -3905,7 +3905,7 @@ async function guardarInvitacion() {
   var nombreCompleto = apellido ? nombre + " " + apellido : nombre;
 
   if (!nombre || !username || !password) { showToast("Completa todos los campos obligatorios"); return; }
-  if (!/^[a-z0-9._]+$/.test(username))  { showToast("El usuario solo puede tener letras minúsculas, números y punto"); return; }
+  if (!/^[a-z0-9._]+$/.test(username))  { showToast("El colaborador solo puede tener letras minúsculas, números y punto"); return; }
   if (password.length < 8)              { showToast("La contraseña debe tener al menos 8 caracteres"); return; }
 
   var btn = document.querySelector("#modalInvitar .btn-primary");
@@ -3928,7 +3928,7 @@ async function guardarInvitacion() {
 }
 
 /* ============================================================
-   ACCIONES — Cambiar rol, activar y desactivar usuarios
+   ACCIONES — Cambiar rol, activar y desactivar colaboradores
    Analogia: el gerente moviendo fichas en el organigrama
    ============================================================ */
 async function cambiarRolUsuario(usuarioId, nuevoRol) {
@@ -4116,12 +4116,16 @@ async function abrirModalPermisos(usuarioId, nombreUsuario) {
   _permisosEditandoId   = usuarioId;
   _permisosEditandoNomb = nombreUsuario;
 
+  // Resetear siempre antes de cargar (evita datos del colaborador anterior)
+  _permisosActualesEdit = {};
+  SECCIONES_PERMISOS.forEach(function(s){ _permisosActualesEdit[s.key] = true; });
   try {
-    _permisosActualesEdit = await api("/empresa/usuarios/" + usuarioId + "/permisos");
-  } catch(e) {
-    _permisosActualesEdit = {};
-    SECCIONES_PERMISOS.forEach(function(s){ _permisosActualesEdit[s.key] = true; });
-  }
+    var permisosApi = await api("/empresa/usuarios/" + usuarioId + "/permisos");
+    // Mezclar: usar API como base, conservar true para secciones no devueltas
+    SECCIONES_PERMISOS.forEach(function(s) {
+      if (permisosApi.hasOwnProperty(s.key)) _permisosActualesEdit[s.key] = permisosApi[s.key];
+    });
+  } catch(e) { /* ya inicializado con true arriba */ }
 
   if (!document.getElementById("modalPermisos")) {
     var div = document.createElement("div");
