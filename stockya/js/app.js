@@ -2485,6 +2485,7 @@ async function showScreen(name) {
   if (name === "equipo")      await cargarEquipo();
   if (name === "fiados")      await cargarFiados();
   if (name === "settings")    await cargarConfiguracion();
+  if (name === "sucursales")  await cargarSucursales();   // [v1.3.1] Pantalla multi-sucursal
 }
 
 function toggleSidebar() {
@@ -3527,6 +3528,10 @@ document.addEventListener("DOMContentLoaded", function(){
   var btnInvC = document.getElementById("btnInvitarColaborador");
   if (btnInvC) btnInvC.addEventListener("click", abrirModalInvitar);
 
+  // [v1.3.1] Navegación a pantalla de sucursales
+  var navSuc = document.getElementById("nav-sucursales");
+  if (navSuc) navSuc.addEventListener("click", function() { showScreen("sucursales"); });
+
   // Botones del carrito de ventas
   var btnAgrCart = document.getElementById("btnAgregarCarrito");
   if (btnAgrCart) btnAgrCart.addEventListener("click", agregarAlCarrito);
@@ -3613,6 +3618,13 @@ function actualizarBadgePlan() {
   badge.textContent      = esPro ? "⭐ Plan Pro" : "✦ Plan Básico";
   badge.style.background = esPro ? "rgba(124,58,237,0.15)" : "rgba(0,199,123,0.15)";
   badge.style.color      = esPro ? "#7c3aed" : "var(--verde)";
+
+  // [v1.3.1] Nav de sucursales visible para admin y líder, oculto para operador
+  var navSuc = document.getElementById("nav-sucursales");
+  if (navSuc) {
+    var rol = usuarioActual ? usuarioActual.rol : "operador";
+    navSuc.style.display = (rol === "admin" || rol === "lider") ? "" : "none";
+  }
 }
 let esAdmin = false;
 
@@ -4310,3 +4322,472 @@ async function guardarConfigColaborador() {
     if (btn) { btn.disabled = false; btn.textContent = "Guardar cambios"; }
   }
 }
+
+/* ============================================================
+   MÓDULO SUCURSALES — v1.3.1
+   ============================================================
+   REGLAS DE NEGOCIO:
+   - Toda cuenta (gratis, basico, pro) tiene Sucursal Principal
+     desde el día 1 — se crea automáticamente en el onboarding.
+   - El botón "Nueva Sucursal" solo aparece si:
+       1. El usuario tiene rol "admin", Y
+       2. El backend responde puede_crear_sucursal = true
+          (solo es true en plan Pro con cupos disponibles)
+   - Gratis y Básico: max_sucursales = 1 → puede_crear = false
+   - Pro: max_sucursales = 3 → puede_crear = true si cupos quedan
+   
+   Analogía: toda tienda tiene al menos 1 local físico desde que
+   abre. Solo las cadenas Pro pueden abrir locales adicionales.
+   El botón es la "llave de un local vacío" — solo Pro la tiene.
+   ============================================================ */
+
+// ID de sucursal seleccionada para ver su equipo
+var _sucursalSeleccionada = null;
+
+// ID de sucursal en edición (null = creando nueva)
+var _sucursalEditandoId   = null;
+
+
+/* ============================================================
+   cargarSucursales — punto de entrada de la pantalla
+============================================================ */
+async function cargarSucursales() {
+  try {
+    // Traer sucursales e info de empresa en paralelo
+    // Analogía: dos empleados que buscan distintos archivos al mismo tiempo
+    var [sucursales, infoEmp] = await Promise.all([
+      api("/sucursales/"),
+      api("/empresa/info"),
+    ]);
+
+    var rol = usuarioActual && usuarioActual.rol ? usuarioActual.rol : "operador";
+
+    // Actualizar contadores del encabezado
+    var usadas = infoEmp.total_sucursales || sucursales.length;
+    var maximo = infoEmp.max_sucursales   || 1;
+    var pct    = Math.round((usadas / maximo) * 100);
+
+    setEl("sucursalesUsadas",     usadas);
+    setEl("sucursalesMax",        maximo);
+    setEl("sucursalesBarraLabel", usadas + " / " + maximo);
+
+    var barra = document.getElementById("sucursalesBarraProgreso");
+    if (barra) {
+      barra.style.width      = pct + "%";
+      // Rojo si llegó al límite, azul si aún hay cupo
+      barra.style.background = pct >= 100 ? "var(--rojo)" : "var(--azul)";
+    }
+
+    var subtitulo = document.getElementById("sucursalesSubtitulo");
+    if (subtitulo) {
+      subtitulo.textContent = usadas + " sucursal" + (usadas !== 1 ? "es" : "") + " activa" + (usadas !== 1 ? "s" : "");
+    }
+
+    // ─── REGLA CENTRAL DEL BOTÓN "Nueva Sucursal" ────────────
+    // Visible SOLO SI:
+    //   - rol === "admin", Y
+    //   - puede_crear_sucursal === true (viene del backend)
+    //     El backend calcula: plan == "pro" AND total < max
+    // En gratis/basico siempre false → botón siempre oculto.
+    var btnNueva = document.getElementById("btnNuevaSucursal");
+    if (btnNueva) {
+      var puedeCrear = rol === "admin" && infoEmp.puede_crear_sucursal === true;
+      btnNueva.style.display = puedeCrear ? "flex" : "none";
+    }
+    // ─────────────────────────────────────────────────────────
+
+    // Hint informativo según el plan
+    var hint = document.getElementById("sucursalesPlanHint");
+    if (hint) {
+      if (infoEmp.plan === "pro") {
+        hint.textContent = "Plan Pro — hasta " + maximo + " sucursales · Cada una puede tener su propio líder";
+        hint.style.color = "var(--muted)";
+      } else {
+        hint.textContent = "Plan " + infoEmp.plan + " — incluye 1 Sucursal Principal · Sube a Pro para agregar más";
+        hint.style.color = "var(--muted)";
+      }
+    }
+
+    // Renderizar tarjetas del grid
+    _renderizarSucursales(sucursales, rol, infoEmp.plan);
+
+  } catch (error) {
+    console.error("Error cargando sucursales:", error);
+    var grid = document.getElementById("sucursalesGrid");
+    if (grid) {
+      grid.innerHTML = "<div style='text-align:center;padding:40px;color:var(--muted);grid-column:1/-1'>"
+        + "⚠️ " + _esc(error.message) + "</div>";
+    }
+  }
+}
+
+
+/* ============================================================
+   _renderizarSucursales — construye las tarjetas del grid
+============================================================ */
+function _renderizarSucursales(sucursales, rol, plan) {
+  var grid = document.getElementById("sucursalesGrid");
+  if (!grid) return;
+
+  if (sucursales.length === 0) {
+    // No debería ocurrir — toda cuenta tiene al menos la Sucursal Principal
+    grid.innerHTML = "<div style='text-align:center;padding:64px 24px;color:var(--muted);grid-column:1/-1'>"
+      + "<div style='font-size:48px;margin-bottom:16px'>🏪</div>"
+      + "<div style='font-size:16px;font-weight:600;margin-bottom:8px'>Sin sucursales</div>"
+      + "<div style='font-size:13px'>Contacta a soporte</div>"
+      + "</div>";
+    return;
+  }
+
+  grid.innerHTML = sucursales.map(function(s) {
+    var esSeleccionada = _sucursalSeleccionada === s.id;
+    var borderColor    = esSeleccionada ? "var(--azul)" : "var(--border)";
+    var bgColor        = esSeleccionada ? "rgba(91,142,255,0.05)" : "var(--bg2)";
+
+    // Botón editar solo para el admin
+    var btnEditar = rol === "admin"
+      ? "<button onclick='event.stopPropagation();abrirEditarSucursal(" + s.id + ")' "
+        + "style='background:none;border:1px solid var(--border);border-radius:8px;"
+        + "color:var(--muted);padding:5px 10px;cursor:pointer;font-size:12px' "
+        + "title='Editar sucursal'>✏️</button>"
+      : "";
+
+    // Badge de estado activo/inactivo
+    var estadoBadge = s.activa
+      ? "<span style='background:rgba(0,199,123,0.15);color:var(--verde);font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px'>✓ Activa</span>"
+      : "<span style='background:rgba(239,68,68,0.15);color:var(--rojo);font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px'>Inactiva</span>";
+
+    // Badge especial para la Sucursal Principal
+    var esPrincipal = s.nombre === "Sucursal Principal";
+    var badgePrincipal = esPrincipal
+      ? "<span style='background:rgba(0,199,123,0.12);color:var(--verde);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:6px'>Principal</span>"
+      : "";
+
+    return "<div onclick='seleccionarSucursal(" + s.id + ",\"" + _esc(s.nombre) + "\")' "
+      + "style='background:" + bgColor + ";border:2px solid " + borderColor + ";"
+      + "border-radius:16px;padding:20px;cursor:pointer;transition:all 0.2s'>"
+
+      + "<div style='display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px'>"
+      + "<div>"
+      + "<div style='font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:4px'>Sucursal</div>"
+      + "<div style='font-family:var(--font-head);font-size:18px;font-weight:800'>"
+      + _esc(s.nombre) + badgePrincipal + "</div>"
+      + "</div>"
+      + "<div style='display:flex;gap:6px;align-items:center'>"
+      + estadoBadge + btnEditar
+      + "</div>"
+      + "</div>"
+
+      + "<div style='display:flex;flex-direction:column;gap:6px;margin-bottom:14px'>"
+      + (s.direccion
+          ? "<div style='font-size:12px;color:var(--muted)'>📍 " + _esc(s.direccion) + "</div>"
+          : "<div style='font-size:12px;color:var(--border)'>📍 Sin dirección</div>")
+      + (s.telefono ? "<div style='font-size:12px;color:var(--muted)'>📞 " + _esc(s.telefono) + "</div>" : "")
+      + "</div>"
+
+      + "<div style='display:flex;align-items:center;justify-content:space-between;"
+      + "padding-top:12px;border-top:1px solid var(--border)'>"
+      + "<div style='font-size:12px;color:var(--muted)'>"
+      + "<span style='font-weight:700;color:var(--text)'>" + (s.total_colaboradores || 0) + "</span>"
+      + " colaborador" + ((s.total_colaboradores || 0) !== 1 ? "es" : "")
+      + "</div>"
+      + "<div style='font-size:12px;color:var(--azul);font-weight:600'>"
+      + (esSeleccionada ? "✓ Seleccionada" : "Ver equipo →")
+      + "</div>"
+      + "</div>"
+      + "</div>";
+  }).join("");
+}
+
+
+/* ============================================================
+   seleccionarSucursal — resalta la tarjeta y muestra su equipo
+============================================================ */
+async function seleccionarSucursal(sucursalId, nombre) {
+  _sucursalSeleccionada = sucursalId;
+  setEl("sucursalColabNombre", nombre);
+
+  // Mostrar la card de colaboradores
+  var card = document.getElementById("sucursalColaboradoresCard");
+  if (card) card.style.display = "block";
+
+  // Re-renderizar tarjetas para resaltar la seleccionada
+  try {
+    var [suc, infoEmp] = await Promise.all([
+      api("/sucursales/"),
+      api("/empresa/info"),
+    ]);
+    var rol = usuarioActual && usuarioActual.rol ? usuarioActual.rol : "operador";
+    _renderizarSucursales(suc, rol, infoEmp.plan || "gratis");
+  } catch(e) {}
+
+  await cargarColaboradoresSucursal(sucursalId);
+  if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+
+/* ============================================================
+   cargarColaboradoresSucursal — tabla de equipo de la sucursal
+============================================================ */
+async function cargarColaboradoresSucursal(sucursalId) {
+  var tbody = document.getElementById("sucursalColabTableBody");
+  if (!tbody) return;
+
+  tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;color:var(--muted);padding:20px'>Cargando...</td></tr>";
+
+  try {
+    var colaboradores = await api("/sucursales/" + sucursalId + "/colaboradores");
+    var rol           = usuarioActual && usuarioActual.rol ? usuarioActual.rol : "operador";
+
+    if (colaboradores.length === 0) {
+      tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;color:var(--muted);padding:32px;font-size:13px'>"
+        + "Sin colaboradores asignados — haz clic en '+ Asignar colaborador'</td></tr>";
+
+      // Mostrar botón asignar para admin y líder
+      var btnAsignar = document.getElementById("btnAsignarColaborador");
+      if (btnAsignar) {
+        btnAsignar.style.display = (rol === "admin" || rol === "lider") ? "flex" : "none";
+      }
+      return;
+    }
+
+    tbody.innerHTML = colaboradores.map(function(c) {
+      // Etiqueta de rol con colores
+      var rolLabel =
+        c.rol === "lider" ? "<span style='background:rgba(91,142,255,0.15);color:var(--azul);font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px'>🔑 Líder</span>"  :
+        c.rol === "admin" ? "<span style='background:rgba(0,199,123,0.15);color:var(--verde);font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px'>👑 Admin</span>"  :
+        "<span style='background:var(--bg3);color:var(--muted);font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px'>👷 Operador</span>";
+
+      var estadoLabel = c.activo
+        ? "<span style='color:var(--verde);font-size:12px;font-weight:600'>● Activo</span>"
+        : "<span style='color:var(--muted);font-size:12px'>○ Inactivo</span>";
+
+      // Admin puede desasignar a cualquiera; líder solo puede desasignar operadores
+      var puedeDesasignar = rol === "admin" || (rol === "lider" && c.rol === "operador");
+      var btnDesasignar   = puedeDesasignar
+        ? "<button onclick='desasignarColaborador(" + c.id + "," + sucursalId + ",\"" + _esc(c.nombre) + "\")' "
+          + "style='background:none;border:1px solid var(--border);border-radius:8px;"
+          + "color:var(--muted);padding:4px 10px;cursor:pointer;font-size:12px'>"
+          + "✕ Desasignar</button>"
+        : "";
+
+      return "<tr>"
+        + "<td style='padding-left:16px'><strong>" + _esc(c.nombre) + "</strong>"
+        + (c.apellido ? " " + _esc(c.apellido) : "") + "</td>"
+        + "<td style='font-family:monospace;font-size:12px;color:var(--muted)'>@" + _esc(c.username || "—") + "</td>"
+        + "<td>" + rolLabel + "</td>"
+        + "<td>" + estadoLabel + "</td>"
+        + "<td style='text-align:center'>" + btnDesasignar + "</td>"
+        + "</tr>";
+    }).join("");
+
+    // Mostrar botón asignar para admin y líder
+    var btnAsignar = document.getElementById("btnAsignarColaborador");
+    if (btnAsignar) {
+      btnAsignar.style.display = (rol === "admin" || rol === "lider") ? "flex" : "none";
+    }
+
+  } catch (error) {
+    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;color:var(--rojo);padding:20px;font-size:13px'>"
+      + "Error: " + _esc(error.message) + "</td></tr>";
+  }
+}
+
+
+/* ============================================================
+   abrirModalNuevaSucursal / abrirEditarSucursal / guardarSucursal
+============================================================ */
+function abrirModalNuevaSucursal() {
+  // Doble verificación de seguridad: solo admin en plan Pro puede llegar aquí
+  if (!usuarioActual || usuarioActual.rol !== "admin") return;
+
+  _sucursalEditandoId = null;
+  setEl("modalSucursalTitulo", "🏪 Nueva Sucursal");
+  ["sucursalNombre","sucursalDireccion","sucursalTelefono"].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  var overlay = document.getElementById("modalSucursal");
+  if (overlay) overlay.classList.add("active");
+}
+
+async function abrirEditarSucursal(sucursalId) {
+  _sucursalEditandoId = sucursalId;
+  setEl("modalSucursalTitulo", "✏️ Editar Sucursal");
+  try {
+    var suc = await api("/sucursales/" + sucursalId);
+    var n = document.getElementById("sucursalNombre");
+    var d = document.getElementById("sucursalDireccion");
+    var t = document.getElementById("sucursalTelefono");
+    if (n) n.value = suc.nombre    || "";
+    if (d) d.value = suc.direccion || "";
+    if (t) t.value = suc.telefono  || "";
+    var overlay = document.getElementById("modalSucursal");
+    if (overlay) overlay.classList.add("active");
+  } catch (error) {
+    showToast("Error al cargar sucursal: " + _esc(error.message));
+  }
+}
+
+async function guardarSucursal() {
+  var nombre    = document.getElementById("sucursalNombre")?.value.trim();
+  var direccion = document.getElementById("sucursalDireccion")?.value.trim() || null;
+  var telefono  = document.getElementById("sucursalTelefono")?.value.trim()  || null;
+
+  if (!nombre) { showToast("Escribe el nombre de la sucursal"); return; }
+
+  var btn = document.getElementById("btnGuardarSucursal");
+  if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
+
+  try {
+    if (_sucursalEditandoId) {
+      // Editando una existente
+      await api("/sucursales/" + _sucursalEditandoId, "PUT", { nombre, direccion, telefono });
+      showToast("✅ Sucursal actualizada");
+    } else {
+      // Creando nueva (solo Pro llega aquí)
+      await api("/sucursales/", "POST", { nombre, direccion, telefono });
+      showToast("✅ Sucursal creada");
+    }
+    var overlay = document.getElementById("modalSucursal");
+    if (overlay) overlay.classList.remove("active");
+    await cargarSucursales();
+  } catch (error) {
+    showToast("Error: " + _esc(error.message));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "✓ Guardar sucursal"; }
+  }
+}
+
+
+/* ============================================================
+   abrirModalAsignarColab / confirmarAsignarColab
+============================================================ */
+async function abrirModalAsignarColab() {
+  if (!_sucursalSeleccionada) { showToast("Primero selecciona una sucursal"); return; }
+
+  var sucNombre = document.getElementById("sucursalColabNombre")?.textContent || "esta sucursal";
+  setEl("asignarSucursalNombre", sucNombre);
+
+  try {
+    var todos = await api("/empresa/usuarios");
+    // Mostrar solo colaboradores activos sin sucursal y que no sean admin
+    var disponibles = todos.filter(function(u) {
+      return u.activo && !u.sucursal_id && u.rol !== "admin";
+    });
+
+    var select = document.getElementById("asignarColabSelect");
+    if (select) {
+      select.innerHTML = "<option value=''>Selecciona un colaborador...</option>";
+      disponibles.forEach(function(u) {
+        var opt = document.createElement("option");
+        opt.value       = u.id;
+        opt.textContent = (u.nombre || "") + " (@" + (u.username || "") + ")";
+        select.appendChild(opt);
+      });
+      if (disponibles.length === 0) {
+        var opt = document.createElement("option");
+        opt.disabled    = true;
+        opt.textContent = "— Todos los colaboradores ya tienen sucursal —";
+        select.appendChild(opt);
+      }
+    }
+
+    // El líder no puede asignar otro líder — ocultar la opción
+    var rol       = usuarioActual && usuarioActual.rol ? usuarioActual.rol : "operador";
+    var selectRol = document.getElementById("asignarColabRol");
+    if (selectRol && rol === "lider") {
+      Array.from(selectRol.options).forEach(function(opt) {
+        if (opt.value === "lider") opt.style.display = "none";
+      });
+      selectRol.value = "operador";
+    }
+
+    var overlay = document.getElementById("modalAsignarColab");
+    if (overlay) overlay.classList.add("active");
+  } catch (error) {
+    showToast("Error: " + _esc(error.message));
+  }
+}
+
+async function confirmarAsignarColab() {
+  var usuarioId = document.getElementById("asignarColabSelect")?.value;
+  var rolAsign  = document.getElementById("asignarColabRol")?.value || "operador";
+
+  if (!usuarioId)             { showToast("Selecciona un colaborador"); return; }
+  if (!_sucursalSeleccionada) { showToast("Error: no hay sucursal seleccionada"); return; }
+
+  var btn = document.getElementById("btnConfirmarAsignar");
+  if (btn) { btn.disabled = true; btn.textContent = "Asignando..."; }
+
+  try {
+    await api("/sucursales/" + _sucursalSeleccionada + "/colaboradores", "POST", {
+      usuario_id: parseInt(usuarioId),
+      rol:        rolAsign,
+    });
+    showToast("✅ Colaborador asignado");
+    document.getElementById("modalAsignarColab").classList.remove("active");
+    await cargarColaboradoresSucursal(_sucursalSeleccionada);
+    await cargarSucursales();
+  } catch (error) {
+    showToast("Error: " + _esc(error.message));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "✓ Asignar"; }
+  }
+}
+
+
+/* ============================================================
+   desasignarColaborador
+============================================================ */
+async function desasignarColaborador(usuarioId, sucursalId, nombre) {
+  var ok = confirm("¿Quitar a " + nombre + " de esta sucursal?\n\nEl colaborador quedará disponible para ser reasignado.");
+  if (!ok) return;
+  try {
+    await api("/sucursales/" + sucursalId + "/colaboradores/" + usuarioId, "DELETE");
+    showToast("✅ " + _esc(nombre) + " fue desasignado");
+    await cargarColaboradoresSucursal(sucursalId);
+    await cargarSucursales();
+  } catch (error) {
+    showToast("Error: " + _esc(error.message));
+  }
+}
+
+
+/* ============================================================
+   EVENT LISTENERS de sucursales — se registran al cargar la página
+   Nota: el nav-sucursales ya tiene su listener en DOMContentLoaded
+============================================================ */
+document.addEventListener("DOMContentLoaded", function() {
+  // Botón nueva sucursal
+  var btnNS = document.getElementById("btnNuevaSucursal");
+  if (btnNS) btnNS.addEventListener("click", abrirModalNuevaSucursal);
+
+  // Guardar sucursal (crear o editar)
+  var btnGS = document.getElementById("btnGuardarSucursal");
+  if (btnGS) btnGS.addEventListener("click", guardarSucursal);
+
+  // Asignar colaborador a sucursal
+  var btnAC = document.getElementById("btnAsignarColaborador");
+  if (btnAC) btnAC.addEventListener("click", abrirModalAsignarColab);
+
+  // Confirmar asignación de colaborador
+  var btnCA = document.getElementById("btnConfirmarAsignar");
+  if (btnCA) btnCA.addEventListener("click", confirmarAsignarColab);
+
+  // Cerrar modal de sucursal (botón X y botón Cancelar)
+  document.querySelectorAll("#modalSucursal .modal-close, #modalSucursal .btn-secondary")
+    .forEach(function(b) {
+      b.addEventListener("click", function() {
+        document.getElementById("modalSucursal").classList.remove("active");
+      });
+    });
+
+  // Cerrar modal de asignar colaborador
+  document.querySelectorAll("#modalAsignarColab .modal-close, #modalAsignarColab .btn-secondary")
+    .forEach(function(b) {
+      b.addEventListener("click", function() {
+        document.getElementById("modalAsignarColab").classList.remove("active");
+      });
+    });
+});
