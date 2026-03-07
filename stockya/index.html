@@ -829,9 +829,9 @@ input[type="text"]::placeholder { text-transform: none; }
     <div class="screen" id="screen-settings">
       <div class="page-header">
         <div><div class="page-title">⚙️ Configuración</div><div class="page-subtitle">Personaliza tu negocio y cuenta</div></div>
-        <button class="btn-primary">✓ Guardar cambios</button>
+        <button class="btn-primary" id="btnGuardarSettingsAdmin">✓ Guardar cambios</button>
       </div>
-      <div class="settings-section">
+      <div class="settings-section" id="settingsAdminNegocio">
         <div class="settings-section-title">🏢 Datos del negocio</div>
         <div class="settings-card">
           <div class="settings-logo-row">
@@ -889,7 +889,7 @@ input[type="text"]::placeholder { text-transform: none; }
           </div>
         </div>
       </div>
-      <div class="settings-section">
+      <div class="settings-section" id="settingsAdminCuenta">
         <div class="settings-section-title">👤 Tu cuenta</div>
         <div class="settings-card">
           <div class="form-grid">
@@ -898,7 +898,7 @@ input[type="text"]::placeholder { text-transform: none; }
           </div>
         </div>
       </div>
-      <div class="settings-section">
+      <div class="settings-section" id="settingsAdminPass">
         <div class="settings-section-title">🔒 Cambiar contraseña</div>
         <div class="settings-card">
           <div class="form-grid">
@@ -983,8 +983,8 @@ input[type="text"]::placeholder { text-transform: none; }
         </div>
       </div>
 
-      <!-- SECCIÓN: Sonido del escáner -->
-      <div class="settings-section">
+      <!-- SECCIÓN: Sonido del escáner — visible para todos -->
+      <div class="settings-section" id="settingsSonido">
         <div class="settings-section-title">🔊 Sonido del escáner</div>
         <div class="settings-card">
           <div style="margin-bottom:18px;font-size:13px;color:var(--muted)">
@@ -1013,7 +1013,7 @@ input[type="text"]::placeholder { text-transform: none; }
         </div>
       </div>
 
-      <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:8px;margin-bottom:32px">
+      <div id="settingsAdminFooter" style="display:flex;justify-content:flex-end;gap:12px;margin-top:8px;margin-bottom:32px">
         <button class="btn-secondary">Descartar cambios</button>
         <button class="btn-primary">✓ Guardar todos los cambios</button>
       </div>
