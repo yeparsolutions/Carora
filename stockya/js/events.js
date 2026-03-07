@@ -371,13 +371,13 @@ document.addEventListener('DOMContentLoaded', function () {
   // CONFIGURACIÓN
   // ============================================================
 
-  // Botón guardar (footer único, admin y colaborador)
+  // Botones guardar/descartar (header y footer)
   var settingsBtns = document.querySelectorAll('#screen-settings .btn-primary');
   settingsBtns.forEach(function (btn) {
-    if (btn.id !== 'btnProbarSonido') {
-      btn.addEventListener('click', function () { guardarConfiguracion(); });
-    }
+    btn.addEventListener('click', function () { guardarConfiguracion(); });
   });
+  var btnDescartar = document.querySelector('#screen-settings .btn-secondary');
+  if (btnDescartar) btnDescartar.addEventListener('click', function () { descartarCambios(); });
 
   // Logo — subir, pegar URL, quitar
   var inputLogo    = el('inputLogo');
@@ -407,6 +407,14 @@ document.addEventListener('DOMContentLoaded', function () {
   var inputColorHex = el('inputColorHex');
   if (inputColorHex) inputColorHex.addEventListener('input', function () { sincronizarColor(this.value); });
 
+  // Color colaborador
+  var colabColor = el('colabColor');
+  if (colabColor) colabColor.addEventListener('input', function () { previsualizarColor(this.value); });
+
+  // Botón guardar colaborador
+  var btnGuardarConfigColab = el('btnGuardarConfigColab');
+  if (btnGuardarConfigColab) btnGuardarConfigColab.addEventListener('click', function () { guardarConfiguracion(); });
+
   // Contraseñas — botones "ojo"
   var eyeBtns = document.querySelectorAll('.settings-eye-btn');
   eyeBtns.forEach(function (btn) {
@@ -423,20 +431,23 @@ document.addEventListener('DOMContentLoaded', function () {
     evaluarFuerzaPassword(this.value);
   });
 
-  // Sonido del escáner — dropdown select
-  var soundSelect = el('soundSelect');
-  if (soundSelect) {
-    soundSelect.addEventListener('change', function () {
-      seleccionarSonido(this.value, null);
+  // Sonidos del escáner — labels con data-sound
+  var soundOptions = document.querySelectorAll('.sound-option');
+  soundOptions.forEach(function (label) {
+    var sound = label.getAttribute('data-sound');
+    // Clic en el label → seleccionar sonido
+    label.addEventListener('click', function () {
+      seleccionarSonido(sound, this);
     });
-  }
-  var btnProbarSonido = el('btnProbarSonido');
-  if (btnProbarSonido) {
-    btnProbarSonido.addEventListener('click', function () {
-      var sel = document.getElementById('soundSelect');
-      _beepPreview(sel ? sel.value : 'scanner');
-    });
-  }
+    // Botón "▶ Probar" dentro del label
+    var previewBtn = label.querySelector('.sound-preview-btn');
+    if (previewBtn) {
+      previewBtn.addEventListener('click', function (e) {
+        e.stopPropagation(); // no disparar el click del label
+        _beepPreview(sound);
+      });
+    }
+  });
 
   // ============================================================
   // MODAL: Agregar producto rápido
