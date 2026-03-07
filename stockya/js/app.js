@@ -4213,8 +4213,10 @@ async function guardarPermisos() {
 }
 
 function cerrarModalPermisos() {
+  // Destruir el modal para que se recree limpio la próxima vez
+  // (evita que el botón quede disabled y que listeners se acumulen)
   var m = document.getElementById("modalPermisos");
-  if (m) m.classList.remove("open");
+  if (m) m.parentNode.removeChild(m);
   _permisosEditandoId = null;
 }
 
