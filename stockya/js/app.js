@@ -3476,6 +3476,10 @@ document.addEventListener("DOMContentLoaded", function(){
 
 
 
+  // Botón agregar colaborador
+  var btnInvC = document.getElementById("btnInvitarColaborador");
+  if (btnInvC) btnInvC.addEventListener("click", abrirModalInvitar);
+
   // Generar username automático al escribir nombre o apellido del colaborador
   var elNombre   = document.getElementById("invitarNombre");
   var elApellido = document.getElementById("invitarApellido");
