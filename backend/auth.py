@@ -104,7 +104,13 @@ def get_usuario_actual(
         )
 
     # ── Determinar tipo de token y buscar usuario ────────────
-    if sub.startswith("username:"):
+    if sub.isdigit():
+        # Formato nuevo: ID numérico directo
+        usuario = db.query(models.Usuario).filter(
+            models.Usuario.id == int(sub)
+        ).first()
+
+    elif sub.startswith("username:"):
         # Formato: "username:<username>:<empresa_id>"
         partes = sub.split(":")
         if len(partes) != 3:
