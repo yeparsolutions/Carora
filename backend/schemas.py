@@ -17,17 +17,19 @@ from datetime import datetime
 
 class UsuarioCrear(BaseModel):
     nombre:   str
+    apellido: Optional[str] = None   # para generar username automático
     email:    EmailStr
     password: str
 
 class LoginRequest(BaseModel):
-    email:    str      # acepta email (admin) o username (operador)
+    username: str      # siempre username (nombre.apellido) — el email solo se usa para recuperar contraseña
     password: str
 
 class UsuarioRespuesta(BaseModel):
     id:         int
     nombre:     str
-    email:      str
+    email:      Optional[str] = None   # None para operadores
+    username:   Optional[str] = None   # username de login
     activo:     bool
     created_at: datetime
 
