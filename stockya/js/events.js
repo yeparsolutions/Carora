@@ -193,7 +193,6 @@ document.addEventListener('DOMContentLoaded', function () {
     { id: 'nav-alertas',     screen: 'alertas' },
     { id: 'nav-reportes',    screen: 'reportes' },
     { id: 'nav-fiados',      screen: 'fiados' },
-    { id: 'nav-sucursales',  screen: 'sucursales' },
     { id: 'nav-equipo',      screen: 'equipo' },
     { id: 'nav-settings',    screen: 'settings' },
   ];
@@ -670,6 +669,27 @@ document.addEventListener('DOMContentLoaded', function () {
   var btnGuardarInvitacion = document.querySelector('#modalInvitar .btn-primary');
   if (btnCancelarInvitar)   btnCancelarInvitar.addEventListener('click',   function () { cerrarModalInvitar(); });
   if (btnGuardarInvitacion) btnGuardarInvitacion.addEventListener('click', function () { guardarInvitacion(); });
+
+  // ============================================================
+  // MODAL: Nueva / Editar Sucursal
+  // ============================================================
+  var btnNuevaSucursal = document.getElementById('btnNuevaSucursal');
+  if (btnNuevaSucursal) btnNuevaSucursal.addEventListener('click', function () { abrirModalNuevaSucursal(); });
+
+  // Botón asignar colaborador a sucursal (dentro de la card de equipo)
+  document.addEventListener('click', function(e) {
+    if (e.target && e.target.id === 'btnAsignarColaborador') {
+      abrirModalAsignarColab();
+    }
+  });
+
+  var modalSucursalClose = document.querySelector('#modalSucursal .modal-close');
+  if (modalSucursalClose) modalSucursalClose.addEventListener('click', function () { cerrarModalSucursal(); });
+
+  var btnCancelarSucursal = document.querySelector('#modalSucursal .btn-secondary');
+  var btnGuardarSucursal  = document.querySelector('#modalSucursal .btn-primary');
+  if (btnCancelarSucursal) btnCancelarSucursal.addEventListener('click', function () { cerrarModalSucursal(); });
+  if (btnGuardarSucursal)  btnGuardarSucursal.addEventListener('click',  function () { guardarSucursal(); });
 
   // ============================================================
   // FIN — Todos los listeners registrados
