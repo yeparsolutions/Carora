@@ -4766,76 +4766,79 @@ async function guardarSucursal() {
 /* ============================================================
    abrirModalAsignarColab / confirmarAsignarColab
 ============================================================ */
+function cerrarModalAsignarColab() {
+  var overlay = document.getElementById("modalAsignarColab");
+  if (overlay) overlay.classList.remove("open");
+  ["asignarNombre","asignarApellido","asignarUsername","asignarPassword"].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = "";
+  });
+}
+
 async function abrirModalAsignarColab() {
   if (!_sucursalSeleccionada) { showToast("Primero selecciona una sucursal"); return; }
-
   var sucNombre = document.getElementById("sucursalColabNombre")?.textContent || "esta sucursal";
   setEl("asignarSucursalNombre", sucNombre);
+  // Limpiar campos
+  ["asignarNombre","asignarApellido","asignarUsername","asignarPassword"].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = "";
+  });
+  // Auto-generar username al escribir nombre/apellido
+  ["asignarNombre","asignarApellido"].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.oninput = _autoUsernameAsignar;
+  });
+  var overlay = document.getElementById("modalAsignarColab");
+  if (overlay) overlay.classList.add("open");
+}
 
-  try {
-    var todos = await api("/empresa/usuarios");
-    // Mostrar solo colaboradores activos sin sucursal y que no sean admin
-    var disponibles = todos.filter(function(u) {
-      return u.activo && !u.sucursal_id && u.rol !== "admin";
-    });
-
-    var select = document.getElementById("asignarColabSelect");
-    if (select) {
-      select.innerHTML = "<option value=''>Selecciona un colaborador...</option>";
-      disponibles.forEach(function(u) {
-        var opt = document.createElement("option");
-        opt.value       = u.id;
-        opt.textContent = (u.nombre || "") + " (@" + (u.username || "") + ")";
-        select.appendChild(opt);
-      });
-      if (disponibles.length === 0) {
-        var opt = document.createElement("option");
-        opt.disabled    = true;
-        opt.textContent = "— Todos los colaboradores ya tienen sucursal —";
-        select.appendChild(opt);
-      }
-    }
-
-    // El líder no puede asignar otro líder — ocultar la opción
-    var rol       = usuarioActual && usuarioActual.rol ? usuarioActual.rol : "operador";
-    var selectRol = document.getElementById("asignarColabRol");
-    if (selectRol && rol === "lider") {
-      Array.from(selectRol.options).forEach(function(opt) {
-        if (opt.value === "lider") opt.style.display = "none";
-      });
-      selectRol.value = "operador";
-    }
-
-    var overlay = document.getElementById("modalAsignarColab");
-    if (overlay) overlay.classList.add("active");
-  } catch (error) {
-    showToast("Error: " + _esc(error.message));
-  }
+function _autoUsernameAsignar() {
+  var nombre   = _limpiarUsername(document.getElementById("asignarNombre")?.value   || "");
+  var apellido = _limpiarUsername(document.getElementById("asignarApellido")?.value || "");
+  if (!nombre && !apellido) return;
+  var base = apellido ? nombre + "." + apellido : nombre;
+  var uEl  = document.getElementById("asignarUsername");
+  if (uEl) uEl.value = base;
 }
 
 async function confirmarAsignarColab() {
-  var usuarioId = document.getElementById("asignarColabSelect")?.value;
-  var rolAsign  = document.getElementById("asignarColabRol")?.value || "operador";
+  var nombre   = (document.getElementById("asignarNombre")?.value   || "").trim();
+  var apellido = (document.getElementById("asignarApellido")?.value || "").trim();
+  var username = (document.getElementById("asignarUsername")?.value || "").trim().toLowerCase();
+  var password = (document.getElementById("asignarPassword")?.value || "").trim();
+  var rol      = document.getElementById("asignarColabRol")?.value || "lider";
 
-  if (!usuarioId)             { showToast("Selecciona un colaborador"); return; }
+  if (!nombre)              { showToast("Escribe el nombre"); return; }
+  if (!username)            { showToast("El usuario es obligatorio"); return; }
+  if (password.length < 8)  { showToast("La contraseña debe tener al menos 8 caracteres"); return; }
   if (!_sucursalSeleccionada) { showToast("Error: no hay sucursal seleccionada"); return; }
 
   var btn = document.getElementById("btnConfirmarAsignar");
-  if (btn) { btn.disabled = true; btn.textContent = "Asignando..."; }
+  if (btn) { btn.disabled = true; btn.textContent = "Creando..."; }
 
   try {
-    await api("/sucursales/" + _sucursalSeleccionada + "/colaboradores", "POST", {
-      usuario_id: parseInt(usuarioId),
-      rol:        rolAsign,
+    // 1. Crear el usuario en la empresa
+    var nombreCompleto = apellido ? nombre + " " + apellido : nombre;
+    var nuevoUsuario = await api("/empresa/invitar", "POST", {
+      nombre:   nombreCompleto,
+      username: username,
+      password: password,
+      rol:      rol,
     });
-    showToast("✅ Colaborador asignado");
-    document.getElementById("modalAsignarColab").classList.remove("active");
+    // 2. Asignarlo a la sucursal seleccionada
+    if (nuevoUsuario && nuevoUsuario.id) {
+      await api("/sucursales/" + _sucursalSeleccionada + "/colaboradores", "POST", {
+        usuario_id: nuevoUsuario.id,
+        rol:        rol,
+      });
+    }
+    showToast("✅ " + _esc(nombreCompleto) + " creado y asignado a la sucursal");
+    cerrarModalAsignarColab();
     await cargarColaboradoresSucursal(_sucursalSeleccionada);
     await cargarSucursales();
   } catch (error) {
-    showToast("Error: " + _esc(error.message));
+    showToast("❌ " + _esc(error.message));
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = "✓ Asignar"; }
+    if (btn) { btn.disabled = false; btn.textContent = "✓ Crear y asignar"; }
   }
 }
 
