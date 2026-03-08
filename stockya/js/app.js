@@ -748,7 +748,14 @@ async function cargarSelectorSucursal() {
 // Helper: actualiza el texto de un elemento por su ID de forma segura
 function setEl(id, val) {
   const el = document.getElementById(id);
-  if (el) el.textContent = val; // textContent siempre es seguro
+  if (el) el.textContent = val;
+}
+
+// Helper: agrega sucursal_id al path si hay una activa seleccionada
+function _conSucursal(path) {
+  if (!_sucursalActivaId) return path;
+  var sep = path.includes("?") ? "&" : "?";
+  return path + sep + "sucursal_id=" + _sucursalActivaId;
 }
 
 /* ============================================================
@@ -758,8 +765,8 @@ async function cargarDashboard() {
   try {
     const [alertas, productos, movimientos, config] = await Promise.all([
       api("/alertas/"),
-      api("/productos/"),
-      api("/movimientos/?limit=5"),
+      api(_conSucursal("/productos/")),
+      api(_conSucursal("/movimientos/?limit=5")),
       api("/configuracion/")
     ]);
 
@@ -1449,7 +1456,7 @@ async function abrirModalSalida(tipo) {
   if (clienteWrap)    clienteWrap.style.display    = esMerma ? "none" : "";
 
   try {
-    var productos = await api("/productos/");
+    var productos = await api(_conSucursal("/productos/"));
     var sel       = document.getElementById("salidaProductoId");
     if (sel) {
       // [SEC-5] Usar DOM API para crear opciones — más seguro que innerHTML
@@ -1907,8 +1914,8 @@ async function cargarReportes() {
     }
 
     const [productos, movimientos, resumenReportes, fiadosResumen, fiadosLista] = await Promise.all([
-      api("/productos/"),
-      api("/movimientos/?limit=500"),
+      api(_conSucursal("/productos/")),
+      api(_conSucursal("/movimientos/?limit=500")),
       api("/reportes/ventas-resumen" + getReporteFiltros()),
       api("/fiados/resumen"),
       api("/fiados/"),
