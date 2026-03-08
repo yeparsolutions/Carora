@@ -62,6 +62,20 @@ def get_empresa_id(usuario_actual: models.Usuario) -> int:
     return usuario_actual.empresa_id
 
 
+def get_sucursal_filtro(usuario_actual: models.Usuario, sucursal_id_param: int = None):
+    """
+    Devuelve el sucursal_id a usar como filtro:
+    - Admin con sucursal_id_param → filtra por ese parámetro
+    - Admin sin parámetro → None (ve todo)
+    - Líder/Operador → siempre filtra por su propia sucursal
+    """
+    rol = usuario_actual.rol.value if hasattr(usuario_actual.rol, "value") else usuario_actual.rol
+    if rol == "admin":
+        return sucursal_id_param or None
+    # Líder u operador: solo su sucursal
+    return usuario_actual.sucursal_id or None
+
+
 def _verificar_duplicado_nombre_marca(db, empresa_id: int, nombre: str, marca: str, excluir_id: int = None):
     """
     Valida que no exista otro producto con el mismo NOMBRE + MARCA en la misma empresa.
@@ -117,11 +131,15 @@ def buscar_por_codigo_barra(
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
     empresa_id = get_empresa_id(usuario_actual)
-    producto = db.query(models.Producto).filter(
+    suc_filtro = get_sucursal_filtro(usuario_actual)
+    query_buscar = db.query(models.Producto).filter(
         models.Producto.codigo_barra == codigo_barra,
         models.Producto.activo       == True,
         models.Producto.empresa_id   == empresa_id
-    ).first()
+    )
+    if suc_filtro:
+        query_buscar = query_buscar.filter(models.Producto.sucursal_id == suc_filtro)
+    producto = query_buscar.first()
     if not producto:
         raise HTTPException(
             status_code=404,
@@ -139,14 +157,18 @@ def listar_productos(
     estado:      Optional[str] = None,
     buscar:      Optional[str] = None,
     vencimiento: Optional[str] = None,
+    sucursal_id: Optional[int] = None,
     db:          Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
-    empresa_id = get_empresa_id(usuario_actual)
+    empresa_id  = get_empresa_id(usuario_actual)
+    suc_filtro  = get_sucursal_filtro(usuario_actual, sucursal_id)
     query = db.query(models.Producto).filter(
         models.Producto.activo     == True,
         models.Producto.empresa_id == empresa_id
     )
+    if suc_filtro:
+        query = query.filter(models.Producto.sucursal_id == suc_filtro)
     if buscar:
         query = query.filter(
             models.Producto.nombre.ilike(f"%{buscar}%") |
@@ -251,7 +273,9 @@ def crear_producto(
             datos_dict["precio_compra"] * (1 + datos_dict["porcentaje_ganancia"] / 100), 2
         )
 
-    nuevo = models.Producto(**datos_dict, empresa_id=empresa_id, usuario_id=usuario_actual.id)
+    suc_id = get_sucursal_filtro(usuario_actual)
+    nuevo = models.Producto(**datos_dict, empresa_id=empresa_id, usuario_id=usuario_actual.id,
+                             sucursal_id=suc_id)
     db.add(nuevo)
     db.flush()
 
