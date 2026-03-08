@@ -4694,6 +4694,12 @@ async function cargarColaboradoresSucursal(sucursalId) {
 /* ============================================================
    abrirModalNuevaSucursal / abrirEditarSucursal / guardarSucursal
 ============================================================ */
+function cerrarModalSucursal() {
+  var overlay = document.getElementById("modalSucursal");
+  if (overlay) overlay.classList.remove("active");
+  _sucursalEditandoId = null;
+}
+
 function abrirModalNuevaSucursal() {
   // Doble verificación de seguridad: solo admin en plan Pro puede llegar aquí
   if (!usuarioActual || usuarioActual.rol !== "admin") return;
