@@ -4696,7 +4696,7 @@ async function cargarColaboradoresSucursal(sucursalId) {
 ============================================================ */
 function cerrarModalSucursal() {
   var overlay = document.getElementById("modalSucursal");
-  if (overlay) overlay.classList.remove("active");
+  if (overlay) overlay.classList.remove("open");
   _sucursalEditandoId = null;
 }
 
@@ -4711,7 +4711,7 @@ function abrirModalNuevaSucursal() {
     if (el) el.value = "";
   });
   var overlay = document.getElementById("modalSucursal");
-  if (overlay) overlay.classList.add("active");
+  if (overlay) overlay.classList.add("open");
 }
 
 async function abrirEditarSucursal(sucursalId) {
@@ -4726,7 +4726,7 @@ async function abrirEditarSucursal(sucursalId) {
     if (d) d.value = suc.direccion || "";
     if (t) t.value = suc.telefono  || "";
     var overlay = document.getElementById("modalSucursal");
-    if (overlay) overlay.classList.add("active");
+    if (overlay) overlay.classList.add("open");
   } catch (error) {
     showToast("Error al cargar sucursal: " + _esc(error.message));
   }
@@ -4753,7 +4753,7 @@ async function guardarSucursal() {
       showToast("✅ Sucursal creada");
     }
     var overlay = document.getElementById("modalSucursal");
-    if (overlay) overlay.classList.remove("active");
+    if (overlay) overlay.classList.remove("open");
     await cargarSucursales();
   } catch (error) {
     showToast("Error: " + _esc(error.message));
