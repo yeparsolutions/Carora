@@ -1496,8 +1496,16 @@ input[type="text"]::placeholder { text-transform: none; }
           <label class="form-label">Rol *</label>
           <select id="invitarRol" class="form-input">
             <option value="operador">👷 Operador — puede registrar ventas y movimientos</option>
+            <option value="lider">🏪 Líder — administra una sucursal (casi igual que admin, pero solo su sucursal)</option>
             <option value="admin">🔑 Admin — acceso completo incluyendo configuración</option>
           </select>
+          <!-- Selector de sucursal — solo visible si se elige Líder -->
+          <div id="invitarSucursalWrap" style="display:none;margin-top:10px">
+            <label class="form-label">Sucursal a cargo *</label>
+            <select id="invitarSucursal" class="form-input">
+              <option value="">Selecciona una sucursal...</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="form-actions">
