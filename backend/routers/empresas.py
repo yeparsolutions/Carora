@@ -8,7 +8,7 @@
 #     - total_sucursales < max_sucursales (max = 3)
 #
 #   En gratis y basico, puede_crear_sucursal = False siempre.
-#   El frontend usa este campo para mostrar/ocultar el botón.
+#   El frontend usa este campo para mostrar/ocultar el botón
 #   "Nueva Sucursal".
 # ============================================================
 
@@ -300,12 +300,12 @@ async def invitar_colaborador(
 
     from auth import hashear_password
     nuevo = Usuario(
-        nombre     = nombre,
-        username   = username,
-        password   = hashear_password(password),
-        rol        = rol,
-        empresa_id = usuario_actual.empresa_id,
-        activo     = True,
+        nombre        = nombre,
+        username      = username,
+        password_hash = hashear_password(password),
+        rol           = rol,
+        empresa_id    = usuario_actual.empresa_id,
+        activo        = True,
     )
     db.add(nuevo)
     db.commit()
