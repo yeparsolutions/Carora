@@ -303,14 +303,13 @@ async def invitar_colaborador(
 
     from auth import hashear_password
     nuevo = Usuario(
-        nombre              = nombre,
-        username            = username,
-        password_hash       = hashear_password(password),
-        rol                 = rol,
-        empresa_id          = usuario_actual.empresa_id,
-        activo              = True,
-        email_verificado    = True,   # los colaboradores no necesitan verificar email
-        onboarding_completo = True,   # el admin ya configuró la empresa
+        nombre           = nombre,
+        username         = username,
+        password_hash    = hashear_password(password),
+        rol              = rol,
+        empresa_id       = usuario_actual.empresa_id,
+        activo           = True,
+        email_verificado = True,   # los colaboradores no necesitan verificar email
     )
     db.add(nuevo)
     db.commit()
