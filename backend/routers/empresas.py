@@ -8,7 +8,7 @@
 #     - total_sucursales < max_sucursales (max = 3)
 #
 #   En gratis y basico, puede_crear_sucursal = False siempre.
-#   El frontend usa este campo para mostrar/ocultar el botón
+#   El frontend usa este campo para mostrar/ocultar el botón.
 #   "Nueva Sucursal".
 # ============================================================
 
