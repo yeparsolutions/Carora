@@ -1,382 +1,1575 @@
-# ============================================================
-# YEPARSTOCK — backend/routers/empresas.py
-# Gestión de empresa: info, plan, usuarios, permisos
-#
-# CAMBIO v1.3.1:
-#   puede_crear_sucursal ahora depende de:
-#     - plan == "pro"  Y
-#     - total_sucursales < max_sucursales (max = 3)
-#
-#   En gratis y basico, puede_crear_sucursal = False siempre.
-#   El frontend usa este campo para mostrar/ocultar el botón
-#   "Nueva Sucursal".
-# ============================================================
-
-from fastapi        import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from models         import Usuario, Empresa, Sucursal, Producto
-from database       import get_db
-import auth as auth_utils
-
-router = APIRouter(prefix="/empresa", tags=["empresa"])
-
-
-# ── INFO EMPRESA ─────────────────────────────────────────────
-@router.get("/info")
-async def info_empresa(
-    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
-    db:             Session = Depends(get_db)
-):
-    """
-    Devuelve estado completo de la empresa: plan, sucursales,
-    productos, límites y si puede crear más sucursales.
-
-    puede_crear_sucursal:
-      True  → solo si plan Pro Y total < max (3)
-      False → gratis, basico, o Pro que ya llegó al límite
-    """
-    empresa = db.query(Empresa).filter(
-        Empresa.id == usuario_actual.empresa_id
-    ).first()
-
-    if not empresa:
-        raise HTTPException(status_code=404, detail="Empresa no encontrada")
-
-    # Contar sucursales y productos actuales
-    total_sucursales = db.query(Sucursal).filter(
-        Sucursal.empresa_id == empresa.id,
-        Sucursal.activa     == True
-    ).count()
-
-    total_productos = db.query(Producto).filter(
-        Producto.empresa_id == empresa.id
-    ).count()
-
-    total_usuarios = db.query(Usuario).filter(
-        Usuario.empresa_id == empresa.id,
-        Usuario.activo     == True
-    ).count()
-
-    # ─── REGLA CENTRAL ───────────────────────────────────────
-    # Solo el plan Pro puede crear sucursales adicionales,
-    # y solo si no llegó al límite de 3.
-    # Gratis y Basico tienen max_sucursales = 1 (solo la principal).
-    puede_crear_sucursal = (
-        empresa.plan == "pro" and
-        total_sucursales < empresa.max_sucursales
-    )
-    # ─────────────────────────────────────────────────────────
-
-    return {
-        "id":                  empresa.id,
-        "nombre":              empresa.nombre,
-        "rubro":               empresa.rubro,
-        "moneda":              empresa.moneda,
-        "logo_base64":         empresa.logo_base64,
-        "plan":                empresa.plan,
-        "activa":              empresa.activa,
-
-        # Suscripción
-        "bloqueado":           getattr(empresa, "bloqueado",    False),
-        "en_gracia":           getattr(empresa, "en_gracia",    False),
-        "gracia_hasta":        getattr(empresa, "gracia_hasta", None),
-
-        # Sucursales
-        "max_sucursales":      empresa.max_sucursales,
-        "total_sucursales":    total_sucursales,
-        "puede_crear_sucursal": puede_crear_sucursal,
-
-        # Otros límites
-        "max_productos":       getattr(empresa, "max_productos",  None),
-        "total_productos":     total_productos,
-        "total_usuarios":      total_usuarios,
-    }
-
-
-# ── MIS PERMISOS ─────────────────────────────────────────────
-@router.get("/mis-permisos")
-async def mis_permisos(
-    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
-    db:             Session = Depends(get_db)
-):
-    """
-    Devuelve los permisos del usuario actual.
-    Admin y Líder tienen acceso total a su ámbito.
-    """
-    rol = usuario_actual.rol
-
-    # Admin y líder tienen acceso completo (en su sucursal)
-    acceso_total = rol in ("admin", "lider")
-
-    return {
-        "rol":          rol,
-        "acceso_total": acceso_total,
-        "puede_ver_reportes":    acceso_total,
-        "puede_editar_config":   rol == "admin",
-        "puede_invitar_usuarios": acceso_total,
-        "puede_ver_equipo":      acceso_total,
-        "puede_crear_sucursales": rol == "admin",  # solo admin gestiona sucursales
-    }
-
-
-# ── USUARIOS DE LA EMPRESA ───────────────────────────────────
-@router.get("/usuarios")
-async def listar_usuarios(
-    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
-    db:             Session = Depends(get_db)
-):
-    """Lista todos los usuarios activos de la empresa."""
-    usuarios = db.query(Usuario).filter(
-        Usuario.empresa_id == usuario_actual.empresa_id,
-        Usuario.activo     == True
-    ).all()
-
-    return [_usuario_dict(u) for u in usuarios]
-
-
-# ── CAMBIAR PLAN ─────────────────────────────────────────────
-@router.post("/cambiar-plan")
-async def cambiar_plan(
-    datos:          dict,
-    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
-    db:             Session = Depends(get_db)
-):
-    """
-    Cambia el plan de la empresa.
-
-    Al subir a Pro:
-      - max_sucursales = 3
-      - crea Sucursal Principal si por alguna razón no existe
-
-    Al bajar a basico/gratis:
-      - max_sucursales = 1
-      - puede_crear_sucursal = False automáticamente (lo calcula /info)
-    """
-    if usuario_actual.rol != "admin":
-        raise HTTPException(status_code=403, detail="Solo el admin puede cambiar el plan")
-
-    nuevo_plan = datos.get("plan", "").lower()
-    if nuevo_plan not in ("gratis", "basico", "pro"):
-        raise HTTPException(status_code=400, detail="Plan inválido")
-
-    empresa = db.query(Empresa).filter(Empresa.id == usuario_actual.empresa_id).first()
-    if not empresa:
-        raise HTTPException(status_code=404, detail="Empresa no encontrada")
-
-    empresa.plan = nuevo_plan
-
-    if nuevo_plan == "pro":
-        # Pro puede tener hasta 3 sucursales
-        empresa.max_sucursales = 3
-
-        # Seguridad: si por algún motivo no tiene Sucursal Principal, crearla
-        tiene_sucursal = db.query(Sucursal).filter(
-            Sucursal.empresa_id == empresa.id
-        ).first()
-
-        if not tiene_sucursal:
-            suc = Sucursal(
-                empresa_id = empresa.id,
-                nombre     = "Sucursal Principal",
-                activa     = True,
-            )
-            db.add(suc)
-            # Asignar al admin si no tiene sucursal
-            if not usuario_actual.sucursal_id:
-                db.flush()
-                usuario_actual.sucursal_id = suc.id
-
-    else:
-        # Gratis y básico solo pueden tener 1 sucursal
-        empresa.max_sucursales = 1
-
-    db.commit()
-
-    return {
-        "mensaje":         f"Plan cambiado a {nuevo_plan}",
-        "plan":            nuevo_plan,
-        "max_sucursales":  empresa.max_sucursales,
-    }
-
-
-# ── CANCELAR SUSCRIPCIÓN ─────────────────────────────────────
-@router.post("/cancelar-suscripcion")
-async def cancelar_suscripcion(
-    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
-    db:             Session = Depends(get_db)
-):
-    if usuario_actual.rol != "admin":
-        raise HTTPException(status_code=403, detail="Solo el admin puede cancelar")
-
-    empresa = db.query(Empresa).filter(Empresa.id == usuario_actual.empresa_id).first()
-    if not empresa:
-        raise HTTPException(status_code=404, detail="Empresa no encontrada")
-
-    # Marcar en gracia (7 días de acceso solo lectura)
-    from datetime import datetime, timedelta
-    empresa.en_gracia    = True
-    empresa.gracia_hasta = datetime.utcnow() + timedelta(days=7)
-    db.commit()
-
-    return {"mensaje": "Suscripción cancelada. Tienes 7 días de acceso de solo lectura."}
-
-
-# ── REACTIVAR SUSCRIPCIÓN ────────────────────────────────────
-@router.post("/reactivar")
-async def reactivar_suscripcion(
-    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
-    db:             Session = Depends(get_db)
-):
-    if usuario_actual.rol != "admin":
-        raise HTTPException(status_code=403, detail="Solo el admin puede reactivar")
-
-    empresa = db.query(Empresa).filter(Empresa.id == usuario_actual.empresa_id).first()
-    if not empresa:
-        raise HTTPException(status_code=404, detail="Empresa no encontrada")
-
-    empresa.en_gracia    = False
-    empresa.gracia_hasta = None
-    empresa.bloqueado    = False
-    db.commit()
-
-    return {"mensaje": "Suscripción reactivada correctamente"}
-
-
-# ── ACTUALIZAR EMPRESA ───────────────────────────────────────
-@router.put("/actualizar")
-async def actualizar_empresa(
-    datos:          dict,
-    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
-    db:             Session = Depends(get_db)
-):
-    """Actualiza nombre, rubro, moneda y logo de la empresa."""
-    if usuario_actual.rol != "admin":
-        raise HTTPException(status_code=403, detail="Solo el admin puede editar la empresa")
-
-    empresa = db.query(Empresa).filter(Empresa.id == usuario_actual.empresa_id).first()
-    if not empresa:
-        raise HTTPException(status_code=404, detail="Empresa no encontrada")
-
-    if "nombre"   in datos: empresa.nombre      = datos["nombre"]
-    if "rubro"    in datos: empresa.rubro        = datos["rubro"]
-    if "moneda"   in datos: empresa.moneda       = datos["moneda"]
-    if "logo_base64" in datos: empresa.logo_base64 = datos["logo_base64"]
-
-    db.commit()
-    return {"mensaje": "Empresa actualizada correctamente"}
-
-
-# ── INVITAR COLABORADOR ──────────────────────────────────────
-@router.post("/invitar")
-async def invitar_colaborador(
-    datos:          dict,
-    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
-    db:             Session = Depends(get_db)
-):
-    """
-    Crea un nuevo usuario colaborador en la empresa.
-    Solo admin puede invitar. Devuelve el usuario creado con su id
-    para que el frontend pueda asignarlo a una sucursal si es líder.
-    """
-    if usuario_actual.rol != "admin":
-        raise HTTPException(status_code=403, detail="Solo el admin puede agregar colaboradores")
-
-    nombre   = (datos.get("nombre")   or "").strip()
-    username = (datos.get("username") or "").strip().lower()
-    password = (datos.get("password") or "").strip()
-    rol      = (datos.get("rol")      or "operador").strip()
-
-    if not nombre or not username or not password:
-        raise HTTPException(status_code=400, detail="nombre, username y password son obligatorios")
-    if len(password) < 8:
-        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
-    if rol not in ("operador", "lider", "admin"):
-        raise HTTPException(status_code=400, detail="Rol inválido")
-
-    # Username único dentro de la empresa
-    existe = db.query(Usuario).filter(Usuario.username == username).first()
-    if existe:
-        raise HTTPException(status_code=409, detail=f"El usuario '@{username}' ya está en uso")
-
-    from auth import hashear_password
-    nuevo = Usuario(
-        nombre        = nombre,
-        username      = username,
-        password_hash = hashear_password(password),
-        rol           = rol,
-        empresa_id    = usuario_actual.empresa_id,
-        activo        = True,
-    )
-    db.add(nuevo)
-    db.commit()
-    db.refresh(nuevo)
-
-    return _usuario_dict(nuevo)
-
-
-# ── CAMBIAR ROL ───────────────────────────────────────────────
-@router.patch("/usuarios/{usuario_id}/rol")
-async def cambiar_rol(
-    usuario_id:     int,
-    rol:            str,
-    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
-    db:             Session = Depends(get_db)
-):
-    if usuario_actual.rol != "admin":
-        raise HTTPException(status_code=403, detail="Solo el admin puede cambiar roles")
-    if rol not in ("operador", "lider", "admin"):
-        raise HTTPException(status_code=400, detail="Rol inválido")
-
-    usuario = db.query(Usuario).filter(
-        Usuario.id         == usuario_id,
-        Usuario.empresa_id == usuario_actual.empresa_id
-    ).first()
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    if usuario.id == usuario_actual.id:
-        raise HTTPException(status_code=400, detail="No puedes cambiar tu propio rol")
-
-    usuario.rol = rol
-    db.commit()
-    return {"mensaje": f"Rol actualizado a {rol}", "usuario_id": usuario_id}
-
-
-# ── ACTIVAR / DESACTIVAR USUARIO ─────────────────────────────
-@router.patch("/usuarios/{usuario_id}/estado")
-async def cambiar_estado_usuario(
-    usuario_id:     int,
-    datos:          dict,
-    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
-    db:             Session = Depends(get_db)
-):
-    if usuario_actual.rol != "admin":
-        raise HTTPException(status_code=403, detail="Solo el admin puede activar/desactivar usuarios")
-
-    usuario = db.query(Usuario).filter(
-        Usuario.id         == usuario_id,
-        Usuario.empresa_id == usuario_actual.empresa_id
-    ).first()
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    if usuario.id == usuario_actual.id:
-        raise HTTPException(status_code=400, detail="No puedes desactivarte a ti mismo")
-
-    usuario.activo = datos.get("activo", True)
-    db.commit()
-    estado = "activado" if usuario.activo else "desactivado"
-    return {"mensaje": f"Usuario {estado}", "usuario_id": usuario_id}
-
-
-# ── HELPER INTERNO ───────────────────────────────────────────
-def _usuario_dict(u: Usuario) -> dict:
-    """Convierte un objeto Usuario en dict para la API."""
-    return {
-        "id":          u.id,
-        "nombre":      u.nombre,
-        "apellido":    u.apellido or "",
-        "username":    u.username,
-        "email":       u.email or "",
-        "rol":         u.rol,
-        "activo":      u.activo,
-        "sucursal_id": u.sucursal_id,  # incluido para el frontend
-    }
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <!-- ============================================================
+       YEPARSTOCK — Archivo principal HTML
+       Archivo: index.html
+       Descripcion: Estructura de todas las pantallas del MVP
+       Para editar estilos → css/styles.css
+       Para editar logica  → js/app.js
+  ============================================================ -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YeparStock — Sistema de Inventario</title>
+
+  <!-- ============================================================
+       [SEC-6] Content Security Policy (CSP)
+       Analogia: portero de discoteca que solo deja entrar recursos
+       de dominios aprobados explicitamente.
+
+       NOTA [SEC-7]: frame-ancestors y X-Frame-Options NO funcionan
+       como <meta> — el navegador los ignora. Deben ir como HTTP
+       headers en el servidor (ver instrucciones abajo del archivo).
+
+       - script-src 'self'             → solo scripts del propio servidor
+       - style-src 'self' 'unsafe-inline' → estilos inline necesarios
+       - img-src 'self' data: blob:    → imágenes, base64, cámara
+       - media-src 'self' blob:        → stream de cámara (escáner)
+       - connect-src 'self' + Railway  → permite fetch al API backend
+  ============================================================ -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self';
+                 script-src 'self' 'unsafe-inline' 'unsafe-hashes';
+                 style-src 'self' 'unsafe-inline';
+                 img-src 'self' data: blob:;
+                 media-src 'self' blob:;
+                 connect-src 'self' https://yeparstock-api.up.railway.app;">
+
+  <!-- Fuentes del sistema — carga instantánea sin peticiones externas -->
+  <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="shortcut icon" type="image/png" href="icons/icon-192.png">
+
+  <!-- PWA — instalable como app en celular y escritorio -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#00C77B">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="YeparStock">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+<style>
+/* ── SCROLL EN SIDEBAR ──────────────────────────────────────────
+   El sidebar tenía overflow oculto — el contenido del footer
+   (tema, usuario) quedaba cortado en pantallas pequeñas.
+   Con overflow-y: auto aparece la barra de scroll solo cuando
+   se necesita, y flex-direction: column + justify-content permiten
+   que el footer quede al fondo pero sea alcanzable con scroll.
+─────────────────────────────────────────────────────────────── */
+.sidebar {
+  overflow-y: auto;        /* scroll vertical cuando el contenido supera la altura */
+  overflow-x: hidden;      /* evita scroll horizontal innecesario */
+  display: flex;
+  flex-direction: column;  /* apila logo → items → footer verticalmente */
+}
+
+/* El footer del sidebar se empuja al fondo pero no se oculta */
+.sidebar-footer {
+  margin-top: auto;        /* empuja el footer hacia abajo */
+  padding-bottom: 12px;    /* respira un poco al final */
+}
+
+/* Mayúsculas en todos los inputs de texto — salvo contraseñas y email */
+.form-input[type="text"],
+input[type="text"]:not(.no-upper) { text-transform: uppercase; }
+.form-input[type="text"]::placeholder,
+input[type="text"]::placeholder { text-transform: none; }
+
+/* Botones método de pago */
+.metodo-pago-btn {
+  background: var(--bg3);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.metodo-pago-btn:hover  { border-color: var(--verde); background: rgba(0,199,123,0.08); }
+.metodo-pago-btn.active { border-color: var(--verde); background: rgba(0,199,123,0.15); color: var(--verde); }
+.metodo-pago-btn.fiado.active { border-color: #f59e0b; background: rgba(245,158,11,0.15); color: #f59e0b; }
+
+/* ============================================================
+   PRO LOCK OVERLAY — cubre tarjetas Pro para usuarios Basico
+   Analogia: vitrina con vidrio — puedes ver pero no tocar
+   ============================================================ */
+.pro-lock-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(3px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  z-index: 10;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pro-lock-overlay:hover { background: rgba(15,23,42,0.88); }
+.pro-lock-overlay .lock-icon { font-size: 32px; }
+.pro-lock-overlay .lock-label {
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+}
+.pro-lock-overlay .lock-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,0.65);
+}
+.pro-lock-overlay .lock-btn {
+  background: linear-gradient(135deg,#1e40af,#7c3aed);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 4px;
+}
+</style>
+</head>
+<body class="tema-claro">
+
+<!-- LOGIN -->
+<div id="loginPage">
+  <div class="login-screen">
+    <div class="login-card">
+      <div class="login-logo">
+        <!-- [SEC-8] onerror movido a handler inline mínimo sin cadena de JS larga
+             Analogia: en vez de dejar la llave bajo el felpudo (onerror ejecutando
+             múltiples comandos), usamos una función controlada en app.js.
+             logoFallbackHandler() está definida en app.js y solo hace lo necesario. -->
+        <img id="logoImg" src="img/IsotipoStock.png"
+             style="width:72px;height:72px;object-fit:contain;margin-bottom:8px">
+        <div id="logoFallback" style="display:none;width:72px;height:72px;align-items:center;justify-content:center;font-size:52px;margin-bottom:8px">📦</div>
+        <div class="logo-text">Yepar<span>Stock</span></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:1px;text-transform:uppercase;font-weight:600">by YEPARSOLUTIONS</div>
+      </div>
+      <div id="panelLogin">
+        <p class="login-tagline">Sabe qué se está acabando<br>antes de quedarte sin stock.</p>
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">Colaborador</label>
+          <input id="loginUsername" class="form-input" type="text" placeholder="nombre.apellido"
+                 autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
+                 style="text-transform:none">
+        </div>
+        <div class="form-group" style="margin-bottom:20px">
+          <label class="form-label">Contraseña</label>
+          <input id="loginPassword" class="form-input" type="password" placeholder="••••••••"
+                 autocomplete="new-password">
+        </div>
+        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px">Entrar al negocio →</button>
+        <p style="text-align:right;margin:8px 0 4px"><span style="font-size:12px;color:var(--azul);cursor:pointer;text-decoration:underline">¿Olvidaste tu contraseña?</span></p>
+        <p class="divider-text">¿Primera vez?</p>
+        <button class="btn-secondary" style="width:100%;justify-content:center">Crear cuenta gratis — 30 días</button>
+        <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:20px">Sin tarjeta de crédito · Cancela cuando quieras</p>
+      </div>
+      <div id="panelRegistro" style="display:none">
+        <p class="login-tagline">Crea tu cuenta y empieza a<br>controlar tu inventario hoy.</p>
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">Nombre completo *</label>
+          <input id="regNombre" class="form-input" type="text" placeholder="Ej: Juan Rodríguez"
+                 autocomplete="name">
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">Correo electrónico *</label>
+          <input id="regEmail" class="form-input" type="email" placeholder="tu@negocio.com"
+                 autocomplete="email">
+        </div>
+              <div class="form-group">
+                <label for="regApellido">Apellido</label>
+                <input id="regApellido" type="text" placeholder="Pérez" autocomplete="family-name">
+              </div>
+        <div class="form-group" style="margin-bottom:20px">
+          <!-- [SEC-3] Placeholder y label consistentes con la validación real (8 caracteres) -->
+          <label class="form-label">Contraseña * (mínimo 8 caracteres)</label>
+          <input id="regPassword" class="form-input" type="password" placeholder="Mínimo 8 caracteres"
+                 autocomplete="new-password">
+          <div class="pass-strength-wrap" id="regStrengthWrap" style="display:none;margin-top:6px">
+            <div class="pass-strength-bar"><div class="pass-strength-fill" id="regStrengthFill"></div></div>
+            <span class="pass-strength-label" id="regStrengthLabel"></span>
+          </div>
+        </div>
+        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px">Crear cuenta →</button>
+        <p class="divider-text">¿Ya tienes cuenta?</p>
+        <button class="btn-secondary" style="width:100%;justify-content:center">← Volver al login</button>
+      </div>
+
+      <!-- PANEL: verificación de email -->
+      <div id="panelVerificacion" style="display:none">
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:40px">📧</div>
+          <p style="font-weight:700;font-size:16px;margin:8px 0 4px">Revisa tu email</p>
+          <p style="color:var(--muted);font-size:13px;margin:0">Enviamos un código de 6 dígitos a<br><strong id="verifiEmailMostrar"></strong></p>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:20px" id="codigoInputs">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" autocomplete="one-time-code">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+        </div>
+        <div id="verifiError" style="display:none;color:var(--rojo);font-size:13px;text-align:center;margin-bottom:12px"></div>
+        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px">✅ Verificar cuenta</button>
+        <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:16px">
+          ¿No llegó? <span style="color:var(--azul);cursor:pointer;text-decoration:underline">Reenviar código</span>
+        </p>
+      </div>
+
+      <!-- PANEL: olvidé mi contraseña - paso 1 email -->
+      <div id="panelOlvideEmail" style="display:none">
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:40px">🔐</div>
+          <p style="font-weight:700;font-size:16px;margin:8px 0 4px">Recuperar contraseña</p>
+          <p style="color:var(--muted);font-size:13px;margin:0">Ingresa tu email y te enviamos un código</p>
+        </div>
+        <div class="form-group" style="margin-bottom:20px">
+          <label class="form-label">Correo electrónico</label>
+          <input id="resetEmail" class="form-input" type="email" placeholder="tu@negocio.com"
+                 autocomplete="email">
+        </div>
+        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px">Enviar código →</button>
+        <p class="divider-text"></p>
+        <button class="btn-secondary" style="width:100%;justify-content:center">← Volver al login</button>
+      </div>
+
+      <!-- PANEL: olvidé mi contraseña - paso 2 código + nueva pass -->
+      <div id="panelOlvideCodigo" style="display:none">
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:40px">📧</div>
+          <p style="font-weight:700;font-size:16px;margin:8px 0 4px">Código enviado</p>
+          <p style="color:var(--muted);font-size:13px;margin:0">Revisa tu email e ingresa el código</p>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px" id="resetCodigoInputs">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0" autocomplete="one-time-code">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+          <input type="text" maxlength="1" class="form-input" style="width:44px;text-align:center;font-size:22px;font-weight:800;padding:10px 0">
+        </div>
+        <div class="form-group" style="margin-bottom:20px">
+          <!-- [SEC-3] Placeholder corregido — dice "6 caracteres" en el original, debe decir 8
+               para ser consistente con la validación real de confirmarReset() en app.js -->
+          <label class="form-label">Nueva contraseña (mínimo 8 caracteres)</label>
+          <input id="resetNuevaPass" class="form-input" type="password" placeholder="Mínimo 8 caracteres"
+                 autocomplete="new-password">
+        </div>
+        <div id="resetError" style="display:none;color:var(--rojo);font-size:13px;text-align:center;margin-bottom:12px"></div>
+        <button class="btn-primary" style="width:100%;justify-content:center;padding:13px">🔐 Cambiar contraseña</button>
+        <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:16px">
+          ¿No llegó? <span style="color:var(--azul);cursor:pointer;text-decoration:underline">Reenviar código</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ONBOARDING — solo se muestra a usuarios nuevos, no se puede saltar -->
+<div id="onboardingPage" style="display:none;position:fixed;inset:0;background:var(--bg1);z-index:100;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:36px;width:100%;max-width:460px;box-shadow:0 24px 60px rgba(0,0,0,0.4)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:36px;margin-bottom:8px">🚀</div>
+      <div style="font-family:var(--font-head);font-size:22px;font-weight:800">Configuremos tu negocio</div>
+      <div style="color:var(--muted);font-size:13px;margin-top:6px">Solo toma 1 minuto · Lo puedes cambiar después</div>
+    </div>
+
+    <!-- Logo opcional -->
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+      <div id="onboardingLogoPreview"
+           style="width:64px;height:64px;border-radius:14px;background:var(--bg3);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer;flex-shrink:0">📷</div>
+      <input id="onboardingLogoFile" type="file" accept="image/*" style="display:none">
+      <div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:2px">Logo del negocio</div>
+        <div style="font-size:11px;color:var(--muted)">Opcional · PNG o JPG · máx 2MB</div>
+        <button type="button"
+                style="background:none;border:1px solid var(--border);border-radius:7px;padding:4px 10px;color:var(--muted);font-size:12px;cursor:pointer;margin-top:4px">Subir logo</button>
+      </div>
+    </div>
+
+    <!-- Nombre del negocio -->
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Nombre del negocio *</label>
+      <input id="onboardingNombreNegocio" class="form-input" type="text" placeholder="Ej: Minimarket Don Pedro"
+             autocomplete="organization">
+    </div>
+
+    <!-- Rubro -->
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Rubro del negocio *</label>
+      <select id="onboardingRubro" class="form-input">
+        <option value="">Selecciona el rubro de tu negocio...</option>
+      </select>
+    </div>
+
+    <!-- Moneda -->
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Moneda</label>
+      <select id="onboardingMoneda" class="form-input">
+        <option value="CLP">🇨🇱 Peso chileno (CLP)</option>
+        <option value="USD">🇺🇸 Dólar (USD)</option>
+        <option value="EUR">🇪🇺 Euro (EUR)</option>
+        <option value="PEN">🇵🇪 Sol peruano (PEN)</option>
+        <option value="COP">🇨🇴 Peso colombiano (COP)</option>
+        <option value="MXN">🇲🇽 Peso mexicano (MXN)</option>
+        <option value="ARS">🇦🇷 Peso argentino (ARS)</option>
+        <option value="VES">🇻🇪 Bolivar venezolano (VES)</option>
+      </select>
+    </div>
+
+    <!-- Nombre del usuario -->
+    <div class="form-group" style="margin-bottom:24px">
+      <label class="form-label">¿Cómo te llamamos? *</label>
+      <input id="onboardingNombreUsuario" class="form-input" type="text" placeholder="Ej: Pedro González"
+             autocomplete="given-name">
+    </div>
+
+    <button id="btnGuardarOnboarding" class="btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px">
+      ✓ Entrar a mi negocio
+    </button>
+    <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:12px">Tus datos son privados y solo tú los ves</div>
+  </div>
+</div>
+
+<!-- PANTALLA DE BLOQUEO — suscripción vencida -->
+<div id="pantallaBloqueo" style="display:none;position:fixed;inset:0;background:var(--bg1);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:40px;width:100%;max-width:440px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,0.4)">
+    <div style="font-size:52px;margin-bottom:16px">🔒</div>
+    <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:8px">Acceso bloqueado</div>
+    <p style="color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:28px">
+      Tu suscripción fue cancelada y el periodo de gracia ha terminado.<br>
+      Reactiva tu plan para volver a acceder a tu inventario.
+    </p>
+    <button class="btn-primary" style="width:100%;justify-content:center;padding:13px;margin-bottom:12px">🔄 Reactivar suscripción</button>
+    <button class="btn-secondary" style="width:100%;justify-content:center">Cerrar sesión</button>
+  </div>
+</div>
+
+<!-- APP PRINCIPAL -->
+<div id="appMain" style="display:none">
+  <button class="mobile-menu-btn">☰</button>
+  <div class="sidebar-backdrop" id="backdrop"></div>
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar" id="sidebar">
+    <div class="logo-block">
+      <img src="img/IsotipoStock.png"
+        style="width:50px; height:50px; object-fit:contain">
+      <div>
+        <div class="logo-text" style="font-size:16px;">Yepar<span>Stock</span></div>
+        <div style="font-size:8px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-top:-2px">
+          by YEPARSOLUTIONS
+        </div>
+      </div>
+    </div>
+
+    <!-- SELECTOR DE SUCURSAL — solo visible para admin Pro con 2+ sucursales -->
+    <div id="selectorSucursalWrap" style="display:none;padding:6px 12px 10px">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">Sucursal activa</div>
+      <div style="position:relative">
+        <select id="selectorSucursal" style="width:100%;padding:7px 30px 7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;appearance:none;-webkit-appearance:none">
+        </select>
+        <span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:11px;color:var(--muted)">▼</span>
+      </div>
+    </div>
+
+    <span class="nav-label">Principal</span>
+    <button class="nav-item active" id="nav-dashboard">  <span class="nav-icon">🏠</span> Dashboard</button>
+    <button class="nav-item"        id="nav-productos">  <span class="nav-icon">📋</span> Productos</button>
+    <button class="nav-item"        id="nav-stock">      <span class="nav-icon">📦</span> Stock</button>
+    <button class="nav-item"        id="nav-movimientos"><span class="nav-icon">🔄</span> Movimientos</button>
+    <button class="nav-item"        id="nav-salidas">    <span class="nav-icon">📤</span> Salidas</button>
+
+    <span class="nav-label">Análisis</span>
+    <button class="nav-item" id="nav-alertas">  <span class="nav-icon">🔔</span> Alertas <span class="nav-badge" id="alertBadge" style="display:none">0</span></button>
+    <button class="nav-item" id="nav-reportes"> <span class="nav-icon">📊</span> Reportes</button>
+    <button class="nav-item" id="nav-fiados">   <span class="nav-icon">📒</span> Deudores <span class="nav-badge" id="fiadosBadge" style="display:none;background:var(--amarillo);color:#000">0</span></button>
+
+    <span class="nav-label">Sistema</span>
+    <button class="nav-item" id="nav-sucursales" style="display:none">  <span class="nav-icon">🏪</span> Sucursales</button>
+    <button class="nav-item" id="nav-equipo">   <span class="nav-icon">👥</span> Mi Equipo <span id="equipoBadge" style="display:none;background:var(--verde);color:#000;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:4px">Admin</span></button>
+    <button class="nav-item" id="nav-settings"> <span class="nav-icon">⚙️</span> Configuración</button>
+
+    <div class="sidebar-footer">
+      <!-- RELOJ — se actualiza cada segundo desde iniciarReloj() en app.js -->
+      <div id="sidebarReloj" style="text-align:center;font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--text);letter-spacing:2px;margin-bottom:4px;line-height:1;">--:--:--</div>
+      <div id="sidebarFecha" style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:12px;text-transform:capitalize;">--</div>
+      <div class="theme-toggle-row">
+        <span class="theme-toggle-label" id="themeLabel">🌙 Tema oscuro</span>
+        <div class="theme-toggle-switch" id="themeSwitch"><div class="theme-toggle-thumb" id="themeThumb"></div></div>
+      </div>
+      <div class="user-row" style="margin-top:14px">
+        <div class="avatar">JR</div>
+        <div class="user-info">
+          <div class="user-name"></div>
+          <div id="sidebarPlanBadge" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:2px;background:rgba(0,199,123,0.15);color:var(--verde)">✦ Plan Activo</div>
+        </div>
+        <button class="logout-btn" title="Cerrar sesión">⏻</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="main-content">
+
+    <!-- DASHBOARD -->
+    <div class="screen active" id="screen-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title" id="dashTitulo">Buen día 👋</div>
+          <div class="page-subtitle" id="dashSubtitulo">Cargando...</div>
+        </div>
+        <button class="btn-primary" style="background:var(--azul)">🛒 Nueva venta</button>
+        <button class="btn-primary">+ Nuevo Ingreso</button>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card verde">
+          <div class="stat-label">PRODUCTOS EN STOCK</div>
+          <div class="stat-value" id="statTotal">—</div>
+          <div class="stat-trend" id="statTotalTrend">Sin productos aún</div>
+        </div>
+        <div class="stat-card verde" style="background:rgba(0,199,123,0.06)">
+          <div class="stat-label">TOTAL UNIDADES 📦</div>
+          <div class="stat-value" id="statUnidades">—</div>
+          <div class="stat-trend">Unidades físicas en bodega</div>
+        </div>
+        <div class="stat-card rojo">
+          <div class="stat-label">BAJO STOCK 🔴</div>
+          <div class="stat-value" id="statCriticos">—</div>
+          <div class="stat-trend">Requieren reposición urgente</div>
+        </div>
+        <div class="stat-card amarillo">
+          <div class="stat-label">ALERTA AMARILLA</div>
+          <div class="stat-value" id="statAlertas">—</div>
+          <div class="stat-trend">Stock llegando al mínimo</div>
+        </div>
+        <div class="stat-card azul">
+          <div class="stat-label">VALOR INVENTARIO</div>
+          <div class="stat-value" id="statValor">—</div>
+          <div class="stat-trend" id="statMoneda">estimado en bodega</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+        <div class="card">
+          <div class="card-title">🚨 Requieren atención ahora <span style="font-size:12px;color:var(--muted);font-family:var(--font-body);font-weight:400;cursor:pointer">ver todas →</span></div>
+          <div class="alert-list" id="dashAlertasList">
+            <div id="dashAlertasVacio" style="text-align:center;padding:24px;color:var(--muted);font-size:13px">✅ Todo en orden — sin alertas por ahora</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📈 Movimientos esta semana</div>
+          <div class="mini-chart" id="dashMiniChart">
+            <div class="mini-bar" style="height:5%"></div><div class="mini-bar" style="height:5%"></div>
+            <div class="mini-bar" style="height:5%"></div><div class="mini-bar" style="height:5%"></div>
+            <div class="mini-bar" style="height:5%"></div><div class="mini-bar" style="height:5%"></div>
+            <div class="mini-bar" style="height:5%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:8px;padding:0 2px">
+            <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+          </div>
+          <div style="display:flex;gap:20px;margin-top:16px">
+            <div><div style="font-size:11px;color:var(--muted)">ENTRADAS</div><div id="dashEntradas" style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--azul)">+0</div></div>
+            <div><div style="font-size:11px;color:var(--muted)">SALIDAS</div><div id="dashSalidas" style="font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--rojo)">-0</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">🕐 Últimos movimientos registrados</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Producto</th><th>Tipo</th><th>Cantidad</th><th>Stock resultante</th><th>Hora</th></tr></thead>
+            <tbody id="dashMovTableBody">
+              <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Aún no hay movimientos</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUCTOS -->
+    <div class="screen" id="screen-productos">
+      <div class="page-header">
+        <div><div class="page-title">Mis Productos</div><div class="page-subtitle" id="prodSubtitulo">Cargando...</div></div>
+        <button class="btn-primary">+ Nuevo Ingreso</button>
+      </div>
+      <div class="search-row">
+        <input id="prodBuscar" class="search-input" placeholder="🔍  Buscar por nombre, código o marca...">
+        <select id="prodCategoria" class="filter-select">
+          <option value="">Todas las categorías</option>
+          <option>Lácteos</option><option>Bebestibles</option><option>Snacks</option><option>Limpieza</option>
+          <option>Granos</option><option>Panadería</option><option>Congelados</option><option>Carnes</option>
+          <option>Frutas y Verduras</option><option>Otro</option>
+        </select>
+        <select id="prodEstado" class="filter-select">
+          <option value="">Todo el stock</option>
+          <option value="critico">🔴 Crítico</option><option value="alerta">🟡 En alerta</option><option value="ok">🟢 Stock ok</option>
+        </select>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th style="padding-left:20px">Producto</th><th>Código de barras</th><th>Categoría</th><th>Marca</th><th>Proveedor</th><th>P. Compra</th><th>P. Venta</th><th>% Ganancia</th><th style="text-align:center">Acciones</th></tr></thead>
+            <tbody id="prodTableBody"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:40px;font-size:13px">Cargando productos...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- STOCK -->
+    <div class="screen" id="screen-stock">
+      <div class="page-header">
+        <div><div class="page-title">Stock 📦</div><div class="page-subtitle" id="stockSubtitulo">Cargando...</div></div>
+        <button class="btn-primary">+ Nuevo Ingreso</button>
+      </div>
+      <div class="search-row">
+        <input id="stockBuscar" class="search-input" placeholder="🔍  Buscar producto...">
+        <select id="stockCategoria" class="filter-select">
+          <option value="">Todas las categorías</option>
+          <option>Lácteos</option><option>Bebestibles</option><option>Snacks</option><option>Granos</option>
+          <option>Limpieza</option><option>Panadería</option><option>Congelados</option><option>Carnes</option>
+          <option>Frutas y Verduras</option><option>Otro</option>
+        </select>
+        <select id="stockEstado" class="filter-select">
+          <option value="">Todo el stock</option>
+          <option value="critico">🔴 Crítico</option><option value="alerta">🟡 En alerta</option><option value="ok">🟢 Stock ok</option>
+        </select>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th style="padding-left:20px">Producto</th><th>Categoría</th><th>Stock actual</th><th>Mínimo</th><th>Precio venta</th><th>Vence</th><th>Estado</th><th style="text-align:center">Movimiento</th></tr></thead>
+            <tbody id="stockTableBody"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:40px;font-size:13px">Cargando stock...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- MOVIMIENTOS -->
+    <div class="screen" id="screen-movimientos">
+      <div class="page-header">
+        <div><div class="page-title">Movimientos</div><div class="page-subtitle" id="movSubtitulo">Historial completo de entradas y salidas</div></div>
+      </div>
+      <div class="search-row" style="flex-wrap:wrap;gap:8px">
+        <input id="movBuscar"      class="search-input" placeholder="🔍  Buscar por nombre..." style="min-width:160px;flex:1">
+        <input id="movBuscarCodigo" class="search-input" placeholder="📦  Código de producto..." style="min-width:160px;flex:1">
+        <select id="movFiltroTipo" class="filter-select">
+          <option value="">Entradas y salidas</option><option value="entrada">↑ Solo entradas</option><option value="salida">↓ Solo salidas</option>
+        </select>
+        <select id="movFiltroCategoria" class="filter-select">
+          <option value="">Todas las categorías</option>
+          <option>Lácteos</option><option>Bebestibles</option><option>Snacks</option><option>Granos</option>
+          <option>Limpieza</option><option>Panadería</option><option>Congelados</option><option>Carnes</option>
+          <option>Frutas y Verduras</option><option>Otro</option>
+        </select>
+        <input id="movFiltroDesde" class="filter-select" type="date" title="Desde">
+        <input id="movFiltroHasta" class="filter-select" type="date" title="Hasta">
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th style="padding-left:16px">Fecha y hora</th><th>Producto</th><th>Tipo</th><th>Cantidad</th><th>Stock anterior</th><th>Stock resultante</th><th>Lote</th><th>Nota</th><th>Colaborador</th></tr></thead>
+            <tbody id="movTableBody"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:40px;font-size:13px">Cargando movimientos...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SALIDAS -->
+    <div class="screen" id="screen-salidas">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Salidas 📤</div>
+          <div class="page-subtitle" id="salidaSubtitulo">Ventas · Mermas · Cuarentenas · Devoluciones</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-primary" style="background:var(--azul)">🛒 Nueva venta</button>
+          <button class="btn-primary" style="background:var(--rojo)">🗑️ Registrar merma</button>
+        </div>
+      </div>
+      <div class="stats-grid" style="margin-bottom:20px">
+        <div class="stat-card azul"><div class="stat-label">VENTAS</div><div class="stat-value" id="salidaResVentas">—</div><div class="stat-trend">registros totales</div></div>
+        <div class="stat-card rojo"><div class="stat-label">MERMAS</div><div class="stat-value" id="salidaResMermas">—</div><div class="stat-trend">pérdidas registradas</div></div>
+        <div class="stat-card amarillo"><div class="stat-label">EN CUARENTENA ⚠️</div><div class="stat-value" id="salidaResCuarentenas">—</div><div class="stat-trend">pendientes de resolución</div></div>
+        <div class="stat-card verde"><div class="stat-label">VALOR VENDIDO</div><div class="stat-value" id="salidaResValor">—</div><div class="stat-trend">total en ventas</div></div>
+      </div>
+      <div class="search-row" style="flex-wrap:wrap;gap:8px">
+        <input id="salidaBuscar" class="search-input" placeholder="🔍  Buscar por producto..." style="min-width:180px;flex:1">
+        <select id="salidaFiltroTipo" class="filter-select">
+          <option value="">Todos los tipos</option>
+          <option value="venta">Ventas</option>
+          <option value="merma">Mermas</option>
+          <option value="cuarentena">Cuarentenas</option>
+          <option value="devolucion_proveedor">Dev. Proveedor</option>
+        </select>
+        <select id="salidaFiltroEstado" class="filter-select">
+          <option value="">Todos los estados</option>
+          <option value="activo">Confirmado</option>
+          <option value="en_revision">En revisión</option>
+          <option value="reingresado">Reingresado</option>
+          <option value="descartado">Descartado</option>
+          <option value="enviado_proveedor">Enviado proveedor</option>
+        </select>
+        <input id="salidaFiltroDesde" class="filter-select" type="date" title="Desde">
+        <input id="salidaFiltroHasta" class="filter-select" type="date" title="Hasta">
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="padding-left:16px">Fecha</th><th>Producto</th><th>Tipo</th><th>Cantidad</th>
+                <th>Stk. anterior</th><th>Stk. resultante</th><th>Motivo</th><th>Estado</th><th style="text-align:center">Valor</th>
+              </tr>
+            </thead>
+            <tbody id="salidaTableBody">
+              <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:40px;font-size:13px">Cargando salidas...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALERTAS — dinámico, se llena desde cargarAlertas() en app.js -->
+    <div class="screen" id="screen-alertas">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Centro de Alertas 🔔</div>
+          <div class="page-subtitle" id="alertasSubtitulo">0 productos requieren atención</div>
+        </div>
+        <button class="btn-secondary">✓ Marcar todas como vistas</button>
+      </div>
+      <div class="stats-grid" style="margin-bottom:24px">
+        <div class="stat-card rojo">
+          <div class="stat-label">CRÍTICOS 🔴</div>
+          <div class="stat-value" id="alertasCriticosNum">0</div>
+          <div class="stat-trend">Pedir hoy mismo</div>
+        </div>
+        <div class="stat-card amarillo">
+          <div class="stat-label">EN ALERTA 🟡</div>
+          <div class="stat-value" id="alertasAlertaNum">0</div>
+          <div class="stat-trend">Pedir esta semana</div>
+        </div>
+      </div>
+      <div id="alertasCriticosSec" style="display:none">
+        <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">🔴 Stock Crítico — Pedir urgente</div>
+        <div class="alert-big-list" id="alertasCriticosList" style="margin-bottom:28px"></div>
+      </div>
+      <div id="alertasAlertaSec" style="display:none">
+        <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">🟡 Stock en Alerta — Pedir pronto</div>
+        <div class="alert-big-list" id="alertasAlertaList" style="margin-bottom:28px"></div>
+      </div>
+      <div id="alertasVencidosSec" style="display:none">
+        <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">⛔ Productos Vencidos</div>
+        <div class="alert-big-list" id="alertasVencidosList" style="margin-bottom:28px"></div>
+      </div>
+      <div id="alertasProximosSec" style="display:none">
+        <div class="card-title" style="margin-bottom:14px;font-family:var(--font-head);font-size:15px;font-weight:700">⏰ Próximos a Vencer</div>
+        <div class="alert-big-list" id="alertasProximosList" style="margin-bottom:28px"></div>
+      </div>
+      <div id="alertasVacioMsg" style="text-align:center;padding:64px 24px;color:var(--muted)">
+        <div style="font-size:48px;margin-bottom:16px">✅</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px">Todo en orden</div>
+        <div style="font-size:13px">No hay alertas de stock ni vencimientos por ahora</div>
+      </div>
+    </div>
+
+    <!-- REPORTES -->
+    <div class="screen" id="screen-reportes">
+      <div class="page-header">
+        <div><div class="page-title">📊 Reportes</div><div class="page-subtitle">Ventas, inventario y análisis del negocio</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <select class="filter-select" id="reportePeriodo">
+            <option value="hoy">Hoy</option>
+            <option value="semana">Últimos 7 días</option>
+            <option value="mes" selected>Este mes</option>
+            <option value="año">Este año</option>
+            <option value="custom">Rango personalizado</option>
+          </select>
+          <div id="reporteRangoCustom" style="display:none;gap:6px">
+            <input type="date" id="reporteDesde" class="filter-select">
+            <input type="date" id="reporteHasta" class="filter-select">
+            <button style="background:var(--azul);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">Filtrar →</button>
+          </div>
+        </div>
+        <div id="botonesExportPro" style="display:none;gap:8px;flex-wrap:wrap">
+          <button style="display:flex;align-items:center;gap:6px;background:#16a34a;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">📊 Descargar Excel</button>
+          <button style="display:flex;align-items:center;gap:6px;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">📄 Descargar PDF</button>
+          <button style="display:flex;align-items:center;gap:6px;background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer">📧 Enviar por email</button>
+        </div>
+      </div>
+      <div class="stats-grid" style="margin-bottom:20px;grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card verde"><div class="stat-label">VENTAS DEL PERIODO</div><div class="stat-value" id="reporteValorVentas">—</div><div class="stat-trend">Total facturado</div></div>
+        <div class="stat-card azul"><div class="stat-label">UNIDADES VENDIDAS</div><div class="stat-value" id="reporteUnidades">—</div><div class="stat-trend">Total de unidades</div></div>
+        <div class="stat-card rojo"><div class="stat-label">MERMAS DEL PERIODO</div><div class="stat-value" id="reporteMermas">—</div><div class="stat-trend">Unidades perdidas</div></div>
+      </div>
+      <div class="stats-grid" style="margin-bottom:20px;grid-template-columns:repeat(2,1fr)">
+        <div class="stat-card verde"><div class="stat-label">VALOR BODEGA ACTUAL</div><div class="stat-value" id="reporteValorBodega">—</div><div class="stat-trend">Inventario en stock</div></div>
+        <div class="stat-card azul"><div class="stat-label">MARGEN BRUTO EST.</div><div class="stat-value" id="reporteMargen">—</div><div class="stat-trend">Promedio del inventario</div></div>
+      </div>
+      <div id="reportesVacioMsg" style="display:none;text-align:center;padding:64px 24px;color:var(--muted)">
+        <div style="font-size:48px;margin-bottom:16px">📊</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px">Sin datos aún</div>
+        <div style="font-size:13px">Agrega productos y registra ventas para ver reportes</div>
+      </div>
+      <div id="reportesContenido" style="display:none">
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-title">📈 Ventas por día</div>
+          <div id="reporteGrafico" style="min-height:160px;padding:8px 0"></div>
+        </div>
+        <div class="report-grid">
+          <div class="card"><div class="card-title">🏆 Top Productos más Vendidos</div><div id="reporteTopProductos" class="top-products"></div></div>
+          <div class="card"><div class="card-title">🥧 Distribución por Tipo de Salida</div><div id="reportePorTipo" style="padding:8px 0"></div></div>
+          <div class="card"><div class="card-title">📂 Stock por Categoría</div><div id="reporteCategorias" style="display:flex;flex-direction:column;gap:10px;padding:8px 0"></div></div>
+          <div class="card"><div class="card-title">💳 Ventas por Método de Pago</div><div id="reporteMetodoPago" style="display:flex;flex-direction:column;gap:10px;padding:8px 0"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div></div></div>
+          <div class="card"><div class="card-title">📒 Resumen de Deudas</div><div id="reporteDeudas" style="display:flex;flex-direction:column;gap:10px;padding:8px 0"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div></div></div>
+        </div>
+        <div id="seccionPro" style="margin-top:24px">
+          <div id="bannerUpgradePro" style="display:none;background:linear-gradient(135deg,#1e40af,#7c3aed);border-radius:16px;padding:24px 28px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Plan Pro</div>
+              <div style="font-family:var(--font-head);font-size:20px;font-weight:800;color:#fff;margin-bottom:4px">Inteligencia y Crecimiento 🚀</div>
+              <div style="font-size:13px;color:rgba(255,255,255,0.8)">Ganancia real · Top productos · Comparación de periodos · Rotación de inventario</div>
+            </div>
+            <button style="background:#fff;color:#1e40af;border:none;border-radius:10px;padding:12px 24px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">⬆️ Ver planes →</button>
+          </div>
+          <div class="report-grid">
+            <div class="card" id="cardGananciaReal" style="position:relative"><div class="card-title">💰 Ganancia Real del Periodo</div><div id="reporteGananciaReal" style="padding:8px 0"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div></div><div id="lockGananciaReal" class="pro-lock-overlay" style="display:none"></div></div>
+            <div class="card" id="cardComparacion" style="position:relative"><div class="card-title">📅 Comparación de Periodos</div><div id="reporteComparacion" style="padding:8px 0"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div></div><div id="lockComparacion" class="pro-lock-overlay" style="display:none"></div></div>
+            <div class="card" id="cardRotacion" style="position:relative"><div class="card-title">🔄 Rotación de Inventario</div><div id="reporteRotacionPro" style="padding:8px 0"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div></div><div id="lockRotacion" class="pro-lock-overlay" style="display:none"></div></div>
+            <div class="card" id="cardSinMovimiento" style="position:relative"><div class="card-title">📦 Capital Dormido</div><div id="reporteSinMovimiento" style="padding:8px 0"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Cargando...</div></div><div id="lockSinMovimiento" class="pro-lock-overlay" style="display:none"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FIADOS / DEUDORES -->
+    <div class="screen" id="screen-fiados">
+      <div class="page-header">
+        <div>
+          <div class="page-title">📒 Deudores</div>
+          <div class="page-subtitle" id="fiadosSubtitulo">Clientes con deuda pendiente</div>
+        </div>
+        <input class="search-input" id="fiadosBuscar" placeholder="🔍 Buscar cliente..." style="max-width:260px">
+      </div>
+      <div class="stats-grid" style="margin-bottom:20px;grid-template-columns:repeat(2,1fr)">
+        <div class="stat-card amarillo"><div class="stat-label">DEUDA TOTAL PENDIENTE</div><div class="stat-value" id="fiadosTotalDeuda">—</div><div class="stat-trend">Por cobrar</div></div>
+        <div class="stat-card rojo"><div class="stat-label">CLIENTES CON DEUDA</div><div class="stat-value" id="fiadosTotalClientes">—</div><div class="stat-trend">Cuentas abiertas</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn-secondary fiado-filtro active" data-estado="">Todos</button>
+        <button class="btn-secondary fiado-filtro" data-estado="pendiente">⏳ Pendiente</button>
+        <button class="btn-secondary fiado-filtro" data-estado="pagado_parcial">🔄 Parcial</button>
+        <button class="btn-secondary fiado-filtro" data-estado="pagado">✅ Pagado</button>
+      </div>
+      <div id="fiadosLista" class="card" style="padding:0;overflow:hidden">
+        <div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">Cargando deudores...</div>
+      </div>
+    </div>
+
+    <!-- EQUIPO -->
+    <div class="screen" id="screen-equipo">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Mi Equipo 👥</div>
+          <div class="page-subtitle" id="equipoSubtitulo">Gestiona los colaboradores de tu negocio</div>
+        </div>
+        <button class="btn-primary" id="btnInvitarColaborador" style="display:none">+ Agregar colaborador</button>
+      </div>
+      <div class="card" style="margin-bottom:20px" id="equipoPlanCard">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Plan actual</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span id="equipoPlanNombre" style="font-family:var(--font-head);font-size:20px;font-weight:800">—</span>
+              <span id="equipoPlanBadge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:rgba(0,199,123,0.15);color:var(--verde)">Activo</span>
+            </div>
+            <div id="equipoPlanDetalle" style="font-size:12px;color:var(--muted);margin-top:4px">—</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:12px">
+            <div style="display:flex;gap:20px">
+              <div style="text-align:center">
+                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Colaboradores</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800"><span id="equipoUsersActual">—</span><span style="color:var(--muted);font-size:14px">/<span id="equipoUsersMax">—</span></span></div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Productos</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800"><span id="equipoProdsActual">—</span><span id="equipoProdsMax" style="color:var(--muted);font-size:14px"></span></div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+              <button id="btnUpgradePlan" style="display:none;background:linear-gradient(135deg,#5b8eff,#3b6fff);border:none;border-radius:10px;padding:8px 18px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">🔄 Cambiar Plan</button>
+              <div id="avisoCancelacion" style="display:none;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:8px 12px;font-size:12px;color:#f59e0b;max-width:280px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="padding-left:20px">Colaborador</th>
+                <th>Email</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th>Desde</th>
+                <th id="equipoColAcciones" style="text-align:center;display:none">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="equipoTableBody">
+              <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px;font-size:13px">Cargando equipo...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONFIGURACION -->
+    <div class="screen" id="screen-settings">
+      <div class="page-header">
+        <div><div class="page-title">⚙️ Configuración</div><div class="page-subtitle">Personaliza tu negocio y cuenta</div></div>
+        <button class="btn-primary" id="btnGuardarSettingsAdmin">✓ Guardar cambios</button>
+      </div>
+      <div class="settings-section" id="settingsAdminNegocio">
+        <div class="settings-section-title">🏢 Datos del negocio</div>
+        <div class="settings-card">
+          <div class="settings-logo-row">
+            <div class="settings-logo-preview" id="logoPreview">
+              <span id="logoInitials">MR</span>
+              <img id="logoImgSettings" src="" alt="Logo" style="display:none;width:100%;height:100%;object-fit:contain;border-radius:12px;">
+            </div>
+            <div class="settings-logo-info">
+              <div class="settings-logo-label">Logo del negocio</div>
+              <div class="settings-logo-hint">PNG, JPG o SVG · Máximo 2MB · Recomendado 200×200px</div>
+              <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+                <input type="file" id="inputLogo" accept="image/*" style="display:none">
+                <button class="btn-secondary" style="font-size:13px;padding:8px 16px">📁 Subir logo</button>
+                <button class="btn-secondary" style="font-size:13px;padding:8px 16px">🔗 Pegar URL</button>
+                <button class="btn-secondary" style="font-size:13px;padding:8px 16px">🗑️ Quitar</button>
+              </div>
+              <div id="logoUrlWrap" style="display:none;margin-top:10px">
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input id="inputLogoUrl" class="form-input" type="url"
+                    placeholder="https://ejemplo.com/logo.png"
+                    style="font-size:13px;padding:8px 12px;flex:1">
+                  <button class="btn-secondary" style="font-size:13px;padding:8px 12px;white-space:nowrap">✓ Aplicar</button>
+                </div>
+                <span class="settings-field-hint">PNG, JPG o SVG accesible públicamente</span>
+              </div>
+            </div>
+          </div>
+          <div class="settings-divider"></div>
+          <div class="form-grid">
+            <div class="form-group form-full">
+              <label class="form-label">Nombre del negocio *</label>
+              <input id="inputNegocio" class="form-input" type="text" placeholder="Ej: Minimarket El Rincón" value="" autocomplete="off">
+              <span class="settings-field-hint">Aparece en el dashboard y reportes</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Moneda</label>
+              <select id="inputMoneda" class="form-input">
+                <option value="CLP" selected>🇨🇱 CLP — Peso chileno</option>
+                <option value="USD">🇺🇸 USD — Dólar</option>
+                <option value="EUR">🇪🇺 EUR — Euro</option>
+                <option value="PEN">🇵🇪 PEN — Sol peruano</option>
+                <option value="COP">🇨🇴 COP — Peso colombiano</option>
+                <option value="MXN">🇲🇽 MXN — Peso mexicano</option>
+                <option value="ARS">🇦🇷 ARS — Peso argentino</option>
+                <option value="VES">🇻🇪 VES — Bolívar venezolano</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Color principal</label>
+              <div class="settings-color-row">
+                <input type="color" id="inputColor" value="#00C77B" class="settings-color-picker">
+                <input id="inputColorHex" class="form-input" type="text" value="#00C77B" placeholder="#00C77B" maxlength="7" style="font-family:monospace;letter-spacing:1px">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-section" id="settingsAdminCuenta">
+        <div class="settings-section-title">👤 Tu cuenta</div>
+        <div class="settings-card">
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">Nombre completo *</label><input id="inputNombreUsuario" class="form-input" type="text" value="" autocomplete="off"></div>
+            <div class="form-group"><label class="form-label">Correo electrónico</label><input id="inputEmail" class="form-input" type="email" value="" autocomplete="off"></div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-section" id="settingsAdminPass">
+        <div class="settings-section-title">🔒 Cambiar contraseña</div>
+        <div class="settings-card">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:start">
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Contraseña actual</label>
+              <div class="settings-pass-row">
+                <input id="inputPassActual" class="form-input" type="password" placeholder="Actual" autocomplete="current-password">
+                <button class="settings-eye-btn">👁️</button>
+              </div>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Nueva contraseña</label>
+              <div class="settings-pass-row">
+                <input id="inputPassNueva" class="form-input" type="password" placeholder="Mín. 8 caracteres" autocomplete="new-password">
+                <button class="settings-eye-btn">👁️</button>
+              </div>
+              <div class="pass-strength-wrap" id="passStrengthWrap" style="display:none">
+                <div class="pass-strength-bar"><div class="pass-strength-fill" id="passStrengthFill"></div></div>
+                <span class="pass-strength-label" id="passStrengthLabel"></span>
+              </div>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Confirmar contraseña</label>
+              <div class="settings-pass-row">
+                <input id="inputPassConfirm" class="form-input" type="password" placeholder="Repetir" autocomplete="new-password">
+                <button class="settings-eye-btn">👁️</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- PANEL COLABORADOR -->
+      <div id="configColaboradorPanel" style="display:none">
+        <div class="settings-section">
+          <div class="settings-section-title">🔒 Cambiar mi contraseña</div>
+          <div class="settings-card">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:start">
+              <div class="form-group" style="margin:0">
+                <label class="form-label">Contraseña actual</label>
+                <div class="settings-input-wrap">
+                  <input id="colabPassActual" class="form-input" type="password" placeholder="Actual" autocomplete="current-password">
+                  <button class="settings-eye-btn">👁️</button>
+                </div>
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label">Nueva contraseña</label>
+                <div class="settings-input-wrap">
+                  <input id="colabPassNueva" class="form-input" type="password" placeholder="Mín. 8 caracteres" autocomplete="new-password">
+                  <button class="settings-eye-btn">👁️</button>
+                </div>
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label">Confirmar contraseña</label>
+                <div class="settings-input-wrap">
+                  <input id="colabPassConfirm" class="form-input" type="password" placeholder="Repetir" autocomplete="new-password">
+                  <button class="settings-eye-btn">👁️</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-title">🎨 Color de interfaz</div>
+          <div class="settings-card">
+            <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Personaliza el color principal de tu sesión</div>
+            <div style="display:flex;align-items:center;gap:14px">
+              <input id="colabColor" type="color" value="#00C77B"
+                     style="width:48px;height:48px;border:none;background:none;cursor:pointer;border-radius:8px">
+              <span style="font-size:13px;color:var(--muted)">Haz clic para elegir un color</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN: Sonido del escáner — visible para todos -->
+      <div class="settings-section" id="settingsSonido">
+        <div class="settings-section-title">🔊 Sonido del escáner</div>
+        <div class="settings-card">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <select id="soundSelect" class="form-input" style="flex:1;min-width:200px;max-width:340px">
+              <option value="scanner">🔫 Escáner profesional — Beep doble nítido</option>
+              <option value="single">📟 Beep simple — Un solo tono corto</option>
+              <option value="soft">🎵 Tono suave — Ideal para oficinas</option>
+              <option value="retro">🕹️ Retro — Sonido 8-bit clásico</option>
+              <option value="cash">💰 Caja registradora — Ding metálico</option>
+              <option value="none">🔇 Sin sonido</option>
+            </select>
+            <button type="button" id="btnProbarSonido" class="btn-secondary" style="white-space:nowrap">▶ Probar</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="settingsAdminFooter" style="margin-top:8px;margin-bottom:32px">
+        <button class="btn-primary" id="btnGuardarSettingsFooter" style="width:100%;justify-content:center">✓ Guardar cambios</button>
+      </div>
+    </div>
+
+  <!-- PANTALLA: Sucursales -->
+    <div class="screen" id="screen-sucursales">
+      <div class="page-header">
+        <div>
+          <div class="page-title">🏪 Sucursales</div>
+          <div class="page-subtitle" id="sucursalesSubtitulo">Cargando...</div>
+        </div>
+        <button class="btn-primary" id="btnNuevaSucursal" style="display:none">+ Nueva Sucursal</button>
+      </div>
+
+      <!-- Barra de uso -->
+      <div class="card" style="padding:16px 20px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:13px;color:var(--muted)" id="sucursalesPlanHint">Cargando plan...</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text)">
+            <span id="sucursalesUsadas">0</span> / <span id="sucursalesMax">1</span>
+            <span id="sucursalesBarraLabel" style="display:none"></span>
+          </span>
+        </div>
+        <div style="height:6px;background:var(--bg3);border-radius:99px;overflow:hidden">
+          <div id="sucursalesBarraProgreso" style="height:100%;background:var(--azul);border-radius:99px;transition:width 0.3s;width:0%"></div>
+        </div>
+      </div>
+
+      <!-- Grid de tarjetas -->
+      <div id="sucursalesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+        <div style="text-align:center;padding:60px;color:var(--muted);grid-column:1/-1">Cargando sucursales...</div>
+      </div>
+
+      <!-- Card de equipo de la sucursal seleccionada -->
+      <div id="sucursalColaboradoresCard" class="card" style="display:none;margin-top:20px;padding:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div>
+            <div style="font-size:16px;font-weight:700">👥 Equipo — <span id="sucursalColabNombre"></span></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">Colaboradores asignados a esta sucursal</div>
+          </div>
+          <button class="btn-primary" id="btnAsignarColaborador" style="font-size:13px;padding:8px 14px">+ Asignar colaborador</button>
+        </div>
+        <table class="table" style="width:100%">
+          <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th></th></tr></thead>
+          <tbody id="sucursalColabTableBody">
+            <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">Selecciona una sucursal</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+<!-- MODAL: Nueva / Editar Sucursal -->
+<div class="modal-overlay" id="modalSucursal">
+  <div class="modal" style="max-width:460px;width:100%">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalSucursalTitulo">🏪 Nueva Sucursal</h3>
+      <button class="modal-close" onclick="cerrarModalSucursal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nombre de la sucursal *</label>
+        <input type="text" id="sucursalNombre" class="form-input" placeholder="Ej: Sucursal Centro">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Dirección</label>
+        <input type="text" id="sucursalDireccion" class="form-input" placeholder="Ej: Av. Principal 123">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Teléfono</label>
+        <input type="text" id="sucursalTelefono" class="form-input" placeholder="Ej: +54 9 11 1234-5678">
+      </div>
+    </div>
+    <div class="form-actions" style="padding:16px 20px">
+      <button type="button" class="btn-secondary" onclick="cerrarModalSucursal()">Cancelar</button>
+      <button type="button" class="btn-primary" onclick="guardarSucursal()">✓ Guardar Sucursal</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- fin appMain -->
+
+
+<!-- MODAL: Registro rápido de producto nuevo -->
+<div class="modal-overlay" id="modalAgregar" style="z-index:9000">
+  <div class="modal-box" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title">📦 Registrar producto nuevo</div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div style="padding:0 24px 4px;color:var(--muted);font-size:13px;line-height:1.5">
+      El código no existe en tu inventario. Completa los datos básicos para registrarlo y seguir con el ingreso.
+    </div>
+    <form id="formProducto">
+      <div style="padding:12px 24px 0;display:flex;flex-direction:column;gap:12px">
+        <div class="form-group">
+          <label class="form-label">📷 Código de barras</label>
+          <input id="inputCodigoBarra" class="form-input" type="text" placeholder="Código escaneado"
+                 style="background:rgba(0,199,123,0.07);border-color:rgba(0,199,123,0.35);font-weight:700;color:var(--verde)">
+          <span class="settings-field-hint" id="codigoHint" style="color:var(--verde)">✓ Código identificado desde el escáner</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nombre del producto *</label>
+          <input id="inputNombre" class="form-input" type="text" placeholder="Ej: Leche entera 1L">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-group">
+            <label class="form-label">Marca</label>
+            <input id="inputProveedor" class="form-input" type="text" placeholder="Ej: Nestlé, Carozzi...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Código interno</label>
+            <input id="inputCodigo" class="form-input" type="text" placeholder="Ej: LAC-001">
+          </div>
+        </div>
+        <!-- Campos ocultos para compatibilidad con saveProduct() -->
+        <input type="hidden" id="inputMarca" value="">
+        <input type="hidden" id="inputCategoria" value="">
+        <input type="hidden" id="inputStock" value="0">
+        <input type="hidden" id="inputStockMin" value="0">
+        <input type="hidden" id="inputPrecioCompra" value="0">
+        <input type="hidden" id="inputPorcentaje" value="0">
+        <input type="hidden" id="inputPrecioVenta" value="0">
+        <input type="hidden" id="inputLote" value="">
+        <input type="hidden" id="inputFechaVenc" value="">
+        <input type="hidden" id="inputDiasAlerta" value="30">
+        <span id="precioHint" style="display:none"></span>
+        <!-- [SEC-9] video de escáner movido fuera del form — evita stream embebido en form -->
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary">Cancelar</button>
+        <button type="button" class="btn-primary" id="btnSaveProductoRapido">✓ Registrar y agregar al ingreso</button>
+      </div>
+    </form>
+  </div>
+</div>
+<!-- [SEC-9] Video del escáner del modal Agregar — fuera del <form> para no interferir con submit -->
+<video id="videoEscaner" style="display:none"></video>
+
+<!-- MODAL: Nuevo Ingreso -->
+<div class="modal-overlay" id="modalMovimiento">
+  <div class="modal-box" style="max-width:620px;display:flex;flex-direction:column;max-height:90vh">
+    <div class="modal-header">
+      <div class="modal-title">📥 Nuevo Ingreso</div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div id="ingresoScrollArea" style="padding:16px 24px 0;overflow-y:auto;flex:1">
+      <!-- VISOR CÁMARA -->
+      <div id="escanerIngresoVisor" style="display:none;margin-bottom:12px;position:relative;border-radius:14px;overflow:hidden">
+        <video id="videoEscanerIngreso" style="width:100%;max-height:260px;object-fit:cover;display:block"></video>
+        <div style="position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center">
+          <div style="width:220px;height:130px;border:3px solid rgba(0,199,123,0.95);border-radius:12px;box-shadow:0 0 0 2000px rgba(0,0,0,0.38)"></div>
+        </div>
+        <button
+                style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.6);border:none;border-radius:50%;width:36px;height:36px;color:#fff;font-size:18px;cursor:pointer;line-height:1;z-index:2">✕</button>
+        <div style="position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,0.9);font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.9)">Apunta al código de barras</div>
+      </div>
+      <!-- Buscador -->
+      <div style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📦 Agregar producto al ingreso</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="movCodigoBuscar" class="form-input"
+                 style="background:none;border:none;font-size:15px;font-weight:600;padding:0;flex:1;outline:none"
+                 type="text" placeholder="Escanea el código o escribe el nombre...">
+          <button type="button"
+                  style="background:var(--verde);border:none;border-radius:10px;padding:8px 16px;color:#000;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap">📷 Cámara</button>
+        </div>
+        <div id="ingresoScanHint" style="font-size:12px;color:var(--muted);margin-top:6px">Escanea o escribe — Enter o "Agregar" para sumarlo al ingreso</div>
+      </div>
+      <!-- Chip producto encontrado -->
+      <div id="ingresoChip" style="display:none;background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:12px 14px;margin-bottom:12px;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font-size:22px">📦</div>
+          <div style="flex:1;min-width:0">
+            <div id="ingresoChipNombre" style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+            <div id="ingresoChipDetalle" style="font-size:11px;color:var(--muted);margin-top:1px"></div>
+          </div>
+          <div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:9px;overflow:hidden;flex-shrink:0">
+            <button type="button" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">−</button>
+            <input id="movCantidad" type="number" value="1" min="1" style="width:42px;background:none;border:none;color:var(--text);font-family:var(--font-head);font-size:16px;font-weight:800;text-align:center;outline:none">
+            <button type="button" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">+</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:90px">
+            <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px">PRECIO COMPRA</div>
+            <input id="movPrecioCompra" type="number" placeholder="$0" min="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:7px 10px;color:var(--text);font-size:13px;font-weight:700;outline:none">
+          </div>
+          <div style="flex:1;min-width:70px">
+            <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px">% GANANCIA</div>
+            <input id="movPorcentajeChip" type="number" placeholder="0%" min="0" max="999" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:7px 10px;color:var(--text);font-size:13px;font-weight:700;outline:none">
+          </div>
+          <div style="flex:1;min-width:90px">
+            <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px">PRECIO VENTA</div>
+            <input id="movPrecioVentaChip" type="number" placeholder="Calculado" min="0" style="width:100%;background:rgba(0,199,123,0.1);border:1px solid rgba(0,199,123,0.3);border-radius:9px;padding:7px 10px;color:var(--verde);font-size:13px;font-weight:800;outline:none">
+          </div>
+          <button type="button" style="background:var(--verde);border:none;border-radius:9px;padding:9px 16px;color:#000;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;align-self:flex-end">+ Agregar</button>
+        </div>
+        <div id="chipPrecioHint" style="font-size:11px;color:var(--verde);margin-top:-4px;display:none"></div>
+      </div>
+      <div style="margin-bottom:12px">
+        <select id="movProductoId" class="form-input" style="font-size:13px">
+          <option value="">— O selecciona de la lista —</option>
+        </select>
+      </div>
+      <div id="ingresoCarritoWrap" style="display:none;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📋 Productos en este ingreso</div>
+        <div id="ingresoCarritoLista" style="display:flex;flex-direction:column;gap:6px;max-height:150px;overflow-y:auto"></div>
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase">Unidades a ingresar</div>
+          <div id="ingresoTotalDetalle" style="font-size:11px;color:var(--muted);margin-top:2px">0 productos</div>
+        </div>
+        <div style="text-align:right">
+          <div id="ingresoTotalUnidades" style="font-family:var(--font-head);font-size:36px;font-weight:900;color:var(--verde);line-height:1">0</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">unidades</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
+        <div class="form-group"><label class="form-label">Proveedor</label><input id="movProveedor" class="form-input" type="text" placeholder="Ej: Distribuidora Norte"></div>
+        <div class="form-group"><label class="form-label">N° Documento</label><input id="movNumDocumento" class="form-input" type="text" placeholder="Factura, guía, orden..."></div>
+        <div class="form-group"><label class="form-label">Fecha de vencimiento</label><input id="movFechaVenc" class="form-input" type="date"></div>
+        <div class="form-group"><label class="form-label">Alertar X días antes</label><input id="movDiasAlerta" class="form-input" type="number" min="1" placeholder="30" value="30"></div>
+        <div class="form-group form-full"><label class="form-label">Nota u observación</label><input id="movNota" class="form-input" type="text" placeholder="Observación opcional"></div>
+        <input type="hidden" id="movMarca">
+        <input type="hidden" id="movCategoria">
+        <input type="hidden" id="movCodigoInterno">
+        <input type="hidden" id="movStockMin">
+        <input type="hidden" id="movPrecioCompraExtra">
+        <input type="hidden" id="movPorcentaje">
+        <input type="hidden" id="movPrecioVenta">
+        <input type="hidden" id="movLote">
+        <span id="movPrecioHint" style="display:none"></span>
+      </div>
+    </div>
+    <div class="form-actions" style="flex-shrink:0;border-top:1px solid var(--border);padding:16px 24px">
+      <button type="button" class="btn-secondary">Cancelar</button>
+      <button type="button" class="btn-primary" id="btnConfirmarIngreso" disabled style="opacity:0.5">✔ Confirmar ingreso</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Editar producto -->
+<div class="modal-overlay" id="modalEditar">
+  <div class="modal-box">
+    <div class="modal-header"><div class="modal-title">✏️ Editar producto</div><button class="modal-close">✕</button></div>
+    <input type="hidden" id="editId">
+    <form id="formEditar">
+      <div class="form-grid">
+        <div class="form-group form-full"><label class="form-label">Nombre del producto *</label><input id="editNombre" class="form-input" type="text"></div>
+        <div class="form-group"><label class="form-label">Código de barras</label><input id="editCodigoBarra" class="form-input" type="text"></div>
+        <div class="form-group"><label class="form-label">Código interno</label><input id="editCodigo" class="form-input" type="text"></div>
+        <div class="form-group"><label class="form-label">Marca</label><input id="editMarca" class="form-input" type="text"></div>
+        <div class="form-group"><label class="form-label">Proveedor</label><input id="editProveedor" class="form-input" type="text"></div>
+        <div class="form-group"><label class="form-label">Categoría</label><select id="editCategoria" class="form-input"><option value="">Sin categoría</option><option>Lácteos</option><option>Bebestibles</option><option>Snacks</option><option>Granos</option><option>Limpieza</option><option>Panadería</option><option>Congelados</option><option>Carnes</option><option>Frutas y Verduras</option><option>Otro</option></select></div>
+        <div class="form-group"><label class="form-label">Stock mínimo 🔔</label><input id="editStockMin" class="form-input" type="number" min="0"></div>
+        <div class="form-group"><label class="form-label">Precio compra</label><input id="editPrecioCompra" class="form-input" type="number" min="0"></div>
+        <div class="form-group"><label class="form-label">% Ganancia</label><input id="editPorcentaje" class="form-input" type="number" min="0"></div>
+        <div class="form-group"><label class="form-label">Precio venta</label><input id="editPrecioVenta" class="form-input" type="number" min="0"><span class="settings-field-hint" id="editPrecioHint" style="color:var(--verde)"></span></div>
+        <div class="form-group"><label class="form-label">Número de lote</label><input id="editLote" class="form-input" type="text"></div>
+        <div class="form-group"><label class="form-label">Fecha de vencimiento</label><input id="editFechaVenc" class="form-input" type="date"></div>
+        <div class="form-group"><label class="form-label">Alertar X días antes</label><input id="editDiasAlerta" class="form-input" type="number" min="1"></div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary">Cancelar</button>
+        <button type="button" class="btn-primary">✓ Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: Eliminar producto -->
+<div class="modal-overlay" id="modalEliminar">
+  <div class="modal-box" style="max-width:380px">
+    <div class="modal-header"><div class="modal-title" style="color:var(--rojo)">⚠️ Eliminar producto</div></div>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:24px" id="eliminarMsg">Esta acción no se puede deshacer.</p>
+    <div class="form-actions">
+      <button type="button" class="btn-secondary">Cancelar</button>
+      <button type="button" class="btn-primary" style="background:var(--rojo)">🗑️ Eliminar permanentemente</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Carrito de ventas -->
+<div class="modal-overlay" id="modalSalida">
+  <div class="modal-box" style="max-width:620px;display:flex;flex-direction:column;max-height:90vh">
+    <div class="modal-header">
+      <div class="modal-title" id="modalSalidaTitulo">🛒 Nueva venta</div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div style="padding:16px 24px 0;overflow-y:auto;flex:1">
+      <div id="scanBox" style="background:var(--bg3);border:2px dashed var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📷 Agregar producto al carrito</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="salidaCodigoBarra" class="form-input"
+                 style="background:none;border:none;font-size:15px;font-weight:600;padding:0;flex:1;outline:none"
+                 type="text" placeholder="Escanea el código o escribe el nombre...">
+          <button type="button"
+                  style="background:var(--bg4);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-size:16px;cursor:pointer">📷</button>
+        </div>
+        <div id="salidaScanHint" style="font-size:12px;color:var(--muted);margin-top:6px">Escanea o escribe — Enter o "Agregar" para sumarlo al carrito</div>
+        <video id="videoEscanerSalida" style="display:none;width:100%;height:180px;object-fit:cover;border-radius:10px;margin-top:8px"></video>
+      </div>
+      <div id="productoChip" style="display:none;background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:12px 14px;margin-bottom:12px;align-items:center;gap:10px">
+        <div style="font-size:22px">📦</div>
+        <div style="flex:1;min-width:0">
+          <div id="chipNombre" style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+          <div id="chipDetalle" style="font-size:11px;color:var(--muted);margin-top:1px"></div>
+        </div>
+        <div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:9px;overflow:hidden;flex-shrink:0">
+          <button type="button" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">−</button>
+          <input id="salidaCantidad" type="number" value="1" min="1" style="width:42px;background:none;border:none;color:var(--text);font-family:var(--font-head);font-size:16px;font-weight:800;text-align:center;outline:none">
+          <button type="button" style="background:none;border:none;color:var(--text);font-size:16px;font-weight:700;width:34px;height:36px;cursor:pointer">+</button>
+        </div>
+        <input id="salidaPrecioUnitario" type="number" placeholder="Precio" style="width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px;color:var(--text);font-size:13px;font-weight:600;outline:none;flex-shrink:0">
+        <button type="button" id="btnAgregarCarrito" style="background:var(--verde);border:none;border-radius:9px;padding:8px 14px;color:#000;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">+ Agregar</button>
+      </div>
+      <div style="margin-bottom:12px">
+        <select id="salidaProductoId" class="form-input" style="font-size:13px">
+          <option value="">— O selecciona de la lista —</option>
+        </select>
+      </div>
+      <div id="carritoWrap" style="display:none;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">🧾 Productos en esta venta</div>
+        <div id="carritoLista" style="display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto"></div>
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.5px;text-transform:uppercase">Total de la venta</div>
+          <div id="totalDetalle" style="font-size:11px;color:var(--muted);margin-top:2px">0 productos</div>
+        </div>
+        <div id="totalValor" style="font-family:var(--font-head);font-size:26px;font-weight:800;color:var(--verde)">$0</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
+        <div class="form-group form-full">
+          <label class="form-label">Cliente</label>
+          <input id="salidaCliente" class="form-input" type="text" placeholder="Nombre del cliente (opcional)">
+          <div style="display:flex;align-items:center;gap:6px;background:rgba(91,142,255,0.1);border:1px solid rgba(91,142,255,0.25);border-radius:8px;padding:7px 12px;margin-top:5px;cursor:pointer;font-size:12px;color:var(--azul);font-weight:600">👤 Cliente Genérico</div>
+        </div>
+        <div class="form-group"><label class="form-label">N° Documento</label><input id="salidaDocumento" class="form-input" type="text" placeholder="Boleta, factura..."></div>
+        <div class="form-group form-full">
+          <label class="form-label">Método de pago *</label>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px" id="metodoPagoGrid">
+            <button type="button" class="metodo-pago-btn active" data-metodo="efectivo">💵 Efectivo</button>
+            <button type="button" class="metodo-pago-btn"        data-metodo="tarjeta"       id="btnMetodoTarjeta">💳 Tarjeta</button>
+            <button type="button" class="metodo-pago-btn fiado"  data-metodo="fiado">📒 Crédito</button>
+            <button type="button" class="metodo-pago-btn"        data-metodo="transferencia">📱 Transferencia</button>
+            <button type="button" class="metodo-pago-btn"        data-metodo="mixto" style="grid-column:1/-1">🔀 Pago Mixto (varios métodos)</button>
+          </div>
+          <!-- Mini-modal tipo tarjeta -->
+          <div id="tarjetaSubModal" style="display:none;margin-top:10px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 14px">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;margin-bottom:8px">TIPO DE TARJETA</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <button type="button" class="metodo-pago-btn" id="btnTarjetaDebito"  data-subtipo="debito">💳 Débito</button>
+              <button type="button" class="metodo-pago-btn" id="btnTarjetaCredito" data-subtipo="credito">💳 Crédito</button>
+            </div>
+          </div>
+          <div id="pagoMixtoPanel" style="display:none;margin-top:12px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px">
+            <div style="text-align:center;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Total a distribuir</div>
+              <div id="mixtoTotalVenta" style="font-family:var(--font-head);font-size:28px;font-weight:900;color:var(--text)">$0</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💵 Efectivo</label><input id="mixtoEfectivo" class="form-input" type="number" min="0" placeholder="0"></div>
+              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💳 Débito</label><input id="mixtoDebito" class="form-input" type="number" min="0" placeholder="0"></div>
+              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">💳 Crédito</label><input id="mixtoCredito" class="form-input" type="number" min="0" placeholder="0"></div>
+              <div><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">📱 Transferencia</label><input id="mixtoTransferencia" class="form-input" type="number" min="0" placeholder="0"></div>
+            </div>
+            <div style="margin-top:12px">
+              <div style="height:6px;background:var(--bg2);border-radius:99px;overflow:hidden;margin-bottom:8px">
+                <div id="mixtoBarra" style="height:100%;background:var(--verde);border-radius:99px;transition:width 0.2s;width:0%"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+                <span style="color:var(--muted)">Asignado: <strong id="mixtoAsignado" style="color:var(--verde)">$0</strong></span>
+                <span id="mixtoRestanteLabel" style="color:var(--azul);font-weight:700">Falta: <span id="mixtoRestante">$0</span></span>
+              </div>
+            </div>
+            <div id="mixtoAlertaExceso" style="display:none;margin-top:10px;background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--rojo)">
+              ⚠️ <strong>El monto asignado supera el total de la venta.</strong> Ajusta los valores.
+            </div>
+          </div>
+          <div id="fiadoAviso" style="display:none;margin-top:8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:#f59e0b">
+            ⚠️ <strong>Venta a crédito</strong> — El cliente lleva el producto y paga después. El nombre del cliente es <strong>obligatorio</strong>.
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Nota</label><input id="salidaMotivo" class="form-input" type="text" placeholder="Observación opcional"></div>
+      </div>
+    </div>
+    <div class="form-actions" style="flex-shrink:0;border-top:1px solid var(--border);padding:16px 24px">
+      <button type="button" class="btn-secondary">Cancelar</button>
+      <button type="button" class="btn-primary" id="btnConfirmarVenta" disabled style="opacity:0.5">✔ Confirmar venta</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Resolver cuarentena -->
+<div class="modal-overlay" id="modalResolucion">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header"><div class="modal-title">⚠️ Resolver cuarentena</div><button class="modal-close">✕</button></div>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Decide el destino final del producto en cuarentena.</p>
+    <form id="formResolucion">
+      <div class="form-grid">
+        <div class="form-group form-full">
+          <label class="form-label">Resolución *</label>
+          <select id="resolucionEstado" class="form-input">
+            <option value="">Seleccionar resolución...</option>
+            <option value="reingresado">🔄 Reingresar al stock (producto apto)</option>
+            <option value="descartado">🚫 Descartar (dado de baja definitiva)</option>
+            <option value="enviado_proveedor">📦 Enviar al proveedor (devolución)</option>
+          </select>
+        </div>
+        <div class="form-group form-full"><label class="form-label">Nota de resolución</label><input id="resolucionNota" class="form-input" type="text" placeholder="Ej: Inspección aprobada, lote retirado..."></div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary">Cancelar</button>
+        <button type="button" class="btn-primary">✔ Confirmar resolución</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"><span id="toastMsg">¡Guardado!</span></div>
+
+<!-- MODAL: Cambio de plan -->
+<div class="modal-overlay" id="modalUpgrade">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">🔄 Cambiar Plan</div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div style="padding:0 24px 24px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">
+        <div id="cardPlanGratis" style="border:2px solid var(--border);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">🆓 Gratis</div>
+          <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:8px">$0<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
+          <div style="font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:5px">
+            <div>✓ 1 usuario</div><div>✓ Hasta 30 productos</div><div>✓ Inventario básico</div><div>✓ Ventas y entradas</div>
+            <div style="color:var(--rojo)">✗ Sin reportes</div><div style="color:var(--rojo)">✗ Marca de agua</div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--muted);background:var(--bg3);border-radius:8px;padding:6px 10px">🎯 Para probar YeparStock</div>
+        </div>
+        <div id="cardPlanBasico" style="border:2px solid var(--verde);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s;background:rgba(0,199,123,0.03)">
+          <div style="font-size:11px;color:var(--verde);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;font-weight:700">🟢 Básico</div>
+          <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:8px">$9.99 + IVA<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
+          <div style="font-size:11px;display:flex;flex-direction:column;gap:5px">
+            <div style="color:var(--verde)">✓ Usuarios ilimitados</div><div style="color:var(--verde)">✓ Productos ilimitados</div>
+            <div style="color:var(--verde)">✓ Ventas, ingresos, alertas</div><div style="color:var(--verde)">✓ Reportes básicos</div>
+            <div style="color:var(--verde)">✓ Soporte WhatsApp</div><div style="color:var(--muted)">✗ Sin multisucursales</div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--verde);background:rgba(0,199,123,0.08);border-radius:8px;padding:6px 10px">🎯 Comercios y tiendas</div>
+        </div>
+        <div id="cardPlanPro" style="border:2px solid var(--azul);border-radius:14px;padding:14px;cursor:pointer;transition:all 0.2s;background:rgba(91,142,255,0.04)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div style="font-size:11px;color:var(--azul);text-transform:uppercase;letter-spacing:1px;font-weight:700">🔵 Pro</div>
+            <div style="font-size:10px;background:var(--azul);color:#fff;border-radius:20px;padding:2px 8px;font-weight:700">POPULAR</div>
+          </div>
+          <div style="font-family:var(--font-head);font-size:22px;font-weight:800;margin-bottom:8px">$19.99 + IVA<span style="font-size:12px;font-weight:400;color:var(--muted)">/mes</span></div>
+          <div style="font-size:11px;display:flex;flex-direction:column;gap:5px">
+            <div style="color:var(--verde)">✓ Todo lo del Básico</div><div style="color:var(--verde)">✓ Usuarios ilimitados</div>
+            <div style="color:var(--verde)">✓ Productos ilimitados</div><div style="color:var(--azul);font-weight:700">✓ 🏪 Multisucursales</div>
+            <div style="color:var(--verde)">✓ Reportes avanzados</div><div style="color:var(--verde)">✓ Exportar Excel / PDF</div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--azul);background:rgba(91,142,255,0.08);border-radius:8px;padding:6px 10px">🎯 Negocios en crecimiento</div>
+        </div>
+      </div>
+      <div style="background:rgba(0,199,123,0.08);border:1px solid rgba(0,199,123,0.25);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:12px">
+        🎉 <strong>Precio fundador:</strong> Primeros 50 negocios acceden a Pro por <strong>$14.99 + IVA/mes de por vida</strong>. ¡Pocos cupos disponibles!
+      </div>
+      <div id="upgradeMensaje" style="display:none;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px"></div>
+      <button id="btnConfirmarPlan" class="btn-primary" disabled style="width:100%;justify-content:center;padding:13px;font-size:15px;opacity:0.5">
+        Selecciona un plan para continuar
+      </button>
+      <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:10px">El cambio es inmediato · Sin compromiso</p>
+      <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;display:flex;justify-content:center">
+        <button id="btnCancelarSuscripcionModal" style="background:transparent;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline">
+          ❌ Cancelar suscripción
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Invitar usuario al equipo -->
+<div class="modal-overlay" id="modalInvitar">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">👤 Agregar colaborador</div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div style="padding:0 24px 8px;color:var(--muted);font-size:13px">
+      El colaborador podrá acceder al inventario de <strong id="invitarEmpresaNombre">tu negocio</strong> con su usuario y contraseña.
+    </div>
+    <form id="formInvitar">
+      <div style="padding:0 24px">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Nombre *</label>
+            <input id="invitarNombre" class="form-input" type="text" placeholder="Ej: María"
+                   autocomplete="off" style="text-transform:none">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Apellido *</label>
+            <input id="invitarApellido" class="form-input" type="text" placeholder="Ej: Pérez"
+                   autocomplete="off" style="text-transform:none">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label">
+            Usuario
+            <span style="font-weight:400;color:var(--muted);font-size:11px"> — se genera solo, puedes editarlo</span>
+          </label>
+          <div style="position:relative">
+            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;font-family:monospace;pointer-events:none">@</span>
+            <input id="invitarUsername" class="form-input" type="text"
+                   style="padding-left:26px;font-family:monospace;background:var(--bg3);text-transform:none"
+                   placeholder="nombre.apellido"
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+          <span class="settings-field-hint">Solo letras minúsculas, números, punto y guión bajo</span>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label">Contraseña temporal * <span style="font-weight:400;color:var(--muted)">(mínimo 8 caracteres)</span></label>
+          <input id="invitarPassword" class="form-input" type="password" placeholder="Mínimo 8 caracteres"
+                 autocomplete="new-password">
+          <span class="settings-field-hint">Comparte esta contraseña con el colaborador — puede cambiarla después</span>
+        </div>
+
+        <div class="form-group" style="margin-bottom:20px">
+          <label class="form-label">Rol *</label>
+          <select id="invitarRol" class="form-input">
+            <option value="operador">👷 Operador — puede registrar ventas y movimientos</option>
+            <option value="lider">🏪 Líder — administra una sucursal (casi igual que admin, pero solo su sucursal)</option>
+            <option value="admin">🔑 Admin — acceso completo incluyendo configuración</option>
+          </select>
+          <!-- Selector de sucursal — solo visible si se elige Líder -->
+          <div id="invitarSucursalWrap" style="display:none;margin-top:10px">
+            <label class="form-label">Sucursal a cargo *</label>
+            <select id="invitarSucursal" class="form-input">
+              <option value="">Selecciona una sucursal...</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary">Cancelar</button>
+        <button type="button" class="btn-primary">✓ Agregar colaborador</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/events.js"></script>
+
+<!-- ============================================================
+     [SEC-10] Service Worker + logoFallback — movidos a js/sw-init.js
+     El CSP con script-src 'self' bloquea scripts inline.
+     Analogia: el portero no acepta instrucciones verbales (inline),
+     solo admite documentos firmados (archivos .js del servidor).
+============================================================ -->
+<script src="js/sw-init.js"></script>
+</body>
+</html>
