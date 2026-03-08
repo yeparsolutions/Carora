@@ -193,6 +193,7 @@ document.addEventListener('DOMContentLoaded', function () {
     { id: 'nav-alertas',     screen: 'alertas' },
     { id: 'nav-reportes',    screen: 'reportes' },
     { id: 'nav-fiados',      screen: 'fiados' },
+    { id: 'nav-sucursales',  screen: 'sucursales' },
     { id: 'nav-equipo',      screen: 'equipo' },
     { id: 'nav-settings',    screen: 'settings' },
   ];
