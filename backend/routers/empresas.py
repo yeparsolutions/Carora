@@ -266,6 +266,107 @@ async def actualizar_empresa(
     return {"mensaje": "Empresa actualizada correctamente"}
 
 
+# ── INVITAR COLABORADOR ──────────────────────────────────────
+@router.post("/invitar")
+async def invitar_colaborador(
+    datos:          dict,
+    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
+    db:             Session = Depends(get_db)
+):
+    """
+    Crea un nuevo usuario colaborador en la empresa.
+    Solo admin puede invitar. Devuelve el usuario creado con su id
+    para que el frontend pueda asignarlo a una sucursal si es líder.
+    """
+    if usuario_actual.rol != "admin":
+        raise HTTPException(status_code=403, detail="Solo el admin puede agregar colaboradores")
+
+    nombre   = (datos.get("nombre")   or "").strip()
+    username = (datos.get("username") or "").strip().lower()
+    password = (datos.get("password") or "").strip()
+    rol      = (datos.get("rol")      or "operador").strip()
+
+    if not nombre or not username or not password:
+        raise HTTPException(status_code=400, detail="nombre, username y password son obligatorios")
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
+    if rol not in ("operador", "lider", "admin"):
+        raise HTTPException(status_code=400, detail="Rol inválido")
+
+    # Username único dentro de la empresa
+    existe = db.query(Usuario).filter(Usuario.username == username).first()
+    if existe:
+        raise HTTPException(status_code=409, detail=f"El usuario '@{username}' ya está en uso")
+
+    from auth import hashear_password
+    nuevo = Usuario(
+        nombre     = nombre,
+        username   = username,
+        password   = hashear_password(password),
+        rol        = rol,
+        empresa_id = usuario_actual.empresa_id,
+        activo     = True,
+    )
+    db.add(nuevo)
+    db.commit()
+    db.refresh(nuevo)
+
+    return _usuario_dict(nuevo)
+
+
+# ── CAMBIAR ROL ───────────────────────────────────────────────
+@router.patch("/usuarios/{usuario_id}/rol")
+async def cambiar_rol(
+    usuario_id:     int,
+    rol:            str,
+    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
+    db:             Session = Depends(get_db)
+):
+    if usuario_actual.rol != "admin":
+        raise HTTPException(status_code=403, detail="Solo el admin puede cambiar roles")
+    if rol not in ("operador", "lider", "admin"):
+        raise HTTPException(status_code=400, detail="Rol inválido")
+
+    usuario = db.query(Usuario).filter(
+        Usuario.id         == usuario_id,
+        Usuario.empresa_id == usuario_actual.empresa_id
+    ).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if usuario.id == usuario_actual.id:
+        raise HTTPException(status_code=400, detail="No puedes cambiar tu propio rol")
+
+    usuario.rol = rol
+    db.commit()
+    return {"mensaje": f"Rol actualizado a {rol}", "usuario_id": usuario_id}
+
+
+# ── ACTIVAR / DESACTIVAR USUARIO ─────────────────────────────
+@router.patch("/usuarios/{usuario_id}/estado")
+async def cambiar_estado_usuario(
+    usuario_id:     int,
+    datos:          dict,
+    usuario_actual: Usuario = Depends(auth_utils.get_current_user),
+    db:             Session = Depends(get_db)
+):
+    if usuario_actual.rol != "admin":
+        raise HTTPException(status_code=403, detail="Solo el admin puede activar/desactivar usuarios")
+
+    usuario = db.query(Usuario).filter(
+        Usuario.id         == usuario_id,
+        Usuario.empresa_id == usuario_actual.empresa_id
+    ).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if usuario.id == usuario_actual.id:
+        raise HTTPException(status_code=400, detail="No puedes desactivarte a ti mismo")
+
+    usuario.activo = datos.get("activo", True)
+    db.commit()
+    estado = "activado" if usuario.activo else "desactivado"
+    return {"mensaje": f"Usuario {estado}", "usuario_id": usuario_id}
+
+
 # ── HELPER INTERNO ───────────────────────────────────────────
 def _usuario_dict(u: Usuario) -> dict:
     """Convierte un objeto Usuario en dict para la API."""
