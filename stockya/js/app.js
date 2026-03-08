@@ -3977,7 +3977,7 @@ function renderEquipoTabla(usuarios) {
 /* ============================================================
    MODAL — Invitar usuario al equipo
    ============================================================ */
-function abrirModalInvitar() {
+async function abrirModalInvitar() {
   if (!esAdmin) return;
   document.getElementById("modalInvitar").classList.add("open");
   document.getElementById("formInvitar").reset();
@@ -3986,6 +3986,30 @@ function abrirModalInvitar() {
   if (empresaInfo) {
     var nomEmp = document.getElementById("invitarEmpresaNombre");
     if (nomEmp) nomEmp.textContent = empresaInfo.nombre;
+  }
+  // Ocultar selector de sucursal al abrir
+  var wrap = document.getElementById("invitarSucursalWrap");
+  if (wrap) wrap.style.display = "none";
+
+  // Cargar sucursales disponibles para lider
+  try {
+    var sucursales = await api("/sucursales/");
+    var sel = document.getElementById("invitarSucursal");
+    if (sel && sucursales && sucursales.length > 0) {
+      sel.innerHTML = "<option value=''>Selecciona una sucursal...</option>"
+        + sucursales.filter(function(s){ return s.activa; }).map(function(s){
+            return "<option value='" + s.id + "'>" + _esc(s.nombre) + "</option>";
+          }).join("");
+    }
+  } catch(e) {}
+
+  // Mostrar/ocultar selector según rol elegido
+  var rolSel = document.getElementById("invitarRol");
+  if (rolSel) {
+    rolSel.onchange = function() {
+      var wrap = document.getElementById("invitarSucursalWrap");
+      if (wrap) wrap.style.display = this.value === "lider" ? "block" : "none";
+    };
   }
 }
 
@@ -4033,13 +4057,31 @@ async function guardarInvitacion() {
   var btn = document.querySelector("#modalInvitar .btn-primary");
   if (btn) { btn.disabled = true; btn.textContent = "Guardando..."; }
 
+  // Si es líder, validar que haya sucursal seleccionada
+  var sucursalId = null;
+  if (rol === "lider") {
+    sucursalId = parseInt(document.getElementById("invitarSucursal")?.value || "0");
+    if (!sucursalId) { showToast("Selecciona la sucursal que administrará el líder"); return; }
+  }
+
   try {
-    await api("/empresa/invitar", "POST", {
+    var nuevoUsuario = await api("/empresa/invitar", "POST", {
       nombre:   nombreCompleto,
       username: username,
       password: password,
       rol:      rol
     });
+    // Si es líder, asignarlo a la sucursal elegida
+    if (rol === "lider" && sucursalId && nuevoUsuario && nuevoUsuario.id) {
+      try {
+        await api("/sucursales/" + sucursalId + "/colaboradores", "POST", {
+          usuario_id: nuevoUsuario.id,
+          rol:        "lider"
+        });
+      } catch(eAsign) {
+        console.warn("No se pudo asignar sucursal al líder:", eAsign.message);
+      }
+    }
     showToast("✅ " + _esc(nombreCompleto) + " agregado — @" + _esc(username));
     cerrarModalInvitar();
     await cargarEquipo();
