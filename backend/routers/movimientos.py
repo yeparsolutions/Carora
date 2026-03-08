@@ -12,6 +12,14 @@ from database import get_db
 from auth import get_usuario_actual
 import models, schemas
 
+
+def get_sucursal_filtro(usuario_actual: models.Usuario, sucursal_id_param: int = None):
+    """Líder/Operador solo ve su sucursal. Admin ve todo o filtra por parámetro."""
+    rol = usuario_actual.rol.value if hasattr(usuario_actual.rol, "value") else usuario_actual.rol
+    if rol == "admin":
+        return sucursal_id_param or None
+    return usuario_actual.sucursal_id or None
+
 router = APIRouter(prefix="/movimientos", tags=["Movimientos"])
 
 
@@ -38,25 +46,25 @@ def movimiento_a_dict(m):
 # ============================================================
 @router.get("/", response_model=List[schemas.MovimientoRespuesta])
 def listar_movimientos(
-    tipo:      Optional[str] = None,
-    buscar:    Optional[str] = None,
-    categoria: Optional[str] = None,
-    desde:     Optional[str] = None,
-    hasta:     Optional[str] = None,
-    limit:     int = 500,
-    db:        Session = Depends(get_db),
+    tipo:        Optional[str] = None,
+    buscar:      Optional[str] = None,
+    categoria:   Optional[str] = None,
+    desde:       Optional[str] = None,
+    hasta:       Optional[str] = None,
+    limit:       int = 500,
+    sucursal_id: Optional[int] = None,
+    db:          Session = Depends(get_db),
     usuario_actual: models.Usuario = Depends(get_usuario_actual)
 ):
+    suc_filtro = get_sucursal_filtro(usuario_actual, sucursal_id)
     query = db.query(models.Movimiento).options(
         joinedload(models.Movimiento.producto),
         joinedload(models.Movimiento.usuario)
     ).filter(
-        models.Movimiento.usuario_id.in_(
-            db.query(models.Usuario.id).filter(
-                models.Usuario.empresa_id == usuario_actual.empresa_id
-            )
-        )
+        models.Movimiento.empresa_id == usuario_actual.empresa_id
     )
+    if suc_filtro:
+        query = query.filter(models.Movimiento.sucursal_id == suc_filtro)
 
     if tipo:
         query = query.filter(models.Movimiento.tipo == tipo)
@@ -132,6 +140,7 @@ def registrar_movimiento(
 
     producto.stock_actual = stock_nuevo
 
+    suc_id = get_sucursal_filtro(usuario_actual)
     movimiento = models.Movimiento(
         producto_id    = datos.producto_id,
         empresa_id     = usuario_actual.empresa_id,
@@ -143,6 +152,7 @@ def registrar_movimiento(
         nota           = datos.nota,
         lote           = datos.lote,
         num_documento  = getattr(datos, "num_documento", None),
+        sucursal_id    = suc_id,
     )
     db.add(movimiento)
     db.commit()
