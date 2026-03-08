@@ -1037,6 +1037,23 @@ input[type="text"]::placeholder { text-transform: none; }
       <div id="sucursalesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
         <div style="text-align:center;padding:60px;color:var(--muted);grid-column:1/-1">Cargando sucursales...</div>
       </div>
+
+      <!-- Card de equipo de la sucursal seleccionada -->
+      <div id="sucursalColaboradoresCard" class="card" style="display:none;margin-top:20px;padding:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div>
+            <div style="font-size:16px;font-weight:700">👥 Equipo — <span id="sucursalColabNombre"></span></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">Colaboradores asignados a esta sucursal</div>
+          </div>
+          <button class="btn-primary" id="btnAsignarColaborador" style="font-size:13px;padding:8px 14px">+ Asignar colaborador</button>
+        </div>
+        <table class="table" style="width:100%">
+          <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th></th></tr></thead>
+          <tbody id="sucursalColabTableBody">
+            <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">Selecciona una sucursal</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
   </main>
